@@ -216,63 +216,150 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       </div>
 
       {/* Main container: Two-column layout (Brand Identity + Login Card) */}
-      <main className="relative z-10 w-full max-w-[1080px] mx-auto pt-10 sm:pt-16 lg:pt-24 pb-12 px-4 sm:px-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-10 lg:gap-14">
+      <main className="relative z-10 w-full max-w-[1160px] mx-auto pt-8 sm:pt-12 lg:pt-14 pb-12 px-4 sm:px-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-10 lg:gap-12">
         
-        {/* Left Column: Brand Identity & Institutional Motto */}
-        <section className="w-full lg:w-[560px] text-center lg:text-left lg:pt-4 flex flex-col items-center lg:items-start">
-          <div className="flex items-center gap-3.5 mb-5 justify-center lg:justify-start">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-3 shadow-sm border border-[#e5eeff] flex items-center justify-center shrink-0">
+        {/* Left Column: Brand Identity, Academic Metrics & Institutional Pillars */}
+        <section className="w-full lg:w-[620px] text-left flex flex-col items-center lg:items-start">
+          
+          {/* Top Institutional Eyebrow / Badges */}
+          <div className="flex flex-wrap items-center gap-2 mb-4 justify-center lg:justify-start">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00288e]/10 border border-[#00288e]/20 text-[#00288e] text-xs font-bold uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[15px]">account_balance</span>
+              Portal Institucional Oficial
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#dce9ff] text-[#0b1c30] text-xs font-semibold shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              I.E. Vallejuelos • Medellín
+            </span>
+          </div>
+
+          {/* Logo brand & Identity */}
+          <div className="flex items-center gap-4 mb-4 justify-center lg:justify-start">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-3 shadow-md border border-[#e5eeff] flex items-center justify-center shrink-0">
               <img
                 src={ASSETS.logo}
                 alt="Edulink School Logo"
                 className="w-full h-full object-contain"
               />
             </div>
-            <div className="flex items-baseline">
-              <span className="text-[#00288e] font-extrabold text-[44px] sm:text-[54px] tracking-tight leading-none">
-                edulink
-              </span>
-              <span className="text-[#0051d5] font-bold text-[30px] sm:text-[38px] tracking-tight ml-2">
-                school
-              </span>
+            <div>
+              <div className="flex items-baseline leading-none">
+                <span className="text-[#00288e] font-black text-[38px] sm:text-[48px] tracking-tight">
+                  edulink
+                </span>
+                <span className="text-[#0051d5] font-extrabold text-[26px] sm:text-[34px] tracking-tight ml-2">
+                  school
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold text-[#555869] mt-1">
+                Sistema Integral de Gestión Académica y Comunitaria
+              </p>
             </div>
           </div>
 
-          <h2 className="text-[#0b1c30] text-2xl sm:text-3xl lg:text-[32px] font-bold leading-snug max-w-[540px] mb-4 tracking-tight">
-            Plataforma institucional de gestión curricular, calificaciones y comunidad académica.
+          {/* Main Headline */}
+          <h2 className="text-[#0b1c30] text-2xl sm:text-3xl font-extrabold leading-snug max-w-[580px] mb-3 tracking-tight text-center lg:text-left">
+            Gestión curricular, calificaciones y acompañamiento en una sola plataforma.
           </h2>
 
-          <p className="text-[#444653] text-base sm:text-lg leading-relaxed max-w-[500px] mb-6">
-            Conecta en tiempo real a estudiantes, docentes, acudientes y equipo directivo en un entorno seguro y unificado.
+          {/* Institutional Narrative */}
+          <p className="text-[#444653] text-sm sm:text-base leading-relaxed max-w-[560px] mb-6 text-center lg:text-left">
+            Diseñada para articular en tiempo real a estudiantes, docentes, familias y directivos de la I.E. Vallejuelos, garantizando transparencia académica y comunicación continua.
           </p>
 
-          {/* Institutional Trust Badge */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white border border-[#dce9ff] text-[#0b1c30] text-sm font-semibold shadow-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Institución Educativa Vallejuelos • Jornada 6:15 AM - 12:15 PM</span>
+          {/* Institutional Fast Facts Bar (Metrics / Quick Indicators) */}
+          <div className="w-full max-w-[580px] mb-6 grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-white border border-[#dce9ff] shadow-xs">
+            <div className="flex flex-col items-center lg:items-start px-2 py-1 border-r border-[#eff4ff] last:border-r-0">
+              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Jornada</span>
+              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">6:15 - 12:15</span>
+              <span className="text-[10px] text-[#757684]">Mañana</span>
+            </div>
+            <div className="flex flex-col items-center lg:items-start px-2 py-1 border-r border-[#eff4ff] last:border-r-0">
+              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Cobertura</span>
+              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">6° a 11°</span>
+              <span className="text-[10px] text-[#757684]">12 Grupos (1 y 2)</span>
+            </div>
+            <div className="flex flex-col items-center lg:items-start px-2 py-1">
+              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Comunidad</span>
+              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">4 Perfiles</span>
+              <span className="text-[10px] text-[#757684]">Conectados</span>
+            </div>
           </div>
 
-          {/* Institutional Feature Highlights */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-[500px]">
-            <div className="p-4 bg-white/90 rounded-2xl border border-[#dce9ff] text-left shadow-xs">
-              <div className="flex items-center gap-2 text-[#00288e] font-bold text-sm mb-1">
-                <span className="material-symbols-outlined text-[20px]">verified_user</span>
-                <span>Acceso Seguro</span>
+          {/* Organized Institutional Pillars (2x2 Grid) */}
+          <div className="w-full max-w-[580px] grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            
+            {/* Pillar 1: Curricular & Grades */}
+            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-8 h-8 rounded-xl bg-[#eff4ff] text-[#00288e] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[19px]">fact_check</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
+                  Calificaciones al Día
+                </h4>
               </div>
-              <p className="text-sm text-[#444653] leading-relaxed">
-                Ingreso con correo institucional o número de documento de identidad registrado.
+              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
+                Registro y consulta inmediata de periodos académicos, notas por taller y promedios ponderados.
               </p>
             </div>
-            <div className="p-4 bg-white/90 rounded-2xl border border-[#dce9ff] text-left shadow-xs">
-              <div className="flex items-center gap-2 text-[#0051d5] font-bold text-sm mb-1">
-                <span className="material-symbols-outlined text-[20px]">groups</span>
-                <span>Comunidad 6° a 11°</span>
+
+            {/* Pillar 2: Family & School Bond */}
+            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-8 h-8 rounded-xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[19px]">family_restroom</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
+                  Vínculo Escuela - Familia
+                </h4>
               </div>
-              <p className="text-sm text-[#444653] leading-relaxed">
-                Gestión estructurada por grupos (6°1 a 11°2) y seguimiento académico al día.
+              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
+                Canal directo para acudientes: seguimiento de boletines, comunicados y citaciones con docentes.
+              </p>
+            </div>
+
+            {/* Pillar 3: Academic Groups & Cycles */}
+            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-8 h-8 rounded-xl bg-[#f0fdf4] text-[#16a34a] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[19px]">domain</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
+                  Estructura 6°1 a 11°2
+                </h4>
+              </div>
+              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
+                Distribución curricular ordenada en secundaria básica y media técnica en dos grupos por nivel.
+              </p>
+            </div>
+
+            {/* Pillar 4: Security & Verified Identity */}
+            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-8 h-8 rounded-xl bg-[#fef3c7] text-[#d97706] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[19px]">verified_user</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
+                  Acceso y Protección
+                </h4>
+              </div>
+              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
+                Ingreso protegido con documento de identidad o correo institucional y política de datos garantizada.
               </p>
             </div>
           </div>
+
+          {/* Institutional Support & Help Banner */}
+          <div className="w-full max-w-[580px] p-3.5 rounded-xl bg-[#f0f4fd] border border-[#d2dff6] flex items-center gap-3 text-left">
+            <span className="material-symbols-outlined text-[22px] text-[#00288e] shrink-0">
+              support_agent
+            </span>
+            <div className="text-xs text-[#334155] leading-snug">
+              <span className="font-bold text-[#00288e]">Atención Institucional:</span> Secretaría Académica disponible de lunes a viernes en la sede Vallejuelos para trámites de matrícula y carnetización.
+            </div>
+          </div>
+
         </section>
 
         {/* Right Column: Login Card */}
