@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Registered user in Edulink School",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "teacher", "family"] },
+        "createdAt": { "type": "string" },
+        "hasConfigured": { "type": "boolean" },
+        "institution": { "type": "string" }
+      },
+      "required": ["id", "email", "fullName", "role"]
+    },
+    "UserSubject": {
+      "title": "User Subject",
+      "description": "Subject configured by a student or teacher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "teacher": { "type": "string" },
+        "code": { "type": "string" },
+        "schedule": { "type": "string" },
+        "grade": { "type": "number" },
+        "progress": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "RegisteredEmail": {
+      "title": "Registered Email Index",
+      "description": "Index of registered user emails to verify registration status",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "registeredAt": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles"
+    },
+    "/users/{userId}/subjects/{subjectId}": {
+      "schema": "UserSubject",
+      "description": "Subjects configured by user"
+    },
+    "/registered_emails/{emailDoc}": {
+      "schema": "RegisteredEmail",
+      "description": "Lookup table of registered email addresses"
+    }
+  }
+}

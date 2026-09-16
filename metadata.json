@@ -1,0 +1,6 @@
+{
+  "name": "Edulink School",
+  "description": "Plataforma educativa institucional con portales para estudiantes, docentes y familias: gestión de calificaciones, tareas, asistencia y mensajería escolar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
