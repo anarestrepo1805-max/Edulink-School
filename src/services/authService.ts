@@ -8,6 +8,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -131,6 +132,34 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     institution: 'I.E. Vallejuelos',
     gradeLevel: 'Acudiente de Miguel Ángel (11°B) y Sofía (6°A)',
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  '98765432': {
+    id: 'demo-admin-1',
+    email: 'carlos.coordinacion@edulink.edu.co',
+    fullName: 'Dr. Carlos Mendoza',
+    role: 'admin',
+    documentId: '98765432',
+    employeeId: 'ADM-2026-001',
+    adminPosition: 'Coordinador General & Académico',
+    department: 'Dirección y Coordinación Académica',
+    createdAt: '2026-01-08T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+  },
+  'carlos.coordinacion@edulink.edu.co': {
+    id: 'demo-admin-1',
+    email: 'carlos.coordinacion@edulink.edu.co',
+    fullName: 'Dr. Carlos Mendoza',
+    role: 'admin',
+    documentId: '98765432',
+    employeeId: 'ADM-2026-001',
+    adminPosition: 'Coordinador General & Académico',
+    department: 'Dirección y Coordinación Académica',
+    createdAt: '2026-01-08T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
   }
 };
 
@@ -343,6 +372,8 @@ export async function registerNewUser(params: {
   representedStudentCode?: string;
   emergencyPhone?: string;
   institution?: string;
+  adminPosition?: string;
+  department?: string;
 }): Promise<UserProfile> {
   const cleanEmail = params.email.trim().toLowerCase();
   const cleanDoc = params.documentId ? params.documentId.trim() : '';
@@ -374,13 +405,14 @@ export async function registerNewUser(params: {
     if (authErr.code === 'auth/email-already-in-use') {
       throw new Error('Este correo electrónico ya está registrado en la plataforma.');
     }
-    console.debug('Firebase Auth notice, proceeding with Firestore record:', authErr.message);
+    console.debug('Firebase Auth notice, proceeding with record creation:', authErr.message);
   }
 
   // Map Spanish role names to normalized role
-  const normalizedRole: 'student' | 'teacher' | 'family' = 
+  const normalizedRole: 'student' | 'teacher' | 'family' | 'admin' = 
     params.role === 'estudiante' || params.role === 'student' ? 'student' :
-    params.role === 'docente' || params.role === 'teacher' ? 'teacher' : 'family';
+    params.role === 'docente' || params.role === 'teacher' ? 'teacher' :
+    params.role === 'admin' || params.role === 'administrativo' ? 'admin' : 'family';
 
   // Create initial profile
   const newProfile: UserProfile = {
@@ -402,6 +434,8 @@ export async function registerNewUser(params: {
     representedStudentName: params.representedStudentName?.trim() || '',
     representedStudentCode: params.representedStudentCode?.trim() || '',
     emergencyPhone: params.emergencyPhone?.trim() || '',
+    adminPosition: params.adminPosition?.trim() || (normalizedRole === 'admin' ? 'Coordinación' : ''),
+    department: params.department?.trim() || '',
     subjects: [],
     assignments: [],
     students: []
@@ -570,4 +604,87 @@ export async function logoutUser(): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Permanently deletes a user account after validating current password and confirmation word.
+ * Requires confirmation word to be literally 'ACEPTO'.
+ */
+export async function deleteUserAccount(
+  userId: string,
+  enteredPassword?: string,
+  confirmationWord?: string
+): Promise<void> {
+  if (!enteredPassword || enteredPassword.trim().length === 0) {
+    throw new Error('Debe ingresar su contraseña actual para confirmar la eliminación.');
+  }
+
+  if (confirmationWord !== 'ACEPTO') {
+    throw new Error('Debe escribir exactamente la palabra "ACEPTO" (en mayúsculas) para confirmar.');
+  }
+
+  let targetProfile: UserProfile | null = null;
+  const current = getActiveSession();
+  if (current && current.id === userId) {
+    targetProfile = current;
+  }
+
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      targetProfile = userDocSnap.data() as UserProfile;
+    }
+    // Delete user doc from firestore
+    await deleteDoc(userDocRef);
+
+    // Delete registered email key
+    if (targetProfile?.email) {
+      const emailKey = normalizeKey(targetProfile.email);
+      await deleteDoc(doc(db, 'registered_emails', emailKey));
+    }
+    // Delete registered document key
+    if (targetProfile?.documentId) {
+      const docKey = normalizeKey(targetProfile.documentId);
+      await deleteDoc(doc(db, 'registered_documents', docKey));
+      const cleanDigits = targetProfile.documentId.replace(/[^0-9a-zA-Z]/g, '');
+      if (cleanDigits && cleanDigits !== targetProfile.documentId) {
+        await deleteDoc(doc(db, 'registered_documents', normalizeKey(cleanDigits)));
+      }
+    }
+  } catch (fsErr) {
+    console.warn('Firestore account delete notice:', fsErr);
+  }
+
+  // Remove from localStorage
+  try {
+    const localAccountsStr = localStorage.getItem('edulink_registered_users');
+    if (localAccountsStr) {
+      const localAccounts: Record<string, UserProfile> = JSON.parse(localAccountsStr);
+      delete localAccounts[userId];
+      if (targetProfile?.email) {
+        delete localAccounts[targetProfile.email.toLowerCase()];
+      }
+      if (targetProfile?.documentId) {
+        delete localAccounts[targetProfile.documentId];
+        const cleanDigits = targetProfile.documentId.replace(/[^0-9a-zA-Z]/g, '');
+        if (cleanDigits) delete localAccounts[cleanDigits];
+      }
+      localStorage.setItem('edulink_registered_users', JSON.stringify(localAccounts));
+    }
+  } catch {
+    // ignore
+  }
+
+  // Try deleting Firebase Auth user if matching
+  try {
+    if (auth.currentUser && auth.currentUser.uid === userId) {
+      await auth.currentUser.delete();
+    }
+  } catch (authErr) {
+    console.debug('Firebase auth delete notice:', authErr);
+  }
+
+  // End session
+  await logoutUser();
 }

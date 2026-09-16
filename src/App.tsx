@@ -7,6 +7,7 @@ import { StudentAssignmentView } from './components/StudentAssignmentView';
 import { TeacherGradesView } from './components/TeacherGradesView';
 import { FamilyDashboardView } from './components/FamilyDashboardView';
 import { FamilyMessagingView } from './components/FamilyMessagingView';
+import { AdminDashboardView } from './components/AdminDashboardView';
 import { getCurrentUser, logoutUser } from './services/authService';
 
 export default function App() {
@@ -24,6 +25,8 @@ export default function App() {
       setCurrentScreen('teacher_grades');
     } else if (user.role === 'family') {
       setCurrentScreen('family_dashboard');
+    } else if (user.role === 'admin') {
+      setCurrentScreen('admin_dashboard');
     }
   };
 
@@ -95,6 +98,15 @@ export default function App() {
         <FamilyMessagingView
           onNavigate={setCurrentScreen}
           onLogout={handleLogout}
+        />
+      )}
+
+      {currentScreen === 'admin_dashboard' && (
+        <AdminDashboardView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
         />
       )}
     </NavigationShell>

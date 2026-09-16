@@ -42,9 +42,9 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
   const studentData = {
     miguel: {
       name: 'Miguel Ángel Jiménez',
-      grade: 'Grado 11°B',
+      grade: 'Grado 11°2',
       avatar: ASSETS.studentAvatar,
-      matricula: '2026-11B',
+      matricula: '2026-1102',
       director: 'Prof. Roberto Gómez',
       average: '4.2',
       attendance: '98%',
@@ -53,9 +53,9 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
     },
     sofia: {
       name: 'Sofía Valentina Jiménez',
-      grade: 'Grado 6°A',
+      grade: 'Grado 6°1',
       avatar: ASSETS.studentSofia,
-      matricula: '2026-06A',
+      matricula: '2026-0601',
       director: 'Lic. Claudia Morales',
       average: '4.6',
       attendance: '100%',

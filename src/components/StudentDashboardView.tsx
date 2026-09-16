@@ -316,26 +316,17 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                 <p className="text-sm sm:text-base text-[#d3e4fe] font-normal leading-relaxed">
                   {isConfigured || subjects.length > 0
                     ? `Tienes ${assignments.length} actividades programadas en tus asignaturas activas.`
-                    : 'Tu cuenta de estudiante ha sido creada exitosamente en Firestore. Como recién ingresas, tu portal está listo para que agregues tu información y asignaturas.'}
+                    : 'Bienvenido a tu portal institucional. Tu espacio académico está listo para que consultes tus asignaturas y calificaciones.'}
                 </p>
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/90">
                     <span className="material-symbols-outlined text-[18px] text-[#7bd0ff]">verified_user</span>
                     {gradeLevel} {currentUser?.studentCode ? `(Carnet: ${currentUser.studentCode})` : ''}
                   </span>
-                  {currentUser?.shift && (
-                    <>
-                      <span className="text-white/40">•</span>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/90">
-                        <span className="material-symbols-outlined text-[18px] text-[#7bd0ff]">schedule</span>
-                        {currentUser.shift}
-                      </span>
-                    </>
-                  )}
                   <span className="text-white/40">•</span>
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/90">
-                    <span className="material-symbols-outlined text-[18px] text-[#7bd0ff]">database</span>
-                    Usuario Registrado en Base de Datos
+                    <span className="material-symbols-outlined text-[18px] text-[#7bd0ff]">schedule</span>
+                    {currentUser?.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)'}
                   </span>
                 </div>
               </div>

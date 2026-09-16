@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'teacher' | 'family' | 'estudiante' | 'docente' | 'acudiente';
+export type UserRole = 'student' | 'teacher' | 'family' | 'admin' | 'estudiante' | 'docente' | 'acudiente' | 'administrativo';
 
 export interface UserProfile {
   id: string;
@@ -21,6 +21,8 @@ export interface UserProfile {
   emergencyPhone?: string;
   phone?: string;
   avatarUrl?: string;
+  adminPosition?: string;
+  department?: string;
   subjects?: Subject[];
   assignments?: UpcomingAssignment[];
   students?: { id: string; name: string; grade: string }[];
@@ -55,7 +57,8 @@ export type ActiveScreen =
   | 'student_assignment'
   | 'teacher_grades'
   | 'family_dashboard'
-  | 'family_messaging';
+  | 'family_messaging'
+  | 'admin_dashboard';
 
 export interface Subject {
   id: string;

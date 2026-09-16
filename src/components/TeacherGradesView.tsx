@@ -22,7 +22,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   const [grades, setGrades] = useState<StudentGradeRecord[]>(() => {
     return isConfigured ? INITIAL_STUDENT_GRADES : [];
   });
-  const [selectedGradeGroup, setSelectedGradeGroup] = useState('10A');
+  const [selectedGradeGroup, setSelectedGradeGroup] = useState('10°1');
   const [selectedSubject, setSelectedSubject] = useState('prog');
   const [selectedPeriod, setSelectedPeriod] = useState('p3');
   const [searchTerm, setSearchTerm] = useState('');
@@ -272,7 +272,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           {showSaveToast && (
             <div className="fixed top-20 right-8 z-50 bg-[#059669] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-bold animate-bounce">
               <span className="material-symbols-outlined text-[20px]">check_circle</span>
-              <span>¡Cambios guardados con éxito en la base de datos institucional!</span>
+              <span>¡Cambios guardados con éxito en el sistema institucional!</span>
             </div>
           )}
 
@@ -334,9 +334,18 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                     onChange={(e) => setSelectedGradeGroup(e.target.value)}
                     className="bg-transparent text-xs text-[#0b1c30] focus:outline-none cursor-pointer pr-4 appearance-none font-bold"
                   >
-                    <option value="10A">10° A — Bachillerato Técnico</option>
-                    <option value="10B">10° B — Bachillerato Académico</option>
-                    <option value="11A">11° A — Énfasis Digital</option>
+                    <option value="6°1">6°1 — Básica Secundaria</option>
+                    <option value="6°2">6°2 — Básica Secundaria</option>
+                    <option value="7°1">7°1 — Básica Secundaria</option>
+                    <option value="7°2">7°2 — Básica Secundaria</option>
+                    <option value="8°1">8°1 — Básica Secundaria</option>
+                    <option value="8°2">8°2 — Básica Secundaria</option>
+                    <option value="9°1">9°1 — Básica Secundaria</option>
+                    <option value="9°2">9°2 — Básica Secundaria</option>
+                    <option value="10°1">10°1 — Media Técnica</option>
+                    <option value="10°2">10°2 — Media Técnica</option>
+                    <option value="11°1">11°1 — Media Técnica</option>
+                    <option value="11°2">11°2 — Media Técnica</option>
                   </select>
                 </div>
                 <span className="material-symbols-outlined text-[#757684] text-base pointer-events-none absolute right-3">
