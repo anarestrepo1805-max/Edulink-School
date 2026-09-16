@@ -15,7 +15,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   // Registration Modal state (Facebook Style)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -39,6 +38,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   // Family / Guardian fields
   const [regRelationship, setRegRelationship] = useState('Madre de familia');
+  const [regGuardianDocId, setRegGuardianDocId] = useState('');
   const [regRepresentedStudentName, setRegRepresentedStudentName] = useState('');
   const [regRepresentedStudentCode, setRegRepresentedStudentCode] = useState('');
   const [regEmergencyPhone, setRegEmergencyPhone] = useState('');
@@ -54,7 +54,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setLoginError(null);
 
     if (!identifier.trim()) {
-      setLoginError('Por favor ingresa tu correo electrónico institucional o número de carnet.');
+      setLoginError('Por favor ingresa tu correo electrónico o número de documento de identidad.');
       return;
     }
 
@@ -105,28 +105,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     // Role-specific validation
     if (regRole === 'student' && !regStudentCode.trim()) {
-      setRegError('Por favor ingresa tu carnet o código estudiantil.');
+      setRegError('Por favor ingresa tu número de documento de identidad o carnet.');
       return;
     }
 
     if (regRole === 'teacher' && !regEmployeeId.trim()) {
-      setRegError('Por favor ingresa tu documento de identidad o número de registro docente.');
+      setRegError('Por favor ingresa tu número de documento de identidad (cédula).');
       return;
     }
 
-    if (regRole === 'family' && !regRepresentedStudentName.trim()) {
-      setRegError('Por favor ingresa el nombre del estudiante al que representas.');
+    if (regRole === 'family' && !regGuardianDocId.trim()) {
+      setRegError('Por favor ingresa tu número de documento de identidad como acudiente.');
       return;
     }
 
     setRegLoading(true);
 
     try {
+      const selectedDocId = 
+        regRole === 'student' ? regStudentCode.trim() :
+        regRole === 'teacher' ? regEmployeeId.trim() :
+        regGuardianDocId.trim() || regRepresentedStudentCode.trim();
+
       const newProfile = await registerNewUser({
         email: regEmail,
         password: regPassword,
         fullName: regFullName,
         role: regRole,
+        documentId: selectedDocId,
         gradeLevel: regRole === 'student' ? regGradeLevel : undefined,
         studentCode: regRole === 'student' ? regStudentCode : undefined,
         shift: regRole === 'student' ? regShift : undefined,
@@ -149,12 +155,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     } finally {
       setRegLoading(false);
     }
-  };
-
-  const handleFillDemo = (email: string) => {
-    setIdentifier(email);
-    setLoginPassword('123456');
-    setLoginError(null);
   };
 
   return (
@@ -202,53 +202,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <span>Institución Educativa Vallejuelos • Sede Medellín, Colombia</span>
           </div>
 
-          {/* Demo Helper Toggle */}
-          <div className="mt-8 w-full max-w-[480px] text-left">
-            <button
-              type="button"
-              onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-              className="text-xs text-[#0051d5] hover:text-[#00288e] flex items-center gap-1.5 cursor-pointer font-semibold"
-            >
-              <span className="material-symbols-outlined text-[16px]">info</span>
-              <span>{showDemoAccounts ? 'Ocultar cuentas demo de prueba' : '¿Deseas probar con cuentas registradas en Firestore?'}</span>
-              <span className="material-symbols-outlined text-[16px]">
-                {showDemoAccounts ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-
-            {showDemoAccounts && (
-              <div className="mt-3 p-3.5 bg-white rounded-2xl border border-[#dce9ff] shadow-sm text-xs flex flex-col gap-2.5 animate-in fade-in">
-                <span className="font-bold text-[#0b1c30] text-[11px] uppercase tracking-wider">
-                  Cuentas de prueba registradas (Contraseña: 123456):
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleFillDemo('miguel.jimenez@edulink.edu.co')}
-                    className="p-2.5 rounded-xl bg-[#eff4ff] hover:bg-[#dce9ff] text-left transition-colors cursor-pointer border border-[#c4d7fe]"
-                  >
-                    <span className="font-bold text-[#00288e] block">🎓 Estudiante</span>
-                    <span className="text-[10px] text-[#444653] block truncate">miguel.jimenez@...</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFillDemo('daniela.alvarez@edulink.edu.co')}
-                    className="p-2.5 rounded-xl bg-[#eff4ff] hover:bg-[#dce9ff] text-left transition-colors cursor-pointer border border-[#c4d7fe]"
-                  >
-                    <span className="font-bold text-[#00288e] block">👨‍🏫 Docente</span>
-                    <span className="text-[10px] text-[#444653] block truncate">daniela.alvarez@...</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFillDemo('elena.jimenez@vallejuelos.edu.co')}
-                    className="p-2.5 rounded-xl bg-[#eff4ff] hover:bg-[#dce9ff] text-left transition-colors cursor-pointer border border-[#c4d7fe]"
-                  >
-                    <span className="font-bold text-[#00288e] block">👨‍👩‍👧 Acudiente</span>
-                    <span className="text-[10px] text-[#444653] block truncate">elena.jimenez@...</span>
-                  </button>
-                </div>
+          {/* Institutional Feature Highlights (No example data) */}
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[480px]">
+            <div className="p-3 bg-white/80 rounded-xl border border-[#dce9ff] text-left">
+              <div className="flex items-center gap-2 text-[#00288e] font-bold text-xs mb-1">
+                <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                <span>Acceso Seguro</span>
               </div>
-            )}
+              <p className="text-[11px] text-[#444653] leading-relaxed">
+                Ingreso protegido con correo institucional o documento de identidad registrado.
+              </p>
+            </div>
+            <div className="p-3 bg-white/80 rounded-xl border border-[#dce9ff] text-left">
+              <div className="flex items-center gap-2 text-[#0051d5] font-bold text-xs mb-1">
+                <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
+                <span>Gestión en Línea</span>
+              </div>
+              <p className="text-[11px] text-[#444653] leading-relaxed">
+                Sincronización en tiempo real de calificaciones, boletines y comunicaciones.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -276,18 +249,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <form onSubmit={handleLoginSubmit} className="flex flex-col gap-3.5">
               <div>
                 <label className="block text-[11px] font-bold text-[#444653] uppercase tracking-wider mb-1">
-                  Correo Institucional o Carnet
+                  Correo electrónico o número de documento de identidad
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[20px] text-[#757684]">
-                    account_circle
+                    badge
                   </span>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="ej. miguel.jimenez@edulink.edu.co"
-                    className="w-full pl-10.5 pr-4 py-3 text-sm bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] placeholder-[#757684] transition-all"
+                    placeholder=""
+                    className="w-full pl-10.5 pr-4 py-3 text-sm bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] transition-all"
                     autoComplete="username"
                     required
                   />
@@ -306,8 +279,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     type={showPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Ingresa tu contraseña"
-                    className="w-full pl-10.5 pr-11 py-3 text-sm bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] placeholder-[#757684] transition-all"
+                    placeholder=""
+                    className="w-full pl-10.5 pr-11 py-3 text-sm bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] transition-all"
                     autoComplete="current-password"
                     required
                   />
@@ -558,13 +531,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                       <div>
                         <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
-                          Carnet o Código Estudiantil *
+                          Número de Documento de Identidad (TI / CC) o Código *
                         </label>
                         <input
                           type="text"
                           value={regStudentCode}
                           onChange={(e) => setRegStudentCode(e.target.value)}
-                          placeholder="ej. EST-2026-042"
+                          placeholder=""
                           className="w-full px-3 py-2 text-xs bg-white border border-[#dce9ff] rounded-xl focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
                           required
                         />
@@ -627,13 +600,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                       <div>
                         <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
-                          Cédula / Documento Profesional *
+                          Número de Documento de Identidad (Cédula) *
                         </label>
                         <input
                           type="text"
                           value={regEmployeeId}
                           onChange={(e) => setRegEmployeeId(e.target.value)}
-                          placeholder="ej. 71.394.821"
+                          placeholder=""
                           className="w-full px-3 py-2 text-xs bg-white border border-[#c7d2fe] rounded-xl focus:border-[#1e40af] focus:ring-1 focus:ring-[#1e40af] outline-none text-[#0b1c30]"
                           required
                         />
@@ -647,7 +620,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           type="text"
                           value={regAssignedGrades}
                           onChange={(e) => setRegAssignedGrades(e.target.value)}
-                          placeholder="ej. Grados 10°A, 10°B y 11°A"
+                          placeholder=""
                           className="w-full px-3 py-2 text-xs bg-white border border-[#c7d2fe] rounded-xl focus:border-[#1e40af] focus:ring-1 focus:ring-[#1e40af] outline-none text-[#0b1c30]"
                         />
                       </div>
@@ -691,13 +664,40 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                       <div>
                         <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
+                          Número de Documento de Identidad del Acudiente *
+                        </label>
+                        <input
+                          type="text"
+                          value={regGuardianDocId}
+                          onChange={(e) => setRegGuardianDocId(e.target.value)}
+                          placeholder=""
+                          className="w-full px-3 py-2 text-xs bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
                           Teléfono de Contacto Familiar *
                         </label>
                         <input
                           type="text"
                           value={regEmergencyPhone}
                           onChange={(e) => setRegEmergencyPhone(e.target.value)}
-                          placeholder="ej. 312 456 7890"
+                          placeholder=""
+                          className="w-full px-3 py-2 text-xs bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
+                          Documento del Estudiante Representado
+                        </label>
+                        <input
+                          type="text"
+                          value={regRepresentedStudentCode}
+                          onChange={(e) => setRegRepresentedStudentCode(e.target.value)}
+                          placeholder=""
                           className="w-full px-3 py-2 text-xs bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
                         />
                       </div>
@@ -710,22 +710,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           type="text"
                           value={regRepresentedStudentName}
                           onChange={(e) => setRegRepresentedStudentName(e.target.value)}
-                          placeholder="ej. Miguel Ángel Jiménez Restrepo"
+                          placeholder=""
                           className="w-full px-3 py-2 text-xs bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
                           required
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-bold text-[#0b1c30] mb-1">
-                          Documento o Código del Estudiante
-                        </label>
-                        <input
-                          type="text"
-                          value={regRepresentedStudentCode}
-                          onChange={(e) => setRegRepresentedStudentCode(e.target.value)}
-                          placeholder="ej. 1092837465"
-                          className="w-full px-3 py-2 text-xs bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
                         />
                       </div>
                     </div>
@@ -742,7 +729,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       type="text"
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
-                      placeholder="Nombre y apellidos completos"
+                      placeholder=""
                       className="w-full px-3.5 py-2.5 text-sm bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
                       required
                     />
@@ -756,7 +743,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="Correo institucional o personal"
+                      placeholder=""
                       className="w-full px-3.5 py-2.5 text-sm bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
                       required
                     />
@@ -771,7 +758,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         type={showRegPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder=""
                         className="w-full px-3.5 py-2.5 text-sm bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
                         required
                       />
@@ -785,7 +772,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         type={showRegPassword ? 'text' : 'password'}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="Repite la contraseña"
+                        placeholder=""
                         className="w-full px-3.5 py-2.5 text-sm bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
                         required
                       />

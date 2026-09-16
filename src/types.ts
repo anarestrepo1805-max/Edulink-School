@@ -8,6 +8,7 @@ export interface UserProfile {
   createdAt: string;
   hasConfigured: boolean;
   institution?: string;
+  documentId?: string;
   gradeLevel?: string;
   studentCode?: string;
   shift?: string;
