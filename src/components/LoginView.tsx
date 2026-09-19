@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { ASSETS } from '../data/mockData';
 import { loginUser, registerNewUser } from '../services/authService';
+import { PasswordRecoveryModal } from './PasswordRecoveryModal';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -15,6 +16,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Password Recovery Modal state
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
 
   // Registration Modal state (Facebook Style)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -60,14 +64,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const passHasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(regPassword);
   const passHasMinLength = regPassword.length >= 8;
 
-  // Grade options: 6 grades, each divided into 2 groups (6°1, 6°2, ..., 11°1, 11°2)
+  // Grade options: Grados 6° a 11° (grupos 1 y 2) y Pensar
   const GRADE_OPTIONS = [
     '6°1', '6°2',
     '7°1', '7°2',
     '8°1', '8°2',
     '9°1', '9°2',
     '10°1', '10°2',
-    '11°1', '11°2'
+    '11°1', '11°2',
+    'Pensar'
   ];
 
   // Handle Login submission
@@ -208,177 +213,239 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff] flex flex-col justify-between font-sans selection:bg-[#00288e]/15 selection:text-[#00288e]">
-      {/* Ambient background accents */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-[#dde1ff]/40 blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-96 h-96 rounded-full bg-[#d3e4fe]/30 blur-3xl" />
+    <div className="min-h-screen bg-gradient-to-b from-[#080d1a] via-[#0f172a] to-[#1e3a8a] text-slate-100 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-200 relative overflow-x-hidden">
+      
+      {/* ========================================================================= */}
+      {/* 1. DYNAMIC CELESTIAL ATMOSPHERE: Radial Glows, Twinkling & Shooting Stars */}
+      {/* ========================================================================= */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {/* Deep ambient radial glows */}
+        <div className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full bg-cyan-600/15 blur-[120px]" />
+        <div className="absolute top-1/4 -right-32 w-[600px] h-[600px] rounded-full bg-blue-700/20 blur-[140px]" />
+        <div className="absolute bottom-10 left-1/3 w-[480px] h-[480px] rounded-full bg-teal-500/10 blur-[110px]" />
+
+        {/* Shooting Stars (Estrellas Fugaces) */}
+        <div className="absolute top-12 right-12 w-36 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-white rounded-full animate-shooting-star-1 opacity-0 shadow-[0_0_12px_#22d3ee]" />
+        <div className="absolute top-1/4 right-1/3 w-48 h-[2px] bg-gradient-to-r from-transparent via-teal-300 to-white rounded-full animate-shooting-star-2 opacity-0 shadow-[0_0_14px_#06b6d4]" />
+        <div className="absolute top-1/3 right-16 w-40 h-[2px] bg-gradient-to-r from-transparent via-blue-400 to-white rounded-full animate-shooting-star-3 opacity-0 shadow-[0_0_12px_#38bdf8]" />
+
+        {/* Floating Twinkling Stars (Electric Blue, Aquamarine, Cyan, White) */}
+        <div className="absolute top-16 left-20 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-twinkle-slow" />
+        <div className="absolute top-28 left-1/3 w-2 h-2 rounded-full bg-[#06b6d4] shadow-[0_0_10px_#06b6d4] animate-twinkle-fast" />
+        <div className="absolute top-44 left-1/4 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_#ffffff] animate-twinkle-slow" style={{ animationDelay: '1.2s' }} />
+        <div className="absolute top-14 right-1/4 w-1.5 h-1.5 rounded-full bg-teal-300 shadow-[0_0_8px_#5eead4] animate-twinkle-fast" style={{ animationDelay: '0.6s' }} />
+        <div className="absolute top-36 right-1/3 w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_#60a5fa] animate-twinkle-slow" style={{ animationDelay: '2.1s' }} />
+        <div className="absolute top-64 right-20 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9] animate-twinkle-fast" style={{ animationDelay: '1.7s' }} />
+        <div className="absolute top-80 left-16 w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_10px_#2dd4bf] animate-twinkle-slow" style={{ animationDelay: '0.9s' }} />
+        <div className="absolute top-96 left-2/5 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_#ffffff] animate-twinkle-fast" style={{ animationDelay: '2.5s' }} />
+        <div className="absolute bottom-40 left-24 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-twinkle-slow" style={{ animationDelay: '1.4s' }} />
+        <div className="absolute bottom-28 right-1/4 w-2 h-2 rounded-full bg-blue-300 shadow-[0_0_10px_#93c5fd] animate-twinkle-fast" style={{ animationDelay: '0.4s' }} />
+        <div className="absolute bottom-60 right-16 w-1 h-1 rounded-full bg-[#06b6d4] shadow-[0_0_6px_#06b6d4] animate-twinkle-slow" style={{ animationDelay: '1.9s' }} />
       </div>
 
-      {/* Main container: Two-column layout (Brand Identity + Login Card) */}
+      {/* Main container: Two-column layout (Brand Identity + Glassmorphism Login Card) */}
       <main className="relative z-10 w-full max-w-[1160px] mx-auto pt-8 sm:pt-12 lg:pt-14 pb-12 px-4 sm:px-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-10 lg:gap-12">
         
-        {/* Left Column: Brand Identity, Academic Metrics & Institutional Pillars */}
+        {/* Left Column: Brand Identity, Free Floating Glowing Tree Logo, Content & Institutional Contact */}
         <section className="w-full lg:w-[620px] text-left flex flex-col items-center lg:items-start">
           
-          {/* Top Institutional Eyebrow / Badges */}
-          <div className="flex flex-wrap items-center gap-2 mb-4 justify-center lg:justify-start">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00288e]/10 border border-[#00288e]/20 text-[#00288e] text-xs font-bold uppercase tracking-wider">
+          {/* Top Institutional Eyebrow */}
+          <div className="flex flex-wrap items-center gap-2 mb-3 justify-center lg:justify-start">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider shadow-xs">
               <span className="material-symbols-outlined text-[15px]">account_balance</span>
               Portal Institucional Oficial
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#dce9ff] text-[#0b1c30] text-xs font-semibold shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/60 border border-slate-700/60 text-slate-300 text-xs font-medium backdrop-blur-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               I.E. Vallejuelos • Medellín
             </span>
           </div>
 
-          {/* Logo brand & Identity */}
-          <div className="flex items-center gap-4 mb-4 justify-center lg:justify-start">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-3 shadow-md border border-[#e5eeff] flex items-center justify-center shrink-0">
+          {/* 1. Page Name: Title with Capital Initials "Edulink School" */}
+          <div className="w-full flex items-center justify-center lg:justify-start gap-2.5 mb-1">
+            <span className="text-white font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md">
+              Edulink
+            </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-sky-300 font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md">
+              School
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm font-semibold text-cyan-200/80 tracking-wide mb-3 text-center lg:text-left">
+            Sistema Integral de Gestión Académica y Comunitaria
+          </p>
+
+          {/* 2. Logo: Free Floating Tree (No White Box), Glowing Leaves & Progressively Illuminated Cyan Roots */}
+          <div className="w-full flex justify-center items-center my-3 relative py-4">
+            {/* Ambient pulsating backdrop aura */}
+            <div className="absolute w-52 h-52 sm:w-64 sm:h-64 rounded-full bg-gradient-to-tr from-cyan-500/25 via-blue-600/30 to-teal-400/25 blur-3xl pointer-events-none animate-pulse-glow" />
+
+            {/* Tree roots progressive aquamarine/cyan illumination glow */}
+            <div className="absolute bottom-4 w-40 sm:w-56 h-14 bg-gradient-to-r from-teal-400/40 via-cyan-400/70 to-blue-500/40 rounded-full blur-xl pointer-events-none animate-root-pulse" />
+
+            {/* Sparkle 1: Top Right - Cyan */}
+            <div className="absolute -top-1 right-1/4 sm:right-1/3 text-cyan-300 animate-sparkle-1 pointer-events-none">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
+              </svg>
+            </div>
+
+            {/* Sparkle 2: Top Left - Aquamarine */}
+            <div className="absolute top-2 left-1/4 sm:left-1/3 text-teal-300 animate-sparkle-2 pointer-events-none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
+              </svg>
+            </div>
+
+            {/* Sparkle 3: Bottom Right - Electric Blue */}
+            <div className="absolute bottom-2 right-1/4 sm:right-1/3 text-blue-400 animate-sparkle-3 pointer-events-none">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
+              </svg>
+            </div>
+
+            {/* Sparkle 4: Bottom Left - Bright Cyan */}
+            <div className="absolute -bottom-1 left-1/4 sm:left-1/3 text-cyan-400 animate-sparkle-4 pointer-events-none">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
+              </svg>
+            </div>
+
+            {/* Sparkle 5: Far Right - Soft Ice Blue */}
+            <div className="absolute top-1/2 -right-1 sm:right-1/4 text-teal-200 animate-sparkle-5 pointer-events-none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
+              </svg>
+            </div>
+
+            {/* Transparent, Freely Floating Tree Logo with Glowing Breathing Animation */}
+            <div className="relative z-10 w-36 h-36 sm:w-44 sm:h-44 lg:w-48 lg:h-48 flex items-center justify-center animate-tree-glow cursor-pointer transition-transform hover:scale-105">
               <img
                 src={ASSETS.logo}
                 alt="Edulink School Logo"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain filter drop-shadow-[0_8px_20px_rgba(6,182,212,0.4)]"
               />
             </div>
-            <div>
-              <div className="flex items-baseline leading-none">
-                <span className="text-[#00288e] font-black text-[38px] sm:text-[48px] tracking-tight">
-                  edulink
-                </span>
-                <span className="text-[#0051d5] font-extrabold text-[26px] sm:text-[34px] tracking-tight ml-2">
-                  school
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm font-semibold text-[#555869] mt-1">
-                Sistema Integral de Gestión Académica y Comunitaria
-              </p>
-            </div>
           </div>
 
-          {/* Main Headline */}
-          <h2 className="text-[#0b1c30] text-2xl sm:text-3xl font-extrabold leading-snug max-w-[580px] mb-3 tracking-tight text-center lg:text-left">
-            Gestión curricular, calificaciones y acompañamiento en una sola plataforma.
+          {/* 3. Text below the Logo */}
+          <h2 className="text-white text-xl sm:text-2xl lg:text-[27px] font-bold leading-snug max-w-[560px] mb-3 tracking-tight text-center lg:text-left drop-shadow-sm">
+            Plataforma institucional de gestión curricular, calificaciones y comunidad académica.
           </h2>
 
-          {/* Institutional Narrative */}
-          <p className="text-[#444653] text-sm sm:text-base leading-relaxed max-w-[560px] mb-6 text-center lg:text-left">
-            Diseñada para articular en tiempo real a estudiantes, docentes, familias y directivos de la I.E. Vallejuelos, garantizando transparencia académica y comunicación continua.
+          <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-[540px] mb-5 text-center lg:text-left">
+            Conecta en tiempo real a estudiantes, docentes, acudientes y equipo directivo en un entorno seguro y unificado.
           </p>
 
-          {/* Institutional Fast Facts Bar (Metrics / Quick Indicators) */}
-          <div className="w-full max-w-[580px] mb-6 grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-white border border-[#dce9ff] shadow-xs">
-            <div className="flex flex-col items-center lg:items-start px-2 py-1 border-r border-[#eff4ff] last:border-r-0">
-              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Jornada</span>
-              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">6:15 - 12:15</span>
-              <span className="text-[10px] text-[#757684]">Mañana</span>
+          {/* 4. Jornada & COMUNIDAD (Glassmorphism Cards) */}
+          <div className="w-full max-w-[560px] mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Jornada */}
+            <div className="p-4 rounded-2xl bg-slate-900/65 backdrop-blur-md border border-cyan-500/20 shadow-lg shadow-black/20 flex items-center gap-3.5 transition-all hover:border-cyan-400/40">
+              <div className="w-11 h-11 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0 shadow-inner">
+                <span className="material-symbols-outlined text-[24px]">schedule</span>
+              </div>
+              <div>
+                <span className="block text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Jornada</span>
+                <span className="text-sm sm:text-base font-extrabold text-white">6:15 AM - 12:15 PM</span>
+                <span className="block text-[11px] text-slate-400">Jornada Mañana</span>
+              </div>
             </div>
-            <div className="flex flex-col items-center lg:items-start px-2 py-1 border-r border-[#eff4ff] last:border-r-0">
-              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Cobertura</span>
-              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">6° a 11°</span>
-              <span className="text-[10px] text-[#757684]">12 Grupos (1 y 2)</span>
-            </div>
-            <div className="flex flex-col items-center lg:items-start px-2 py-1">
-              <span className="text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Comunidad</span>
-              <span className="text-xs sm:text-sm font-extrabold text-[#00288e] mt-0.5">4 Perfiles</span>
-              <span className="text-[10px] text-[#757684]">Conectados</span>
+
+            {/* COMUNIDAD (Un solo bloque limpio y directo) */}
+            <div className="p-4 rounded-2xl bg-slate-900/65 backdrop-blur-md border border-teal-500/25 shadow-lg shadow-black/20 flex items-start gap-3.5 transition-all hover:border-teal-400/45">
+              <div className="w-11 h-11 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-300 flex items-center justify-center shrink-0 shadow-inner mt-0.5">
+                <span className="material-symbols-outlined text-[24px]">groups</span>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-[11px] font-bold text-teal-400 uppercase tracking-wider">COMUNIDAD</span>
+                <span className="text-sm sm:text-base font-extrabold text-white block">Grados 6° a 11° y Grado Pensar</span>
+                <p className="text-[11px] text-slate-300 leading-snug mt-1 font-medium">
+                  Grupos: 6°1, 6°2, 7°1, 7°2, 8°1, 8°2, 9°1, 9°2, 10°1, 10°2, 11°1, 11°2 y Pensar.
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Organized Institutional Pillars (2x2 Grid) */}
-          <div className="w-full max-w-[580px] grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            
-            {/* Pillar 1: Curricular & Grades */}
-            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-8 h-8 rounded-xl bg-[#eff4ff] text-[#00288e] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[19px]">fact_check</span>
-                </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
-                  Calificaciones al Día
-                </h4>
+          {/* 5. Institutional Location & Contact Card (from Google Maps capture) */}
+          <div className="w-full max-w-[560px] bg-slate-900/65 backdrop-blur-md rounded-2xl border border-cyan-500/20 shadow-lg shadow-black/20 p-4 sm:p-5 text-left transition-all hover:border-cyan-400/35">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 mb-3">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                  Institución Educativa Vallejuelos
+                </h3>
+                <p className="text-xs sm:text-sm text-cyan-300/80 mt-0.5">
+                  Escuela de enseñanza general en Medellín
+                </p>
               </div>
-              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
-                Registro y consulta inmediata de periodos académicos, notas por taller y promedios ponderados.
-              </p>
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">school</span>
+              </div>
             </div>
 
-            {/* Pillar 2: Family & School Bond */}
-            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-8 h-8 rounded-xl bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[19px]">family_restroom</span>
+            <div className="space-y-2.5 text-xs sm:text-sm">
+              {/* Dirección */}
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[20px] text-rose-400 shrink-0 mt-0.5">
+                  location_on
+                </span>
+                <div className="text-slate-300 leading-relaxed">
+                  <strong className="text-white">Dirección:</strong> Cra. 104c #20, Santa Margarita, Medellín, Robledo, Medellín, Antioquia
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
-                  Vínculo Escuela - Familia
-                </h4>
               </div>
-              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
-                Canal directo para acudientes: seguimiento de boletines, comunicados y citaciones con docentes.
-              </p>
-            </div>
 
-            {/* Pillar 3: Academic Groups & Cycles */}
-            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-8 h-8 rounded-xl bg-[#f0fdf4] text-[#16a34a] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[19px]">domain</span>
+              {/* Teléfono */}
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[20px] text-cyan-400 shrink-0">
+                  call
+                </span>
+                <div className="text-slate-300">
+                  <strong className="text-white">Teléfono:</strong>{' '}
+                  <a
+                    href="tel:3004175616"
+                    className="text-cyan-400 hover:text-cyan-300 font-semibold hover:underline cursor-pointer"
+                  >
+                    300 4175616
+                  </a>
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
-                  Estructura 6°1 a 11°2
-                </h4>
               </div>
-              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
-                Distribución curricular ordenada en secundaria básica y media técnica en dos grupos por nivel.
-              </p>
-            </div>
 
-            {/* Pillar 4: Security & Verified Identity */}
-            <div className="p-4 bg-white rounded-2xl border border-[#dce9ff] shadow-xs hover:border-[#00288e]/30 transition-all text-left">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-8 h-8 rounded-xl bg-[#fef3c7] text-[#d97706] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[19px]">verified_user</span>
+              {/* Horario */}
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[20px] text-teal-400 shrink-0">
+                  schedule
+                </span>
+                <div className="text-slate-300">
+                  <strong className="text-white">Horario:</strong>{' '}
+                  <span className="text-emerald-400 font-bold">Abierto</span>
+                  <span className="text-slate-400"> · Cierra a las 5:30 p.m.</span>
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30]">
-                  Acceso y Protección
-                </h4>
               </div>
-              <p className="text-xs text-[#555869] leading-relaxed pl-0.5">
-                Ingreso protegido con documento de identidad o correo institucional y política de datos garantizada.
-              </p>
-            </div>
-          </div>
-
-          {/* Institutional Support & Help Banner */}
-          <div className="w-full max-w-[580px] p-3.5 rounded-xl bg-[#f0f4fd] border border-[#d2dff6] flex items-center gap-3 text-left">
-            <span className="material-symbols-outlined text-[22px] text-[#00288e] shrink-0">
-              support_agent
-            </span>
-            <div className="text-xs text-[#334155] leading-snug">
-              <span className="font-bold text-[#00288e]">Atención Institucional:</span> Secretaría Académica disponible de lunes a viernes en la sede Vallejuelos para trámites de matrícula y carnetización.
             </div>
           </div>
 
         </section>
 
-        {/* Right Column: Login Card */}
+        {/* ========================================================================= */}
+        {/* Right Column: Glassmorphism Login Card with Aquamarine Glowing Accents   */}
+        {/* ========================================================================= */}
         <section className="w-full max-w-[440px] flex flex-col items-center">
-          <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,40,142,0.08)] p-7 sm:p-8 w-full border border-[#e5eeff] flex flex-col gap-5">
+          <div className="bg-slate-900/70 backdrop-blur-xl rounded-3xl p-7 sm:p-9 w-full border border-cyan-500/30 shadow-[0_8px_32px_0_rgba(6,182,212,0.18)] flex flex-col gap-5 relative overflow-hidden transition-all duration-300 hover:border-cyan-400/50 hover:shadow-[0_12px_40px_0_rgba(6,182,212,0.25)]">
             
-            <div className="pb-1 border-b border-[#f1f5f9]">
-              <h3 className="text-2xl font-bold text-[#0b1c30]">Iniciar Sesión</h3>
-              <p className="text-sm text-[#444653] mt-1">Ingresa tus credenciales institucionales de acceso</p>
+            {/* Soft aquamarine light bar along the top edge */}
+            <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent pointer-events-none" />
+
+            <div className="pb-1 border-b border-slate-800/80">
+              <h3 className="text-2xl font-bold text-white tracking-tight">Iniciar Sesión</h3>
+              <p className="text-sm text-slate-300 mt-1">Ingresa tus credenciales institucionales de acceso</p>
             </div>
 
             {/* Login Form */}
             <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm font-bold text-[#444653] uppercase tracking-wider mb-1.5">
-                  Correo electrónico o número de documento de identidad
+                <label className="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">
+                  Correo electrónico o documento de identidad
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-[#757684]">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-400/80">
                     badge
                   </span>
                   <input
@@ -386,7 +453,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder=""
-                    className="w-full pl-11 pr-4 py-3.5 text-base bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] transition-all"
+                    className="w-full pl-11 pr-4 py-3.5 text-base bg-slate-950/60 border border-slate-700/80 rounded-xl focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25 outline-none text-white transition-all"
                     autoComplete="username"
                     required
                   />
@@ -394,11 +461,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-[#444653] uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">
                   Contraseña
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-[#757684]">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-400/80">
                     lock
                   </span>
                   <input
@@ -406,14 +473,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder=""
-                    className="w-full pl-11 pr-12 py-3.5 text-base bg-[#f8f9ff] border border-[#c4c5d5]/60 rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-2 focus:ring-[#00288e]/15 outline-none text-[#0b1c30] transition-all"
+                    className="w-full pl-11 pr-12 py-3.5 text-base bg-slate-950/60 border border-slate-700/80 rounded-xl focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25 outline-none text-white transition-all"
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#757684] hover:text-[#0b1c30] p-1 cursor-pointer"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-300 p-1 cursor-pointer transition-colors"
                     title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                   >
                     <span className="material-symbols-outlined text-[22px]">
@@ -423,22 +490,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Error message displayed at the bottom right before the action button */}
+              {/* Error message in dark rose glass style */}
               {loginError && (
-                <div className="p-3.5 bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a] text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
-                  <span className="material-symbols-outlined text-[20px] shrink-0 mt-0.5">error</span>
+                <div className="p-3.5 bg-rose-950/70 border border-rose-500/40 text-rose-200 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                  <span className="material-symbols-outlined text-[20px] text-rose-400 shrink-0 mt-0.5">error</span>
                   <div className="leading-snug">
-                    <strong className="block font-bold">Error de Acceso:</strong>
+                    <strong className="block font-bold text-rose-100">Error de Acceso:</strong>
                     <span>{loginError}</span>
                   </div>
                 </div>
               )}
 
-              {/* Login Button */}
+              {/* Login Button with Blue-Aquamarine Gradient & Hover Elevation */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-1 bg-[#00288e] hover:bg-[#001f70] active:bg-[#001453] text-white font-bold text-base py-3.5 rounded-xl transition duration-150 cursor-pointer text-center shadow-md shadow-[#00288e]/20 flex items-center justify-center gap-2 disabled:opacity-75"
+                className="w-full mt-1 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:via-cyan-500 hover:to-teal-400 active:opacity-90 text-white font-bold text-base py-3.5 rounded-xl transition-all duration-200 cursor-pointer text-center shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/45 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75"
               >
                 {isLoading ? (
                   <>
@@ -457,21 +524,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {/* Forgot password link */}
             <div className="text-center pt-1">
               <button
+                id="btn-forgot-password"
                 type="button"
-                onClick={() => setLoginError('Para recuperar tu contraseña, acércate a la Secretaría Académica de la Institución Educativa Vallejuelos o contacta al administrador de TI.')}
-                className="text-[#0051d5] hover:text-[#00288e] text-sm font-semibold hover:underline cursor-pointer"
+                onClick={() => {
+                  setLoginError(null);
+                  setIsRecoveryModalOpen(true);
+                }}
+                className="text-cyan-400 hover:text-cyan-300 text-sm font-semibold hover:underline cursor-pointer transition-colors"
               >
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
 
             {/* Divider line */}
-            <div className="relative my-2">
+            <div className="relative my-1">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#e5eeff]" />
+                <div className="w-full border-t border-slate-800" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-[#757684] font-semibold text-xs tracking-wider">
+                <span className="bg-slate-900/95 px-3 text-slate-400 font-semibold text-xs tracking-wider border border-slate-800 rounded-full py-0.5">
                   ¿Nuevo en Edulink School?
                 </span>
               </div>
@@ -486,34 +557,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   setRegSuccess(null);
                   setIsRegisterModalOpen(true);
                 }}
-                className="w-full bg-[#0051d5] hover:bg-[#0041ab] active:bg-[#003185] text-white font-bold text-base px-5 py-3.5 rounded-xl cursor-pointer transition duration-150 shadow-sm flex items-center justify-center gap-2 active:scale-[0.99]"
+                className="w-full bg-slate-800/80 hover:bg-slate-700/80 active:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400/60 text-white font-bold text-base px-5 py-3.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm flex items-center justify-center gap-2 active:scale-[0.99] hover:shadow-cyan-500/10"
               >
-                <span className="material-symbols-outlined text-[22px]">person_add</span>
+                <span className="material-symbols-outlined text-[22px] text-cyan-400">person_add</span>
                 <span>Crear cuenta nueva</span>
               </button>
             </div>
           </div>
 
           {/* Subtext below login card */}
-          <p className="text-xs text-[#444653] text-center mt-6 leading-relaxed max-w-[380px]">
+          <p className="text-xs text-slate-400 text-center mt-6 leading-relaxed max-w-[380px]">
             Acceso institucional protegido mediante credenciales cifradas y validación oficial.
           </p>
         </section>
       </main>
 
       {/* Institutional Footer */}
-      <footer className="relative z-10 w-full bg-white border-t border-[#e5eeff] py-6 text-[#757684] text-sm">
+      <footer className="relative z-10 w-full bg-slate-950/80 backdrop-blur-md border-t border-cyan-500/15 py-6 text-slate-400 text-sm">
         <div className="max-w-[1080px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex items-center gap-2 text-[#0b1c30] font-semibold">
-            <img src={ASSETS.logo} alt="" className="w-6 h-6 object-contain" />
+          <div className="flex items-center gap-2 text-white font-semibold">
+            <img src={ASSETS.logo} alt="" className="w-6 h-6 object-contain filter drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
             <span>Edulink School © 2026 • Institución Educativa Vallejuelos</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[#444653]">
-            <span className="hover:text-[#00288e] cursor-pointer">Manual de Convivencia</span>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-slate-400">
+            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Manual de Convivencia</span>
             <span>•</span>
-            <span className="hover:text-[#00288e] cursor-pointer">Soporte Técnico</span>
+            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Soporte Técnico</span>
             <span>•</span>
-            <span className="hover:text-[#00288e] cursor-pointer">Secretaría de Educación</span>
+            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Secretaría de Educación</span>
           </div>
         </div>
       </footer>
@@ -1083,6 +1154,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </div>
         </div>
       )}
+      {/* Multi-Step Password Recovery Modal */}
+      <PasswordRecoveryModal
+        isOpen={isRecoveryModalOpen}
+        onClose={() => setIsRecoveryModalOpen(false)}
+        initialEmail={identifier.includes('@') ? identifier : ''}
+        onPasswordResetSuccess={(resetEmail) => {
+          setIdentifier(resetEmail);
+          setLoginPassword('');
+          setLoginError(null);
+        }}
+      />
     </div>
   );
 };
