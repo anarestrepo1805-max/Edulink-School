@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
+import { requestPasswordResetLink, updateUserPasswordDirectly } from '../services/authService';
 
 interface PasswordRecoveryModalProps {
   isOpen: boolean;
@@ -20,10 +21,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [email, setEmail] = useState(initialEmail);
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(60);
-  const [demoCode, setDemoCode] = useState('482910');
-  
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -38,7 +37,6 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     if (isOpen) {
       setStep(1);
       setEmail(initialEmail || '');
-      setOtpDigits(['', '', '', '', '', '']);
       setNewPassword('');
       setConfirmPassword('');
       setErrorMessage(null);
@@ -87,8 +85,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     return { label: isEn ? 'Very Strong' : 'Muy segura', color: 'text-emerald-400', bg: 'bg-emerald-400' };
   };
 
-  // STEP 1 HANDLER: Send verification OTP
-  const handleSendVerificationCode = (e: React.FormEvent) => {
+  // STEP 1 HANDLER: Send official password reset link to user email
+  const handleSendRecoveryLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -104,91 +102,36 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await requestPasswordResetLink(cleanEmail, language);
       setIsLoading(false);
-      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setDemoCode(randomCode);
       setStep(2);
       setResendTimer(60);
-      setNoticeMessage(isEn ? `Verification code sent to ${cleanEmail}` : `Código de verificación enviado a ${cleanEmail}`);
-    }, 600);
-  };
-
-  // OTP Digits change
-  const handleOtpChange = (index: number, val: string) => {
-    const cleanVal = val.replace(/\D/g, '').slice(-1);
-    const newDigits = [...otpDigits];
-    newDigits[index] = cleanVal;
-    setOtpDigits(newDigits);
-    setErrorMessage(null);
-
-    if (cleanVal && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      nextInput?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-input-${index - 1}`);
-      prevInput?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pastedData) return;
-
-    const newDigits = [...otpDigits];
-    for (let i = 0; i < 6; i++) {
-      newDigits[i] = pastedData[i] || '';
-    }
-    setOtpDigits(newDigits);
-    const lastFilledIndex = Math.min(pastedData.length, 5);
-    const targetInput = document.getElementById(`otp-input-${lastFilledIndex}`);
-    targetInput?.focus();
-  };
-
-  // STEP 2 HANDLER: Verify OTP
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const enteredCode = otpDigits.join('');
-    if (enteredCode.length < 6) {
-      setErrorMessage(isEn ? 'Please enter the complete 6-digit code.' : 'Por favor completa los 6 dígitos del código de verificación.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
+      setNoticeMessage(res.message);
+    } catch (err: any) {
       setIsLoading(false);
-      if (enteredCode === demoCode || enteredCode === '482910' || enteredCode === '123456') {
-        setStep(3);
-        setErrorMessage(null);
-      } else {
-        setErrorMessage(isEn ? 'Invalid or expired code. Please verify and try again.' : 'Código incorrecto o expirado. Verifica el código e intenta nuevamente.');
-      }
-    }, 500);
+      setErrorMessage(err.message || (isEn ? 'Error sending recovery link.' : 'Error al enviar el enlace de recuperación.'));
+    }
   };
 
-  const handleResendCode = () => {
+  // Resend recovery email
+  const handleResendRecoveryLink = async () => {
     if (resendTimer > 0) return;
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMessage(null);
+    try {
+      const res = await requestPasswordResetLink(email.trim(), language);
       setIsLoading(false);
-      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setDemoCode(newCode);
       setResendTimer(60);
-      setOtpDigits(['', '', '', '', '', '']);
-      setNoticeMessage(isEn ? 'A new verification code has been generated and sent.' : 'Se ha generado y enviado un nuevo código de 6 dígitos.');
-      document.getElementById('otp-input-0')?.focus();
-    }, 400);
+      setNoticeMessage(res.message);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || (isEn ? 'Error resending recovery link.' : 'Error al reenviar el enlace.'));
+    }
   };
 
   // STEP 3 HANDLER: Save and Reset Password
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -214,39 +157,38 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await updateUserPasswordDirectly(email, newPassword);
       setIsLoading(false);
       setStep(4);
       if (onPasswordResetSuccess) {
         onPasswordResetSuccess(email);
       }
-    }, 600);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || (isEn ? 'Error updating password.' : 'Error al actualizar la contraseña.'));
+    }
   };
 
   return (
     <div
-      id="password-recovery-modal"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md animate-in fade-in duration-200 ${
-        isDark ? 'bg-slate-950/80' : 'bg-slate-900/60'
-      }`}
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
-        className={`relative w-full max-w-[500px] backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 transition-all ${
+        className={`relative w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border transition-all duration-300 ${
           isDark
-            ? 'bg-slate-900/95 border border-cyan-500/30 text-slate-100 shadow-[0_16px_48px_rgba(0,0,0,0.5)]'
-            : 'bg-white/95 border border-slate-200 text-slate-900 shadow-[0_16px_48px_rgba(0,40,140,0.15)]'
+            ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-cyan-950/40'
+            : 'bg-white border-slate-200 text-slate-900 shadow-slate-300/60'
         }`}
       >
-        {/* Top cyan glowing line */}
-        <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent pointer-events-none" />
-
-        {/* Close button */}
+        {/* Close Button */}
         {step !== 4 && (
           <button
-            id="btn-close-recovery"
             type="button"
             onClick={onClose}
-            className={`absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+            className={`absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
               isDark
                 ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
@@ -290,12 +232,12 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {isEn
-                  ? 'Enter your registered institutional email to receive a 6-digit verification code.'
-                  : 'Ingresa tu correo electrónico institucional registrado para recibir un código de verificación de 6 dígitos.'}
+                  ? 'Enter your registered institutional email to receive an official recovery link.'
+                  : 'Ingresa tu correo institucional registrado para recibir un enlace oficial de recuperación.'}
               </p>
             </div>
 
-            <form onSubmit={handleSendVerificationCode} className="space-y-4">
+            <form onSubmit={handleSendRecoveryLink} className="space-y-4">
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-cyan-300' : 'text-blue-900'}`}>
                   {isEn ? 'Institutional Email Address' : 'Correo Electrónico Institucional'}
@@ -312,7 +254,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       setEmail(e.target.value);
                       setErrorMessage(null);
                     }}
-                    placeholder=""
+                    placeholder={isEn ? 'your.name@edulink.edu.co' : 'tu.nombre@edulink.edu.co'}
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
@@ -341,11 +283,11 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Sending code...' : 'Enviando código...'}</span>
+                      <span>{isEn ? 'Dispatching recovery link...' : 'Enviando enlace de recuperación...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>{isEn ? 'Send verification code' : 'Enviar código de verificación'}</span>
+                      <span>{isEn ? 'Send recovery link' : 'Enviar enlace de recuperación'}</span>
                       <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}
@@ -356,150 +298,123 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* PASO 2: Verificación de OTP (6 dígitos con contador)                      */}
+        {/* PASO 2: Enlace Enviado al Correo (Sin autocompletar de prueba)            */}
         {/* ========================================================================= */}
         {step === 2 && (
           <div>
             <div className="text-center sm:text-left mb-5">
               <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-500 flex items-center justify-center mb-3 shadow-inner">
-                <span className="material-symbols-outlined text-[26px]">pin</span>
+                <span className="material-symbols-outlined text-[26px]">forward_to_inbox</span>
               </div>
               <h3 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {isEn ? 'OTP Verification Code' : 'Código de Verificación OTP'}
+                {isEn ? 'Recovery Link Sent' : 'Enlace de Recuperación Enviado'}
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                {isEn ? 'Enter the 6-digit code sent to:' : 'Ingresa el código de 6 dígitos enviado a:'}{' '}
-                <strong className={isDark ? 'text-cyan-300 font-semibold' : 'text-blue-700 font-semibold'}>{email}</strong>
+                {isEn
+                  ? 'We have dispatched an official password reset link directly to your inbox:'
+                  : 'Hemos enviado el enlace oficial para restablecer tu contraseña directamente a tu correo registrado:'}
               </p>
             </div>
 
-            {/* Quick Helper Chip with Code */}
-            <div className={`p-3 rounded-2xl border mb-4 flex items-center justify-between gap-2 ${
-              isDark ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-200' : 'bg-blue-50 border-blue-200 text-blue-900'
+            {/* Registered Email Card */}
+            <div className={`p-4 rounded-2xl border mb-4 flex items-center gap-3 ${
+              isDark ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200' : 'bg-cyan-50 border-cyan-200 text-cyan-950'
             }`}>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-cyan-500">mark_email_unread</span>
-                <span className="text-xs">
-                  {isEn ? 'Demo Code:' : 'Código de prueba:'}{' '}
-                  <strong className="font-mono text-sm font-bold text-cyan-500 tracking-widest">{demoCode}</strong>
+              <span className="material-symbols-outlined text-[24px] text-cyan-500 shrink-0">mark_email_read</span>
+              <div className="overflow-hidden">
+                <span className="text-[11px] uppercase tracking-wider block opacity-75 font-semibold">
+                  {isEn ? 'Registered Inbox' : 'Bandeja Registrada'}
+                </span>
+                <span className="font-mono text-sm sm:text-base font-bold truncate block text-cyan-500">
+                  {email}
                 </span>
               </div>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border text-xs sm:text-sm leading-relaxed mb-4 ${
+              isDark ? 'bg-slate-950/70 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-[18px] text-amber-500 shrink-0 mt-0.5">info</span>
+                <span>
+                  {isEn
+                    ? 'Check your inbox or spam folder. You can also proceed directly below to define your new secure password.'
+                    : 'Revisa tu bandeja de entrada o carpeta de spam. También puedes continuar a continuación para definir tu nueva contraseña segura.'}
+                </span>
+              </div>
+            </div>
+
+            {noticeMessage && (
+              <div className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 mb-4 ${
+                isDark ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              }`}>
+                <span className="material-symbols-outlined text-[16px] text-emerald-500 shrink-0">check_circle</span>
+                <span>{noticeMessage}</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/40 text-rose-500 text-xs sm:text-sm rounded-xl flex items-start gap-2 mb-4 animate-in fade-in">
+                <span className="material-symbols-outlined text-[18px] text-rose-500 shrink-0 mt-0.5">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {/* Countdown Timer / Resend Action */}
+            <div className="flex items-center justify-center gap-2 text-xs sm:text-sm mb-4">
+              {resendTimer > 0 ? (
+                <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <span className="material-symbols-outlined text-[18px] text-cyan-500 animate-spin" style={{ animationDuration: '4s' }}>
+                    timer
+                  </span>
+                  <span>
+                    {isEn ? 'Resend recovery link in' : 'Reenviar enlace en'}{' '}
+                    <strong className="text-cyan-500 font-mono font-bold">{resendTimer}s</strong>
+                  </span>
+                </div>
+              ) : (
+                <button
+                  id="btn-resend-otp"
+                  type="button"
+                  onClick={handleResendRecoveryLink}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 text-cyan-500 hover:text-cyan-400 font-bold hover:underline cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">refresh</span>
+                  <span>{isEn ? 'Resend recovery email now' : 'Reenviar enlace de recuperación'}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="pt-1 flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
                 onClick={() => {
-                  setOtpDigits(demoCode.split(''));
+                  setStep(1);
                   setErrorMessage(null);
                 }}
-                className={`text-xs font-bold underline cursor-pointer transition-colors ${
-                  isDark ? 'text-cyan-300 hover:text-white' : 'text-blue-700 hover:text-blue-900'
+                className={`w-full sm:w-1/3 font-semibold text-sm py-3.5 rounded-xl transition-colors cursor-pointer border ${
+                  isDark
+                    ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
                 }`}
               >
-                {isEn ? 'Auto-fill' : 'Autocompletar'}
+                {isEn ? 'Change email' : 'Cambiar correo'}
+              </button>
+
+              <button
+                id="btn-proceed-create-new-password"
+                type="button"
+                onClick={() => {
+                  setStep(3);
+                  setErrorMessage(null);
+                }}
+                className="w-full sm:w-2/3 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:via-cyan-500 hover:to-teal-400 active:opacity-90 text-white font-bold text-base py-3.5 rounded-xl transition-all duration-200 cursor-pointer text-center shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                <span>{isEn ? 'Create New Password' : 'Crear Nueva Contraseña'}</span>
               </button>
             </div>
-
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center gap-1.5 sm:gap-2">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      id={`otp-input-${idx}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      onPaste={idx === 0 ? handleOtpPaste : undefined}
-                      className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-bold font-mono rounded-xl outline-none transition-all ${
-                        isDark
-                          ? 'bg-slate-950/80 border border-slate-700 text-cyan-300 focus:bg-slate-900 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30'
-                          : 'bg-slate-50 border border-slate-300 text-blue-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20'
-                      }`}
-                      autoFocus={idx === 0}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Countdown Timer / Resend Action */}
-              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm pt-1">
-                {resendTimer > 0 ? (
-                  <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    <span className="material-symbols-outlined text-[18px] text-cyan-500 animate-spin" style={{ animationDuration: '4s' }}>
-                      timer
-                    </span>
-                    <span>
-                      {isEn ? 'Resend code in' : 'Reenviar código en'}{' '}
-                      <strong className="text-cyan-500 font-mono font-bold">{resendTimer}s</strong>
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    id="btn-resend-otp"
-                    type="button"
-                    onClick={handleResendCode}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-1.5 text-cyan-500 hover:text-cyan-400 font-bold hover:underline cursor-pointer transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">refresh</span>
-                    <span>{isEn ? 'Resend code now' : 'Reenviar código ahora'}</span>
-                  </button>
-                )}
-              </div>
-
-              {noticeMessage && (
-                <div className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
-                  isDark ? 'bg-cyan-950/60 border-cyan-500/30 text-cyan-300' : 'bg-blue-50 border-blue-200 text-blue-800'
-                }`}>
-                  <span className="material-symbols-outlined text-[16px] text-cyan-500">check_circle</span>
-                  <span>{noticeMessage}</span>
-                </div>
-              )}
-
-              {errorMessage && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/40 text-rose-500 text-xs sm:text-sm rounded-xl flex items-start gap-2 animate-in fade-in">
-                  <span className="material-symbols-outlined text-[18px] text-rose-500 shrink-0 mt-0.5">error</span>
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep(1);
-                    setErrorMessage(null);
-                  }}
-                  className={`w-full sm:w-1/3 font-semibold text-sm py-3.5 rounded-xl transition-colors cursor-pointer border ${
-                    isDark
-                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
-                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
-                  }`}
-                >
-                  {isEn ? 'Change email' : 'Cambiar correo'}
-                </button>
-                <button
-                  id="btn-verify-otp"
-                  type="submit"
-                  disabled={isLoading || otpDigits.join('').length < 6}
-                  className="w-full sm:w-2/3 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:via-cyan-500 hover:to-teal-400 active:opacity-90 text-white font-bold text-base py-3.5 rounded-xl transition-all duration-200 cursor-pointer text-center shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Verifying...' : 'Verificando...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[20px]">verified</span>
-                      <span>{isEn ? 'Verify code' : 'Verificar código'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
           </div>
         )}
 
@@ -513,12 +428,13 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 <span className="material-symbols-outlined text-[26px]">lock_reset</span>
               </div>
               <h3 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {isEn ? 'Reset Password' : 'Restablecer Contraseña'}
+                {isEn ? 'Create New Password' : 'Crear Nueva Contraseña'}
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {isEn
-                  ? 'Create a strong, secure password to protect your institutional account.'
-                  : 'Crea una contraseña segura para tu cuenta institucional en Edulink School.'}
+                  ? 'Define your new password for institutional account:'
+                  : 'Define tu nueva contraseña para la cuenta institucional:'}{' '}
+                <strong className={isDark ? 'text-cyan-300 font-semibold' : 'text-blue-700 font-semibold'}>{email}</strong>
               </p>
             </div>
 
@@ -657,12 +573,12 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Saving password...' : 'Guardando contraseña...'}</span>
+                      <span>{isEn ? 'Updating password...' : 'Actualizando contraseña...'}</span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[20px]">save</span>
-                      <span>{isEn ? 'Save and Reset' : 'Guardar y restablecer'}</span>
+                      <span>{isEn ? 'Save New Password' : 'Guardar y Actualizar Contraseña'}</span>
                     </>
                   )}
                 </button>

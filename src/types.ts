@@ -23,6 +23,7 @@ export interface UserProfile {
   avatarUrl?: string;
   adminPosition?: string;
   department?: string;
+  roleVerificationCode?: string;
   subjects?: Subject[];
   assignments?: UpcomingAssignment[];
   students?: { id: string; name: string; grade: string }[];

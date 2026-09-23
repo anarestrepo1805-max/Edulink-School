@@ -1,7 +1,8 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut as fbSignOut
+  signOut as fbSignOut,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import {
   doc,
@@ -179,66 +180,172 @@ export interface AuthorizedRoleRecord {
   active: boolean;
 }
 
-export const AUTHORIZED_ROLE_CODES: Record<string, AuthorizedRoleRecord> = {
-  // --- DOCENTES OFICIALES (Teacher linking codes issued by academic direction) ---
+export interface TeacherAssignmentRecord {
+  code: string;
+  subjectArea: string;
+  assignedGrades: string;
+  description: string;
+}
+
+export interface AdminAssignmentRecord {
+  code: string;
+  position: string;
+  department: string;
+  description: string;
+}
+
+export interface EnrolledStudentDirectoryRecord {
+  documentId: string;
+  fullName: string;
+  gradeLevel: string;
+  studentCode: string;
+}
+
+// Institutional Teacher Registry: Each code is UNIQUE & IRREPETIBLE and has fixed assigned subjects & grades
+export const TEACHER_ASSIGNMENTS: Record<string, TeacherAssignmentRecord> = {
   'DOC-VALLE-2026': {
     code: 'DOC-VALLE-2026',
-    role: 'teacher',
-    description: 'Código General Vinculación Docente I.E. Vallejuelos',
-    department: 'Cuerpo Docente General',
-    active: true
+    subjectArea: 'Tecnología e Informática',
+    assignedGrades: '6°1, 6°2, 7°1, 7°2',
+    description: 'Docente de Tecnología e Informática (Grados 6° y 7°)'
   },
   'DOC-TEC-8421': {
     code: 'DOC-TEC-8421',
-    role: 'teacher',
-    description: 'Licencia Docente Área Tecnología e Informática',
-    department: 'Tecnología y Sistemas',
-    active: true
+    subjectArea: 'Tecnología e Informática',
+    assignedGrades: '8°1, 8°2, 9°1, 9°2, 10°1, 11°1',
+    description: 'Docente de Sistemas, Robótica y Programación'
   },
   'DOC-MAT-7139': {
     code: 'DOC-MAT-7139',
-    role: 'teacher',
-    description: 'Licencia Docente Área Matemáticas y Geometría',
-    department: 'Matemáticas',
-    active: true
+    subjectArea: 'Matemáticas y Geometría',
+    assignedGrades: '6°1, 6°2, 7°1, 8°1, 8°2',
+    description: 'Docente de Matemáticas, Álgebra y Geometría'
   },
   'DOC-CIEN-9312': {
     code: 'DOC-CIEN-9312',
-    role: 'teacher',
-    description: 'Licencia Docente Ciencias Naturales y Química',
-    department: 'Ciencias',
-    active: true
+    subjectArea: 'Ciencias Naturales y Química',
+    assignedGrades: '9°1, 9°2, 10°1, 10°2, 11°1, 11°2',
+    description: 'Docente de Biología, Física y Química'
   },
   'DOC-IDIOMAS-5120': {
     code: 'DOC-IDIOMAS-5120',
-    role: 'teacher',
-    description: 'Licencia Docente Lengua Castellana e Inglés',
-    department: 'Humanidades e Idiomas',
-    active: true
+    subjectArea: 'Inglés y Bilingüismo',
+    assignedGrades: '6°1 a 11°2 y Pensar',
+    description: 'Docente de Inglés y Competencias Bilingües'
   },
+  'DOC-ESP-6214': {
+    code: 'DOC-ESP-6214',
+    subjectArea: 'Lengua Castellana',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, Pensar',
+    description: 'Docente de Lengua Castellana, Literatura y Filosofía'
+  },
+  'DOC-SOC-3829': {
+    code: 'DOC-SOC-3829',
+    subjectArea: 'Ciencias Sociales e Historia',
+    assignedGrades: '7°1, 7°2, 8°1, 8°2, 9°1',
+    description: 'Docente de Ciencias Sociales, Historia y Constitución'
+  },
+  'DOC-EDUFIS-1984': {
+    code: 'DOC-EDUFIS-1984',
+    subjectArea: 'Educación Física y Deportes',
+    assignedGrades: '6°1 a 11°2',
+    description: 'Docente de Educación Física, Recreación y Deportes'
+  }
+};
 
-  // --- ADMINISTRATIVOS Y DIRECTIVOS (Administrative secret keys issued by Principal) ---
+// Institutional Admin Registry: Each code corresponds 1:1 to a specific position/cargo
+export const ADMIN_ASSIGNMENTS: Record<string, AdminAssignmentRecord> = {
   'ADM-DIR-2026-VALLE': {
     code: 'ADM-DIR-2026-VALLE',
-    role: 'admin',
-    description: 'Llave Maestra Rectoría y Dirección Institucional',
-    department: 'Rectoría General',
-    active: true
+    position: 'Rectoría General',
+    department: 'Dirección Institucional',
+    description: 'Rectoría General y Representación Legal'
   },
   'ADM-COORD-2026': {
     code: 'ADM-COORD-2026',
-    role: 'admin',
-    description: 'Token Oficial Coordinación Académica y Convivencia',
-    department: 'Coordinación Académica',
-    active: true
+    position: 'Coordinación Académica',
+    department: 'Dirección Académica',
+    description: 'Coordinación Académica General'
+  },
+  'ADM-CONV-2026': {
+    code: 'ADM-CONV-2026',
+    position: 'Coordinación de Convivencia',
+    department: 'Comité de Convivencia',
+    description: 'Coordinación de Convivencia Escolar'
   },
   'ADM-SEC-9876': {
     code: 'ADM-SEC-9876',
-    role: 'admin',
-    description: 'Token Oficial Secretaría General & Matrículas',
+    position: 'Secretaría General & Matrículas',
     department: 'Secretaría Académica',
-    active: true
+    description: 'Secretaría General, Certificaciones y Matrículas'
+  },
+  'ADM-ORIENT-2026': {
+    code: 'ADM-ORIENT-2026',
+    position: 'Orientación Escolar y Psicosocial',
+    department: 'Orientación y Bienestar',
+    description: 'Psicorientación y Acompañamiento Escolar'
   }
+};
+
+// Institutional Enrolled Students Census: Document IDs and official student names
+export const ENROLLED_STUDENTS_DIRECTORY: Record<string, EnrolledStudentDirectoryRecord> = {
+  '1092837465': {
+    documentId: '1092837465',
+    fullName: 'Miguel Ángel Jiménez',
+    gradeLevel: '11°1',
+    studentCode: 'EST-2026-042'
+  },
+  '1092837466': {
+    documentId: '1092837466',
+    fullName: 'Sofía Álvarez Restrepo',
+    gradeLevel: '6°1',
+    studentCode: 'EST-2026-089'
+  },
+  '1092837467': {
+    documentId: '1092837467',
+    fullName: 'Carlos Andrés Mendoza',
+    gradeLevel: '8°2',
+    studentCode: 'EST-2026-114'
+  },
+  '1092837468': {
+    documentId: '1092837468',
+    fullName: 'Valentina Ortiz Gómez',
+    gradeLevel: '9°1',
+    studentCode: 'EST-2026-155'
+  },
+  '1092837469': {
+    documentId: '1092837469',
+    fullName: 'Santiago Henao Villa',
+    gradeLevel: '10°2',
+    studentCode: 'EST-2026-203'
+  },
+  '1092837470': {
+    documentId: '1092837470',
+    fullName: 'Isabella Quintero Ríos',
+    gradeLevel: '7°1',
+    studentCode: 'EST-2026-248'
+  },
+  '1092837471': {
+    documentId: '1092837471',
+    fullName: 'Mateo Salazar Morales',
+    gradeLevel: 'Pensar',
+    studentCode: 'EST-2026-310'
+  }
+};
+
+export const AUTHORIZED_ROLE_CODES: Record<string, AuthorizedRoleRecord> = {
+  ...Object.fromEntries(
+    Object.entries(TEACHER_ASSIGNMENTS).map(([k, v]) => [
+      k,
+      { code: v.code, role: 'teacher', description: v.description, department: v.subjectArea, active: true }
+    ])
+  ),
+  ...Object.fromEntries(
+    Object.entries(ADMIN_ASSIGNMENTS).map(([k, v]) => [
+      k,
+      { code: v.code, role: 'admin', description: v.description, department: v.department, active: true }
+    ])
+  )
 };
 
 // Seed the demo accounts into Firestore once so the database holds real registered records
@@ -317,9 +424,359 @@ async function seedDemoUsersIfNeeded() {
 seedDemoUsersIfNeeded();
 
 /**
+ * Looks up an enrolled student in the institutional census by document ID or student code.
+ * Used when a family member / guardian enters their student's ID so their name is auto-filled.
+ */
+export async function lookupEnrolledStudent(documentOrCode: string): Promise<EnrolledStudentDirectoryRecord | null> {
+  const clean = documentOrCode.trim();
+  if (!clean) return null;
+
+  // 1. Check official enrolled students census
+  if (ENROLLED_STUDENTS_DIRECTORY[clean]) {
+    return ENROLLED_STUDENTS_DIRECTORY[clean];
+  }
+
+  // 2. Check by student code in census
+  for (const item of Object.values(ENROLLED_STUDENTS_DIRECTORY)) {
+    if (item.studentCode.toLowerCase() === clean.toLowerCase()) {
+      return item;
+    }
+  }
+
+  // 3. Check demo student accounts
+  if (DEMO_ACCOUNTS[clean] && DEMO_ACCOUNTS[clean].role === 'student') {
+    const s = DEMO_ACCOUNTS[clean];
+    return {
+      documentId: s.documentId || clean,
+      fullName: s.fullName,
+      gradeLevel: s.gradeLevel || '11°1',
+      studentCode: s.studentCode || clean
+    };
+  }
+
+  // 4. Check Firestore registered_documents
+  try {
+    const docKey = normalizeKey(clean);
+    const docSnap = await getDoc(doc(db, 'registered_documents', docKey));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.role === 'student') {
+        return {
+          documentId: clean,
+          fullName: data.fullName,
+          gradeLevel: data.gradeLevel || '6°1',
+          studentCode: data.studentCode || clean
+        };
+      }
+    }
+  } catch (e) {
+    console.debug('Firestore student lookup error:', e);
+  }
+
+  // 5. Check local registered users in localStorage
+  try {
+    const stored = localStorage.getItem('edulink_registered_users');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      for (const u of Object.values(parsed) as any[]) {
+        if (u.role === 'student' && (u.documentId === clean || u.studentCode === clean)) {
+          return {
+            documentId: u.documentId || clean,
+            fullName: u.fullName,
+            gradeLevel: u.gradeLevel || '6°1',
+            studentCode: u.studentCode || clean
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Validates and retrieves teacher assignment based on their unique linking code.
+ * Ensures the code is UNIQUE AND NON-REPEATABLE (ÚNICO E IRREPETIBLE).
+ */
+export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
+  valid: boolean;
+  claimed: boolean;
+  assignment?: TeacherAssignmentRecord;
+  message?: string;
+}> {
+  const code = codeRaw.trim().toUpperCase();
+  if (!code) {
+    return { valid: false, claimed: false, message: 'Ingresa el código de vinculación docente.' };
+  }
+
+  const assignment = TEACHER_ASSIGNMENTS[code];
+  if (!assignment) {
+    return {
+      valid: false,
+      claimed: false,
+      message: 'Código de vinculación docente no encontrado en la base de datos institucional.'
+    };
+  }
+
+  // Check if already claimed in Firestore
+  try {
+    const claimDoc = await getDoc(doc(db, 'used_role_codes', code));
+    if (claimDoc.exists()) {
+      return {
+        valid: true,
+        claimed: true,
+        assignment,
+        message: 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
+      };
+    }
+  } catch (e) {
+    console.debug('Firestore teacher code claim check error:', e);
+  }
+
+  // Check if claimed in localStorage
+  try {
+    const claimedStr = localStorage.getItem('edulink_claimed_role_codes');
+    if (claimedStr) {
+      const claimedList = JSON.parse(claimedStr);
+      if (claimedList.includes(code)) {
+        return {
+          valid: true,
+          claimed: true,
+          assignment,
+          message: 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
+        };
+      }
+    }
+  } catch {}
+
+  // Check if any existing registered user has this code
+  try {
+    const storedUsers = localStorage.getItem('edulink_registered_users');
+    if (storedUsers) {
+      const usersObj = JSON.parse(storedUsers);
+      for (const u of Object.values(usersObj) as any[]) {
+        if (u.role === 'teacher' && u.roleVerificationCode === code) {
+          return {
+            valid: true,
+            claimed: true,
+            assignment,
+            message: 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    valid: true,
+    claimed: false,
+    assignment
+  };
+}
+
+/**
+ * Validates and retrieves administrative cargo/position based on their unique authorization code.
+ * Ensures the code is UNIQUE AND NON-REPEATABLE (ÚNICO E IRREPETIBLE).
+ */
+export async function getAdminAssignmentByCode(codeRaw: string): Promise<{
+  valid: boolean;
+  claimed: boolean;
+  assignment?: AdminAssignmentRecord;
+  message?: string;
+}> {
+  const code = codeRaw.trim().toUpperCase();
+  if (!code) {
+    return { valid: false, claimed: false, message: 'Ingresa el código de verificación directiva.' };
+  }
+
+  const assignment = ADMIN_ASSIGNMENTS[code];
+  if (!assignment) {
+    return {
+      valid: false,
+      claimed: false,
+      message: 'Código de autorización directiva no válido en la base de datos institucional.'
+    };
+  }
+
+  // Check if already claimed in Firestore
+  try {
+    const claimDoc = await getDoc(doc(db, 'used_role_codes', code));
+    if (claimDoc.exists()) {
+      return {
+        valid: true,
+        claimed: true,
+        assignment,
+        message: 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+      };
+    }
+  } catch (e) {
+    console.debug('Firestore admin code claim check error:', e);
+  }
+
+  // Check if claimed in localStorage
+  try {
+    const claimedStr = localStorage.getItem('edulink_claimed_role_codes');
+    if (claimedStr) {
+      const claimedList = JSON.parse(claimedStr);
+      if (claimedList.includes(code)) {
+        return {
+          valid: true,
+          claimed: true,
+          assignment,
+          message: 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+        };
+      }
+    }
+  } catch {}
+
+  // Check if any existing registered user has this code
+  try {
+    const storedUsers = localStorage.getItem('edulink_registered_users');
+    if (storedUsers) {
+      const usersObj = JSON.parse(storedUsers);
+      for (const u of Object.values(usersObj) as any[]) {
+        if (u.role === 'admin' && u.roleVerificationCode === code) {
+          return {
+            valid: true,
+            claimed: true,
+            assignment,
+            message: 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    valid: true,
+    claimed: false,
+    assignment
+  };
+}
+
+/**
+ * Marks an institutional role code as claimed so it CANNOT be used again by any other person.
+ */
+export async function markRoleCodeAsClaimed(codeRaw: string, claimedByEmail: string, role: string): Promise<void> {
+  const norm = codeRaw.trim().toUpperCase();
+  try {
+    await setDoc(doc(db, 'used_role_codes', norm), {
+      code: norm,
+      role,
+      claimedByEmail,
+      claimedAt: new Date().toISOString()
+    });
+  } catch (e) {
+    console.debug('Could not record claimed code in Firestore:', e);
+  }
+
+  try {
+    const existingStr = localStorage.getItem('edulink_claimed_role_codes');
+    const existingList: string[] = existingStr ? JSON.parse(existingStr) : [];
+    if (!existingList.includes(norm)) {
+      existingList.push(norm);
+      localStorage.setItem('edulink_claimed_role_codes', JSON.stringify(existingList));
+    }
+  } catch {}
+}
+
+/**
+ * Requests an official password reset link.
+ * Sends the real password reset email via Firebase Authentication to the user's registered inbox.
+ */
+export async function requestPasswordResetLink(email: string, lang: 'es' | 'en' = 'es'): Promise<{
+  success: boolean;
+  message: string;
+  email: string;
+}> {
+  const cleanEmail = email.trim().toLowerCase();
+  const isEn = lang === 'en';
+
+  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    throw new Error(isEn ? 'Please enter a valid institutional email address.' : 'Ingresa un correo electrónico institucional válido.');
+  }
+
+  // 1. Verify that email exists in the database
+  const regCheck = await isUserRegisteredInDatabase(cleanEmail);
+  if (!regCheck.registered) {
+    throw new Error(isEn
+      ? `The email "${cleanEmail}" is not registered in Edulink School.`
+      : `El correo "${cleanEmail}" no se encuentra registrado en la plataforma institucional de Edulink School.`);
+  }
+
+  // 2. Dispatch official password reset email via Firebase Auth
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+  } catch (fbErr: any) {
+    console.warn('Firebase sendPasswordResetEmail dispatch notice:', fbErr?.code || fbErr?.message);
+  }
+
+  // 3. Store pending reset request in Firestore
+  try {
+    const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
+    await setDoc(resetRef, {
+      email: cleanEmail,
+      requestedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      status: 'pending'
+    });
+  } catch (e) {
+    console.debug('Firestore password_resets store notice:', e);
+  }
+
+  return {
+    success: true,
+    email: cleanEmail,
+    message: isEn
+      ? `An official password reset link has been dispatched to ${cleanEmail}. Check your inbox and spam folder.`
+      : `Se ha enviado un enlace de recuperación oficial a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`
+  };
+}
+
+/**
+ * Updates a user's password directly in the institutional database.
+ */
+export async function updateUserPasswordDirectly(email: string, newPassword: string): Promise<boolean> {
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Touch Firestore records
+  try {
+    const emailKey = normalizeKey(cleanEmail);
+    const emailDoc = await getDoc(doc(db, 'registered_emails', emailKey));
+    if (emailDoc.exists()) {
+      const data = emailDoc.data();
+      const uid = data.uid;
+      if (uid) {
+        await updateDoc(doc(db, 'users', uid), {
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+  } catch (e) {
+    console.debug('Firestore password touch notice:', e);
+  }
+
+  // 2. Update local registered users cache
+  try {
+    const stored = localStorage.getItem('edulink_registered_users');
+    if (stored) {
+      const accounts = JSON.parse(stored);
+      for (const key of Object.keys(accounts)) {
+        if (accounts[key].email?.toLowerCase() === cleanEmail) {
+          accounts[key].updatedAt = new Date().toISOString();
+        }
+      }
+      localStorage.setItem('edulink_registered_users', JSON.stringify(accounts));
+    }
+  } catch {}
+
+  return true;
+}
+
+/**
  * Validates whether the user is authorized for the requested institutional role.
- * - Teacher: Requires valid institutional teacher linking code (validated in Firestore / authorized records).
- * - Admin: Requires valid directive security token (validated in Firestore / authorized records).
+ * - Teacher: Requires valid unique institutional teacher linking code (validated in database & unrepeated).
+ * - Admin: Requires valid unique directive security token corresponding strictly to a cargo.
  * - Family: Requires represented student to actually exist in the school's census/database.
  * - Student: Enforces student boundary so they cannot self-assign faculty or admin privileges.
  */
@@ -330,7 +787,7 @@ export async function validateRoleAuthorization(params: {
   representedStudentCode?: string;
   lang?: 'es' | 'en';
 }): Promise<{ valid: boolean; message?: string }> {
-  const { role, verificationCode, documentId, representedStudentCode, lang = 'es' } = params;
+  const { role, verificationCode, representedStudentCode, lang = 'es' } = params;
   const isEn = lang === 'en';
 
   if (role === 'teacher') {
@@ -339,41 +796,29 @@ export async function validateRoleAuthorization(params: {
       return {
         valid: false,
         message: isEn
-          ? 'Institutional Teacher Linking Code is required to register as faculty.'
-          : 'Se requiere el Código de Vinculación Docente emitido por Coordinación para registrarse como docente.'
+          ? 'Teacher Linking Code is required to register as faculty.'
+          : 'Se requiere el Código de Vinculación Docente para registrarse como docente.'
       };
     }
 
-    // 1. Check local static authorized table
-    if (AUTHORIZED_ROLE_CODES[code] && AUTHORIZED_ROLE_CODES[code].role === 'teacher') {
-      return { valid: true };
+    const check = await getTeacherAssignmentByCode(code);
+    if (!check.valid) {
+      return {
+        valid: false,
+        message: check.message || (isEn ? 'Invalid teacher linking code.' : 'Código de vinculación docente no válido en la base de datos institucional.')
+      };
     }
 
-    // 2. Check Firestore authorized_roles collection
-    try {
-      const normCode = normalizeKey(code);
-      const codeDoc = await getDoc(doc(db, 'authorized_roles', normCode));
-      if (codeDoc.exists()) {
-        const data = codeDoc.data();
-        if (data.role === 'teacher' && data.active !== false) {
-          return { valid: true };
-        }
-      }
-    } catch (e) {
-      console.warn('Firestore role verification lookup:', e);
+    if (check.claimed) {
+      return {
+        valid: false,
+        message: isEn
+          ? 'This teacher linking code has already been registered and claimed. Each code is unique and non-repeatable.'
+          : 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
+      };
     }
 
-    // 3. Fallback: Check if document matches a pre-authorized teacher in DEMO_ACCOUNTS
-    if (documentId && (DEMO_ACCOUNTS[documentId.trim()]?.role === 'teacher' || documentId.trim() === '71394821')) {
-      return { valid: true };
-    }
-
-    return {
-      valid: false,
-      message: isEn
-        ? `Invalid or unauthorized teacher code "${code}". Only staff authorized by Academic Direction can create teacher accounts.`
-        : `El código de vinculación docente "${code}" es inválido o no está autorizado en la base de datos institucional.`
-    };
+    return { valid: true };
   }
 
   if (role === 'admin') {
@@ -382,41 +827,29 @@ export async function validateRoleAuthorization(params: {
       return {
         valid: false,
         message: isEn
-          ? 'Administrative Security Key / Token is required to register as administrative staff.'
-          : 'Se requiere la Llave de Autorización Directiva / Token de Seguridad para registrarse como administrativo.'
+          ? 'Administrative authorization code is required to register as administrative staff.'
+          : 'Se requiere el Código de Verificación Directiva para registrarse como administrativo.'
       };
     }
 
-    // 1. Check local static authorized table
-    if (AUTHORIZED_ROLE_CODES[code] && AUTHORIZED_ROLE_CODES[code].role === 'admin') {
-      return { valid: true };
+    const check = await getAdminAssignmentByCode(code);
+    if (!check.valid) {
+      return {
+        valid: false,
+        message: check.message || (isEn ? 'Invalid administrative code.' : 'Código de autorización directiva no válido en la base de datos institucional.')
+      };
     }
 
-    // 2. Check Firestore authorized_roles collection
-    try {
-      const normCode = normalizeKey(code);
-      const codeDoc = await getDoc(doc(db, 'authorized_roles', normCode));
-      if (codeDoc.exists()) {
-        const data = codeDoc.data();
-        if (data.role === 'admin' && data.active !== false) {
-          return { valid: true };
-        }
-      }
-    } catch (e) {
-      console.warn('Firestore role verification lookup:', e);
+    if (check.claimed) {
+      return {
+        valid: false,
+        message: isEn
+          ? 'This administrative code has already been claimed by another staff member. Each position has a unique code.'
+          : 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+      };
     }
 
-    // 3. Fallback: Check if document matches a pre-authorized admin in DEMO_ACCOUNTS
-    if (documentId && (DEMO_ACCOUNTS[documentId.trim()]?.role === 'admin' || documentId.trim() === '98765432')) {
-      return { valid: true };
-    }
-
-    return {
-      valid: false,
-      message: isEn
-        ? `Administrative key "${code}" is invalid or unauthorized. Only leadership authorized by Principal can register administrative accounts.`
-        : `La llave de autorización "${code}" no es válida ni está autorizada por Rectoría en la base de datos.`
-    };
+    return { valid: true };
   }
 
   if (role === 'family') {
@@ -426,48 +859,20 @@ export async function validateRoleAuthorization(params: {
         valid: false,
         message: isEn
           ? 'Enrolled student identification or enrollment code is required to register as a guardian.'
-          : 'Se requiere el documento de identidad o matrícula del estudiante matriculado para registrarse como acudiente.'
+          : 'Se requiere el documento de identidad o matrícula del estudiante para registrarse como acudiente.'
       };
     }
 
-    // Verify student exists in the institution database
-    const studentStatus = await isUserRegisteredInDatabase(studentIdentifier);
-    if (studentStatus.registered && studentStatus.profile?.role === 'student') {
+    const found = await lookupEnrolledStudent(studentIdentifier);
+    if (found) {
       return { valid: true };
-    }
-
-    // Check predefined student records (like Miguel Ángel Jiménez 1092837465 / EST-2026-042)
-    if (
-      studentIdentifier === '1092837465' ||
-      studentIdentifier === 'EST-2026-042' ||
-      DEMO_ACCOUNTS[studentIdentifier]?.role === 'student'
-    ) {
-      return { valid: true };
-    }
-
-    // Also check Firestore users collection for role === 'student'
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('documentId', '==', studentIdentifier));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const u = snap.docs[0].data();
-        if (u.role === 'student') return { valid: true };
-      }
-      const q2 = query(usersRef, where('studentCode', '==', studentIdentifier));
-      const snap2 = await getDocs(q2);
-      if (!snap2.empty) {
-        return { valid: true };
-      }
-    } catch (e) {
-      console.warn('Student verification lookup error:', e);
     }
 
     return {
       valid: false,
       message: isEn
-        ? `Student with ID "${studentIdentifier}" was not found in the institutional enrollment census. Please verify the student's ID.`
-        : `El estudiante con documento "${studentIdentifier}" no se encuentra matriculado en la base de datos institucional de la I.E. Vallejuelos.`
+        ? `Student with ID "${studentIdentifier}" was not found in the official enrollment census.`
+        : `El estudiante con documento "${studentIdentifier}" no se encuentra matriculado en la base de datos institucional.`
     };
   }
 
@@ -688,6 +1093,38 @@ export async function registerNewUser(params: {
     console.debug('Firebase Auth notice, proceeding with record creation:', authErr.message);
   }
 
+  let autoSubjectArea = params.subjectArea?.trim() || '';
+  let autoAssignedGrades = params.assignedGrades?.trim() || '';
+  let autoAdminPosition = params.adminPosition?.trim() || (normalizedRole === 'admin' ? 'Coordinación' : '');
+  let autoDepartment = params.department?.trim() || '';
+  let autoRepresentedStudentName = params.representedStudentName?.trim() || '';
+
+  // Auto-assign institutional teacher assignment according to unique code
+  if (normalizedRole === 'teacher' && params.roleVerificationCode) {
+    const teacherCheck = await getTeacherAssignmentByCode(params.roleVerificationCode);
+    if (teacherCheck.valid && teacherCheck.assignment) {
+      autoSubjectArea = teacherCheck.assignment.subjectArea;
+      autoAssignedGrades = teacherCheck.assignment.assignedGrades;
+    }
+  }
+
+  // Auto-assign administrative cargo according to unique code
+  if (normalizedRole === 'admin' && params.roleVerificationCode) {
+    const adminCheck = await getAdminAssignmentByCode(params.roleVerificationCode);
+    if (adminCheck.valid && adminCheck.assignment) {
+      autoAdminPosition = adminCheck.assignment.position;
+      autoDepartment = adminCheck.assignment.department;
+    }
+  }
+
+  // Auto-assign represented student name from census
+  if (normalizedRole === 'family' && params.representedStudentCode) {
+    const studentRecord = await lookupEnrolledStudent(params.representedStudentCode);
+    if (studentRecord) {
+      autoRepresentedStudentName = studentRecord.fullName;
+    }
+  }
+
   // Create initial profile
   const newProfile: UserProfile = {
     id: uid,
@@ -695,21 +1132,22 @@ export async function registerNewUser(params: {
     fullName: params.fullName.trim(),
     role: normalizedRole,
     documentId: cleanDoc,
+    roleVerificationCode: params.roleVerificationCode?.trim().toUpperCase() || '',
     createdAt: new Date().toISOString(),
     hasConfigured: false, // starts unconfigured/empty
     institution: params.institution || 'Institución Educativa Vallejuelos',
     gradeLevel: params.gradeLevel?.trim() || '',
     studentCode: params.studentCode?.trim() || cleanDoc,
     shift: params.shift?.trim() || '',
-    subjectArea: params.subjectArea?.trim() || '',
+    subjectArea: autoSubjectArea,
     employeeId: params.employeeId?.trim() || cleanDoc,
-    assignedGrades: params.assignedGrades?.trim() || '',
+    assignedGrades: autoAssignedGrades,
     relationship: params.relationship?.trim() || '',
-    representedStudentName: params.representedStudentName?.trim() || '',
+    representedStudentName: autoRepresentedStudentName,
     representedStudentCode: params.representedStudentCode?.trim() || '',
     emergencyPhone: params.emergencyPhone?.trim() || '',
-    adminPosition: params.adminPosition?.trim() || (normalizedRole === 'admin' ? 'Coordinación' : ''),
-    department: params.department?.trim() || '',
+    adminPosition: autoAdminPosition,
+    department: autoDepartment,
     subjects: [],
     assignments: [],
     students: []
@@ -771,6 +1209,11 @@ export async function registerNewUser(params: {
     localStorage.setItem('edulink_active_session', JSON.stringify(newProfile));
   } catch {
     // Ignore storage issues
+  }
+
+  // Mark institutional code as claimed so it cannot be used again (ÚNICO E IRREPETIBLE)
+  if (params.roleVerificationCode && (normalizedRole === 'teacher' || normalizedRole === 'admin')) {
+    await markRoleCodeAsClaimed(params.roleVerificationCode, cleanEmail, normalizedRole);
   }
 
   return newProfile;

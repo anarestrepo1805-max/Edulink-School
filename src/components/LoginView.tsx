@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { ASSETS } from '../data/mockData';
-import { loginUser, registerNewUser, AUTHORIZED_ROLE_CODES } from '../services/authService';
+import {
+  loginUser,
+  registerNewUser,
+  getTeacherAssignmentByCode,
+  getAdminAssignmentByCode,
+  lookupEnrolledStudent
+} from '../services/authService';
 import { PasswordRecoveryModal } from './PasswordRecoveryModal';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
@@ -60,13 +66,137 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regAdminDocId, setRegAdminDocId] = useState('');
   const [regAdminEmployeeCode, setRegAdminEmployeeCode] = useState('');
 
-  // Helper toggle to show demo authorized codes in UI
-  const [showDemoCodes, setShowDemoCodes] = useState(false);
+  // Real-time verification states for role assignments
+  const [teacherFeedback, setTeacherFeedback] = useState<{
+    status: 'idle' | 'valid' | 'claimed' | 'invalid';
+    message: string;
+  }>({ status: 'idle', message: '' });
+
+  const [adminFeedback, setAdminFeedback] = useState<{
+    status: 'idle' | 'valid' | 'claimed' | 'invalid';
+    message: string;
+  }>({ status: 'idle', message: '' });
+
+  const [studentLookupFeedback, setStudentLookupFeedback] = useState<{
+    status: 'idle' | 'found' | 'not_found';
+    message: string;
+  }>({ status: 'idle', message: '' });
 
   // Register status states
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const [regSuccess, setRegSuccess] = useState<string | null>(null);
+
+  // Real-time lookup for Teacher linking code
+  const handleTeacherCodeChange = async (val: string) => {
+    const code = val.toUpperCase().trim();
+    setRegTeacherCode(code);
+    setRegError(null);
+    if (!code) {
+      setTeacherFeedback({ status: 'idle', message: '' });
+      return;
+    }
+    const res = await getTeacherAssignmentByCode(code);
+    if (res.valid && res.assignment) {
+      if (res.claimed) {
+        setTeacherFeedback({
+          status: 'claimed',
+          message: isEn
+            ? 'This linking code has already been registered by another teacher. Each code is unique and non-repeatable.'
+            : 'Este código de vinculación docente ya fue registrado por otro docente. Cada código es único e irrepetible.'
+        });
+      } else {
+        setRegSubjectArea(res.assignment.subjectArea);
+        setRegAssignedGrades(res.assignment.assignedGrades);
+        setTeacherFeedback({
+          status: 'valid',
+          message: isEn
+            ? `Assigned: ${res.assignment.subjectArea} (${res.assignment.assignedGrades})`
+            : `Asignación oficial: ${res.assignment.subjectArea} | Grados: ${res.assignment.assignedGrades}`
+        });
+      }
+    } else if (code.length >= 4) {
+      setTeacherFeedback({
+        status: 'invalid',
+        message: isEn
+          ? 'Teacher linking code not found in institutional database.'
+          : 'Código de vinculación docente no encontrado en la base de datos institucional.'
+      });
+    } else {
+      setTeacherFeedback({ status: 'idle', message: '' });
+    }
+  };
+
+  // Real-time lookup for Administrative authorization code
+  const handleAdminCodeChange = async (val: string) => {
+    const code = val.toUpperCase().trim();
+    setRegAdminKey(code);
+    setRegError(null);
+    if (!code) {
+      setAdminFeedback({ status: 'idle', message: '' });
+      return;
+    }
+    const res = await getAdminAssignmentByCode(code);
+    if (res.valid && res.assignment) {
+      if (res.claimed) {
+        setAdminFeedback({
+          status: 'claimed',
+          message: isEn
+            ? 'This code has already been assigned to another staff member. Each position has a unique code.'
+            : 'Este código de verificación directiva ya fue asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+        });
+      } else {
+        setRegAdminPosition(res.assignment.position);
+        setAdminFeedback({
+          status: 'valid',
+          message: isEn
+            ? `Official Position Assigned: ${res.assignment.position}`
+            : `Cargo oficial asignado: ${res.assignment.position}`
+        });
+      }
+    } else if (code.length >= 4) {
+      setAdminFeedback({
+        status: 'invalid',
+        message: isEn
+          ? 'Directive authorization code not recognized in institutional database.'
+          : 'Código de verificación directiva no reconocido en la base de datos institucional.'
+      });
+    } else {
+      setAdminFeedback({ status: 'idle', message: '' });
+    }
+  };
+
+  // Real-time lookup for Enrolled Student ID (Guardian registration)
+  const handleRepresentedStudentDocChange = async (val: string) => {
+    const clean = val.trim();
+    setRegRepresentedStudentCode(clean);
+    setRegError(null);
+    if (!clean) {
+      setStudentLookupFeedback({ status: 'idle', message: '' });
+      setRegRepresentedStudentName('');
+      return;
+    }
+    const student = await lookupEnrolledStudent(clean);
+    if (student) {
+      setRegRepresentedStudentName(student.fullName);
+      setStudentLookupFeedback({
+        status: 'found',
+        message: isEn
+          ? `Enrolled Student: ${student.fullName} (${student.gradeLevel})`
+          : `Estudiante matriculado: ${student.fullName} (${student.gradeLevel})`
+      });
+    } else if (clean.length >= 4) {
+      setRegRepresentedStudentName('');
+      setStudentLookupFeedback({
+        status: 'not_found',
+        message: isEn
+          ? 'No enrolled student found with this document in institutional census.'
+          : 'No se encontró ningún estudiante matriculado con este documento en el censo oficial.'
+      });
+    } else {
+      setStudentLookupFeedback({ status: 'idle', message: '' });
+    }
+  };
 
   // Password validation helper tests
   const passHasUpper = /[A-Z]/.test(regPassword);
@@ -259,21 +389,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       {/* ========================================================================= */}
       {/* TOP INSTITUTIONAL BAR: Aesthetic, compact, non-intrusive control capsule  */}
       {/* ========================================================================= */}
-      <header className="relative z-30 w-full max-w-[1160px] mx-auto px-4 sm:px-6 pt-3 sm:pt-4 pb-0 flex items-center justify-between">
-        {/* Left: Subtle institutional indicator */}
-        <div className="flex items-center gap-2">
-          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border transition-all duration-300 ${
-            isDark
-              ? 'bg-slate-900/60 border-slate-700/60 text-slate-300'
-              : 'bg-white/80 border-slate-200 text-slate-700 shadow-xs'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold tracking-tight">I.E. Vallejuelos</span>
-            <span className="text-slate-400">•</span>
-            <span className="hidden sm:inline font-medium">Edulink School</span>
-          </div>
-        </div>
-
+      <header className="relative z-30 w-full max-w-[1160px] mx-auto px-4 sm:px-6 pt-3 sm:pt-4 pb-0 flex items-center justify-end">
         {/* Right: Sleek, compact aesthetic control capsule */}
         <div className={`flex items-center gap-1 p-1 rounded-full backdrop-blur-xl border shadow-sm transition-all duration-300 ${
           isDark
@@ -985,7 +1101,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
                 )}
 
-                {/* CASE B: ROL DOCENTE (PROTECTED WITH LINKING CODE) */}
+                {/* CASE B: ROL DOCENTE (PROTEGIDO CON CÓDIGO ÚNICO E IRREPETIBLE) */}
                 {regRole === 'teacher' && (
                   <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
                     isDark ? 'bg-indigo-950/30 border-indigo-800/50 text-indigo-100' : 'bg-indigo-50 border-indigo-200 text-indigo-950'
@@ -998,74 +1114,79 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         <h4 className="text-sm font-bold flex items-center gap-2">
                           <span>{isEn ? 'Faculty Verification & Protected Access' : 'Verificación Docente y Acceso Protegido'}</span>
                           <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold">
-                            {isEn ? 'Protected' : 'Protegido'}
+                            {isEn ? 'Unique Code' : 'Código Único'}
                           </span>
                         </h4>
                         <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                           {isEn
-                            ? 'Security constraint: To register as a Teacher, you must provide the official Teacher Linking Code issued by Academic Direction. This code is verified in the database to prevent students or unauthorized persons from registering as teachers.'
-                            : 'Condición de seguridad: Para registrarte como Docente, debes ingresar el Código de Vinculación Docente emitido por la Coordinación Académica. Se valida en la base de datos institucional para impedir que estudiantes se registren como docentes.'}
+                            ? 'Security constraint: To register as a Teacher, enter your official Faculty Code issued in physical format by Academic Direction. Each code is unique, non-repeatable, and automatically assigns your subjects and grades.'
+                            : 'Condición de seguridad: Para registrarte como Docente, ingresa tu Código de Vinculación Docente entregado en físico por Coordinación. El código es único, irrepetible y asigna automáticamente tus materias y grupos.'}
                         </p>
                       </div>
                     </div>
 
-                    {/* Teacher Linking Code Input */}
+                    {/* Teacher Linking Code Input (Strictly manual, no autocomplete) */}
                     <div className={`p-3.5 rounded-xl border ${
                       isDark ? 'bg-slate-900/90 border-indigo-500/40' : 'bg-white border-indigo-200 shadow-xs'
                     }`}>
                       <label className="block text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1.5 flex items-center justify-between">
-                        <span>{isEn ? 'Teacher Linking Code (From Academic Direction) *' : 'Código de Vinculación Docente (Emitido por Coordinación) *'}</span>
+                        <span>{isEn ? 'Teacher Linking Code (Personal & Non-transferable) *' : 'Código de Vinculación Docente (Único e Intransferible) *'}</span>
                         <span className="material-symbols-outlined text-[16px]">key</span>
                       </label>
                       <input
                         id="input-teacher-verification-code"
                         type="text"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
                         value={regTeacherCode}
-                        onChange={(e) => setRegTeacherCode(e.target.value.toUpperCase())}
-                        placeholder={isEn ? 'e.g. DOC-VALLE-2026' : 'ej: DOC-VALLE-2026'}
+                        onChange={(e) => handleTeacherCodeChange(e.target.value)}
+                        placeholder={isEn ? 'Enter your assigned teacher code' : 'Ingresa tu código único de docente'}
                         className={`w-full px-3.5 py-2.5 text-sm font-mono font-bold tracking-wider rounded-xl outline-none border transition-all ${
-                          isDark
-                            ? 'bg-slate-950 border-indigo-500/50 text-indigo-300 focus:border-indigo-400'
-                            : 'bg-indigo-50/50 border-indigo-300 text-indigo-900 focus:bg-white focus:border-indigo-600'
+                          teacherFeedback.status === 'valid'
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                            : teacherFeedback.status === 'claimed' || teacherFeedback.status === 'invalid'
+                              ? 'bg-rose-500/10 border-rose-500 text-rose-400'
+                              : isDark
+                                ? 'bg-slate-950 border-indigo-500/50 text-indigo-300 focus:border-indigo-400'
+                                : 'bg-indigo-50/50 border-indigo-300 text-indigo-900 focus:bg-white focus:border-indigo-600'
                         }`}
                         required
                       />
-                      <div className="flex items-center justify-between mt-2 pt-1 text-[11px]">
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                          {isEn ? 'Validated against institutional database' : 'Validado en base de datos oficial'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setRegTeacherCode('DOC-VALLE-2026')}
-                          className="text-indigo-600 hover:text-indigo-500 font-bold underline cursor-pointer"
-                        >
-                          {isEn ? 'Fill test code (DOC-VALLE-2026)' : 'Autocompletar prueba (DOC-VALLE-2026)'}
-                        </button>
-                      </div>
+
+                      {/* Real-time verification feedback */}
+                      {teacherFeedback.message && (
+                        <div className={`mt-2 p-2 rounded-lg text-xs flex items-center gap-2 ${
+                          teacherFeedback.status === 'valid'
+                            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold'
+                            : 'bg-rose-500/15 border border-rose-500/30 text-rose-400'
+                        }`}>
+                          <span className="material-symbols-outlined text-[16px] shrink-0">
+                            {teacherFeedback.status === 'valid' ? 'check_circle' : 'error'}
+                          </span>
+                          <span>{teacherFeedback.message}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Main Subject Area *' : 'Área o Asignatura Principal *'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Assigned Subject Area' : 'Área o Asignatura Asignada'}</span>
+                          <span className="text-[10px] text-indigo-500 font-semibold">
+                            {isEn ? 'Auto-assigned by code' : 'Asignada por código'}
+                          </span>
                         </label>
-                        <select
+                        <input
+                          type="text"
+                          readOnly
                           value={regSubjectArea}
-                          onChange={(e) => setRegSubjectArea(e.target.value)}
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                          className={`w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl outline-none border cursor-not-allowed ${
                             isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600'
+                              ? 'bg-slate-950/80 border-slate-700 text-indigo-300'
+                              : 'bg-slate-100 border-slate-300 text-slate-800'
                           }`}
-                        >
-                          <option value="Tecnología e Informática">{isEn ? 'Technology & Computing' : 'Tecnología e Informática'}</option>
-                          <option value="Matemáticas y Geometría">{isEn ? 'Mathematics & Geometry' : 'Matemáticas y Geometría'}</option>
-                          <option value="Ciencias Naturales y Química">{isEn ? 'Natural Sciences & Chemistry' : 'Ciencias Naturales y Química'}</option>
-                          <option value="Lengua Castellana">{isEn ? 'Spanish & Literature' : 'Lengua Castellana'}</option>
-                          <option value="Ciencias Sociales e Historia">{isEn ? 'Social Studies & History' : 'Ciencias Sociales e Historia'}</option>
-                          <option value="Inglés y Bilingüismo">{isEn ? 'English & Bilingualism' : 'Inglés y Bilingüismo'}</option>
-                          <option value="Educación Física y Deportes">{isEn ? 'Physical Education & Sports' : 'Educación Física y Deportes'}</option>
-                        </select>
+                        />
                       </div>
 
                       <div>
@@ -1074,9 +1195,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regEmployeeId}
                           onChange={(e) => setRegEmployeeId(e.target.value)}
-                          placeholder=""
+                          placeholder={isEn ? 'Citizen identification number' : 'Número de identificación'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
                             isDark
                               ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
@@ -1087,18 +1209,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Assigned Groups (e.g., 6°1, 6°2, 7°1)' : 'Grupos Asignados (ej: 6°1, 6°2, 7°1)'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Assigned Academic Groups' : 'Grupos Académicos Asignados'}</span>
+                          <span className="text-[10px] text-indigo-500 font-semibold">
+                            {isEn ? 'Bound to official schedule' : 'Vinculados según carga oficial'}
+                          </span>
                         </label>
                         <input
                           type="text"
+                          readOnly
                           value={regAssignedGrades}
-                          onChange={(e) => setRegAssignedGrades(e.target.value)}
-                          placeholder=""
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                          className={`w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl outline-none border cursor-not-allowed ${
                             isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600'
+                              ? 'bg-slate-950/80 border-slate-700 text-indigo-300'
+                              : 'bg-slate-100 border-slate-300 text-slate-800'
                           }`}
                         />
                       </div>
@@ -1106,7 +1230,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
                 )}
 
-                {/* CASE C: ROL ACUDIENTE / FAMILIA (VERIFIED AGAINST ENROLLED STUDENT) */}
+                {/* CASE C: ROL ACUDIENTE / FAMILIA (VERIFICADO CON AUTOCOMPLETADO DE NOMBRE) */}
                 {regRole === 'family' && (
                   <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
                     isDark ? 'bg-amber-950/30 border-amber-800/50 text-amber-100' : 'bg-amber-50 border-amber-200 text-amber-950'
@@ -1121,8 +1245,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </h4>
                         <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                           {isEn
-                            ? 'Condition: Registration requires providing the document or enrollment code of the represented student. The system checks the database to ensure the student is enrolled.'
-                            : 'Condición: Para validar tu rol de acudiente, debes ingresar el documento o código del estudiante a representar. El sistema validará en la base de datos institucional que el estudiante esté registrado.'}
+                            ? 'Condition: Enter your student’s document number. The system will automatically look up the official census and auto-complete the student’s name to ensure legitimate representation.'
+                            : 'Condición: Digita el documento de identidad de tu estudiante. El sistema consultará el censo oficial y autocompletará su nombre automáticamente para verificar la matrícula.'}
                         </p>
                       </div>
                     </div>
@@ -1154,9 +1278,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regGuardianDocId}
                           onChange={(e) => setRegGuardianDocId(e.target.value)}
-                          placeholder=""
+                          placeholder={isEn ? 'Guardian ID number' : 'Cédula del acudiente'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
                             isDark
                               ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
@@ -1167,46 +1292,59 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Represented Student ID / Enrollment Code *' : 'Documento o Matrícula del Estudiante Representado *'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Student ID Number *' : 'Documento del Estudiante *'}</span>
+                          <span className="text-[10px] text-amber-500 font-semibold">
+                            {isEn ? 'Type to search census' : 'Digita para consultar'}
+                          </span>
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regRepresentedStudentCode}
-                          onChange={(e) => setRegRepresentedStudentCode(e.target.value)}
-                          placeholder={isEn ? 'e.g. 1092837465' : 'ej: 1092837465'}
+                          onChange={(e) => handleRepresentedStudentDocChange(e.target.value)}
+                          placeholder={isEn ? 'Enter student document' : 'Digita el documento del estudiante'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border font-mono ${
-                            isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                            studentLookupFeedback.status === 'found'
+                              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
+                              : studentLookupFeedback.status === 'not_found'
+                                ? 'bg-rose-500/10 border-rose-500 text-rose-400 font-bold'
+                                : isDark
+                                  ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                                  : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
                           }`}
                           required
                         />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRegRepresentedStudentCode('1092837465');
-                            setRegRepresentedStudentName('Miguel Ángel Jiménez');
-                          }}
-                          className="text-[11px] text-amber-600 hover:text-amber-500 font-bold underline cursor-pointer mt-1 block"
-                        >
-                          {isEn ? 'Fill enrolled demo student (1092837465)' : 'Autocompletar estudiante de prueba (1092837465)'}
-                        </button>
+                        {studentLookupFeedback.message && (
+                          <div className={`mt-1.5 p-1.5 rounded-lg text-[11px] flex items-center gap-1.5 ${
+                            studentLookupFeedback.status === 'found'
+                              ? 'text-emerald-400 font-semibold'
+                              : 'text-rose-400'
+                          }`}>
+                            <span className="material-symbols-outlined text-[15px] shrink-0">
+                              {studentLookupFeedback.status === 'found' ? 'verified' : 'cancel'}
+                            </span>
+                            <span>{studentLookupFeedback.message}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Represented Student Full Name *' : 'Nombre Completo del Estudiante Representado *'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Student Full Name' : 'Nombre Completo del Estudiante'}</span>
+                          <span className="text-[10px] text-amber-500 font-semibold">
+                            {isEn ? 'Auto-completed' : 'Autocompletado oficial'}
+                          </span>
                         </label>
                         <input
                           type="text"
+                          readOnly
                           value={regRepresentedStudentName}
-                          onChange={(e) => setRegRepresentedStudentName(e.target.value)}
-                          placeholder=""
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
-                            isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          placeholder={isEn ? 'Auto-filled upon entering document' : 'Se autocompleta con el documento'}
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border font-semibold ${
+                            regRepresentedStudentName
+                              ? isDark ? 'bg-slate-950/80 border-emerald-500/60 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                              : isDark ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
                           }`}
                           required
                         />
@@ -1218,9 +1356,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regEmergencyPhone}
                           onChange={(e) => setRegEmergencyPhone(e.target.value)}
-                          placeholder=""
+                          placeholder={isEn ? 'Emergency contact telephone' : 'Número de teléfono o celular'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
                             isDark
                               ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
@@ -1232,7 +1371,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
                 )}
 
-                {/* CASE D: ROL ADMINISTRATIVO (PROTECTED WITH DIRECTIVE KEY) */}
+                {/* CASE D: ROL ADMINISTRATIVO (PROTEGIDO CON CÓDIGO DIRECTIVO ÚNICO) */}
                 {regRole === 'admin' && (
                   <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
                     isDark ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-100' : 'bg-emerald-50 border-emerald-200 text-emerald-950'
@@ -1243,74 +1382,81 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       </div>
                       <div>
                         <h4 className="text-sm font-bold flex items-center gap-2">
-                          <span>{isEn ? 'Directive & Administrative Authorization Key' : 'Llave de Autorización Directiva y Administrativa'}</span>
+                          <span>{isEn ? 'Directive Verification & Staff Authorization' : 'Verificación Directiva y Autorización de Personal'}</span>
                           <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold">
-                            {isEn ? 'High Privilege' : 'Alto Privilegio'}
+                            {isEn ? 'Strict Security' : 'Seguridad Estricta'}
                           </span>
                         </h4>
                         <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                           {isEn
-                            ? 'Critical security constraint: Registration for leadership and staff roles requires an institutional Directive Key verified in the database. Protects rectoría and academic coordination privileges.'
-                            : 'Condición crítica de seguridad: El registro como directivo o administrativo exige la Llave de Autorización Directiva validada en la base de datos institucional. Protege las funciones de rectoría y coordinación.'}
+                            ? 'Directive constraint: Registration for leadership and staff roles requires the directive verification code issued in physical format. Each code corresponds strictly and uniquely to one official position.'
+                            : 'Condición directiva: El registro como directivo o administrativo exige el código de verificación directiva entregado en físico. Cada código corresponde de forma única e irrepetible a un cargo oficial.'}
                         </p>
                       </div>
                     </div>
 
-                    {/* Directive Security Key Input */}
+                    {/* Directive Authorization Code Input (Strictly manual, no autocomplete, no displayed keys) */}
                     <div className={`p-3.5 rounded-xl border ${
                       isDark ? 'bg-slate-900/90 border-emerald-500/40' : 'bg-white border-emerald-200 shadow-xs'
                     }`}>
                       <label className="block text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1.5 flex items-center justify-between">
-                        <span>{isEn ? 'Directive Authorization Key / Security Token *' : 'Llave de Autorización Directiva / Token de Seguridad *'}</span>
+                        <span>{isEn ? 'Directive Verification Code *' : 'Código de Verificación Directiva *'}</span>
                         <span className="material-symbols-outlined text-[16px]">lock</span>
                       </label>
                       <input
                         id="input-admin-verification-code"
                         type="text"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
                         value={regAdminKey}
-                        onChange={(e) => setRegAdminKey(e.target.value.toUpperCase())}
-                        placeholder={isEn ? 'e.g. ADM-DIR-2026-VALLE' : 'ej: ADM-DIR-2026-VALLE'}
+                        onChange={(e) => handleAdminCodeChange(e.target.value)}
+                        placeholder={isEn ? 'Enter directive authorization code' : 'Ingresa tu código de verificación directiva'}
                         className={`w-full px-3.5 py-2.5 text-sm font-mono font-bold tracking-wider rounded-xl outline-none border transition-all ${
-                          isDark
-                            ? 'bg-slate-950 border-emerald-500/50 text-emerald-300 focus:border-emerald-400'
-                            : 'bg-emerald-50/50 border-emerald-300 text-emerald-900 focus:bg-white focus:border-emerald-600'
+                          adminFeedback.status === 'valid'
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                            : adminFeedback.status === 'claimed' || adminFeedback.status === 'invalid'
+                              ? 'bg-rose-500/10 border-rose-500 text-rose-400'
+                              : isDark
+                                ? 'bg-slate-950 border-emerald-500/50 text-emerald-300 focus:border-emerald-400'
+                                : 'bg-emerald-50/50 border-emerald-300 text-emerald-900 focus:bg-white focus:border-emerald-600'
                         }`}
                         required
                       />
-                      <div className="flex items-center justify-between mt-2 pt-1 text-[11px]">
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                          {isEn ? 'Verified in Firestore authorized_roles collection' : 'Validado en la colección authorized_roles de Firestore'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setRegAdminKey('ADM-DIR-2026-VALLE')}
-                          className="text-emerald-600 hover:text-emerald-500 font-bold underline cursor-pointer"
-                        >
-                          {isEn ? 'Fill test key (ADM-DIR-2026-VALLE)' : 'Autocompletar prueba (ADM-DIR-2026-VALLE)'}
-                        </button>
-                      </div>
+
+                      {/* Real-time verification feedback */}
+                      {adminFeedback.message && (
+                        <div className={`mt-2 p-2 rounded-lg text-xs flex items-center gap-2 ${
+                          adminFeedback.status === 'valid'
+                            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold'
+                            : 'bg-rose-500/15 border border-rose-500/30 text-rose-400'
+                        }`}>
+                          <span className="material-symbols-outlined text-[16px] shrink-0">
+                            {adminFeedback.status === 'valid' ? 'check_circle' : 'error'}
+                          </span>
+                          <span>{adminFeedback.message}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Position / Department *' : 'Cargo o Dependencia *'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Position / Department' : 'Cargo o Dependencia'}</span>
+                          <span className="text-[10px] text-emerald-500 font-semibold">
+                            {isEn ? 'Auto-bound to code' : 'Vinculado al código'}
+                          </span>
                         </label>
-                        <select
+                        <input
+                          type="text"
+                          readOnly
                           value={regAdminPosition}
-                          onChange={(e) => setRegAdminPosition(e.target.value)}
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                          className={`w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl outline-none border cursor-not-allowed ${
                             isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                              ? 'bg-slate-950/80 border-slate-700 text-emerald-400'
+                              : 'bg-slate-100 border-slate-300 text-slate-800'
                           }`}
-                        >
-                          <option value="Coordinación Académica">{isEn ? 'Academic Coordination' : 'Coordinación Académica'}</option>
-                          <option value="Rectoría General">{isEn ? 'General Rectorate' : 'Rectoría General'}</option>
-                          <option value="Coordinación de Convivencia">{isEn ? 'Coexistence Coordination' : 'Coordinación de Convivencia'}</option>
-                          <option value="Secretaría General & Matrículas">{isEn ? 'General Secretariat & Admissions' : 'Secretaría General & Matrículas'}</option>
-                          <option value="Orientación Escolar y Psicosocial">{isEn ? 'School Guidance & Counseling' : 'Orientación Escolar y Psicosocial'}</option>
-                        </select>
+                        />
                       </div>
 
                       <div>
@@ -1319,9 +1465,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regAdminDocId}
                           onChange={(e) => setRegAdminDocId(e.target.value)}
-                          placeholder=""
+                          placeholder={isEn ? 'Staff ID number' : 'Cédula de ciudadanía'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
                             isDark
                               ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
@@ -1337,9 +1484,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </label>
                         <input
                           type="text"
+                          autoComplete="off"
                           value={regAdminEmployeeCode}
                           onChange={(e) => setRegAdminEmployeeCode(e.target.value)}
-                          placeholder=""
+                          placeholder={isEn ? 'Optional employee code' : 'Código opcional de nómina o dependencia'}
                           className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
                             isDark
                               ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
@@ -1350,67 +1498,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     </div>
                   </div>
                 )}
-
-                {/* Optional Expandable Helper: View Institutional Authorized Codes for Testing */}
-                <div className={`p-3 rounded-xl border text-xs ${
-                  isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <button
-                    type="button"
-                    onClick={() => setShowDemoCodes(!showDemoCodes)}
-                    className="w-full flex items-center justify-between text-left font-bold text-blue-600 hover:text-blue-500 cursor-pointer"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px]">info</span>
-                      <span>{isEn ? 'Testing role validation? View authorized institutional test codes' : '¿Deseas probar la validación de roles? Ver códigos autorizados en la base de datos'}</span>
-                    </span>
-                    <span className="material-symbols-outlined text-[18px]">
-                      {showDemoCodes ? 'expand_less' : 'expand_more'}
-                    </span>
-                  </button>
-
-                  {showDemoCodes && (
-                    <div className="pt-3 space-y-2.5 border-t border-slate-700/50 mt-2 animate-in fade-in">
-                      <div>
-                        <span className="font-bold block text-indigo-400 mb-1">{isEn ? 'Teacher Linking Codes:' : 'Códigos de Docente:'}</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {['DOC-VALLE-2026', 'DOC-TEC-8421', 'DOC-MAT-7139', 'DOC-CIEN-9312'].map((code) => (
-                            <button
-                              key={code}
-                              type="button"
-                              onClick={() => {
-                                setRegRole('teacher');
-                                setRegTeacherCode(code);
-                              }}
-                              className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 font-mono text-[11px] hover:bg-indigo-500/30 cursor-pointer"
-                            >
-                              {code}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="font-bold block text-emerald-400 mb-1">{isEn ? 'Staff / Admin Directive Keys:' : 'Llaves de Administrativo:'}</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {['ADM-DIR-2026-VALLE', 'ADM-COORD-2026', 'ADM-SEC-9876'].map((key) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => {
-                                setRegRole('admin');
-                                setRegAdminKey(key);
-                              }}
-                              className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono text-[11px] hover:bg-emerald-500/30 cursor-pointer"
-                            >
-                              {key}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 {/* 3. CAMPOS GENERALES DE CUENTA (Nombre, Correo, Contraseña) */}
                 <div className="flex flex-col gap-4">
