@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { ASSETS } from '../data/mockData';
-import { loginUser, registerNewUser } from '../services/authService';
+import { loginUser, registerNewUser, AUTHORIZED_ROLE_CODES } from '../services/authService';
 import { PasswordRecoveryModal } from './PasswordRecoveryModal';
+import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -10,6 +11,10 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  const { theme, toggleTheme, language, toggleLanguage, t } = useThemeLanguage();
+  const isDark = theme === 'dark';
+  const isEn = language === 'en';
+
   // Login form states
   const [identifier, setIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -31,12 +36,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [acceptDataPolicy, setAcceptDataPolicy] = useState(false);
 
   // Dynamic role-specific fields
-  // Student fields (6 Grades, each with 2 groups: 6°1, 6°2 up to 11°1, 11°2)
+  // Student fields
   const [regGradeLevel, setRegGradeLevel] = useState('6°1');
   const [regStudentCode, setRegStudentCode] = useState('');
   const [regShift, setRegShift] = useState('Jornada Mañana (6:15 AM - 12:15 PM)');
 
-  // Teacher fields
+  // Teacher fields + Role Verification Code
+  const [regTeacherCode, setRegTeacherCode] = useState('');
   const [regSubjectArea, setRegSubjectArea] = useState('Tecnología e Informática');
   const [regEmployeeId, setRegEmployeeId] = useState('');
   const [regAssignedGrades, setRegAssignedGrades] = useState('6°1, 6°2 y 7°1');
@@ -48,10 +54,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regRepresentedStudentCode, setRegRepresentedStudentCode] = useState('');
   const [regEmergencyPhone, setRegEmergencyPhone] = useState('');
 
-  // Administrative fields (4th role)
+  // Administrative fields + Security Token
+  const [regAdminKey, setRegAdminKey] = useState('');
   const [regAdminPosition, setRegAdminPosition] = useState('Coordinación Académica');
   const [regAdminDocId, setRegAdminDocId] = useState('');
   const [regAdminEmployeeCode, setRegAdminEmployeeCode] = useState('');
+
+  // Helper toggle to show demo authorized codes in UI
+  const [showDemoCodes, setShowDemoCodes] = useState(false);
 
   // Register status states
   const [regLoading, setRegLoading] = useState(false);
@@ -81,12 +91,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setLoginError(null);
 
     if (!identifier.trim()) {
-      setLoginError('Por favor ingresa tu correo electrónico o número de documento de identidad.');
+      setLoginError(isEn ? 'Please enter your institutional email or ID document number.' : 'Por favor ingresa tu correo electrónico o número de documento de identidad.');
       return;
     }
 
     if (!loginPassword) {
-      setLoginError('Por favor ingresa tu contraseña.');
+      setLoginError(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña.');
       return;
     }
 
@@ -96,7 +106,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       const userProfile = await loginUser(identifier, loginPassword);
       onLoginSuccess(userProfile);
     } catch (err: any) {
-      setLoginError(err.message || 'Error al iniciar sesión en la plataforma.');
+      setLoginError(err.message || (isEn ? 'Error signing in to the platform.' : 'Error al iniciar sesión en la plataforma.'));
     } finally {
       setIsLoading(false);
     }
@@ -109,153 +119,258 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setRegSuccess(null);
 
     if (!regFullName.trim()) {
-      setRegError('Por favor ingresa tu nombre completo.');
+      setRegError(isEn ? 'Please enter your full name.' : 'Por favor ingresa tu nombre completo.');
       return;
     }
 
     if (!regEmail.trim()) {
-      setRegError('Por favor ingresa tu correo electrónico institucional o personal.');
+      setRegError(isEn ? 'Please enter your institutional or personal email.' : 'Por favor ingresa tu correo electrónico institucional o personal.');
       return;
+    }
+
+    // Role-specific strict validations
+    if (regRole === 'student') {
+      if (!regStudentCode.trim()) {
+        setRegError(isEn ? 'Please enter your Student ID (TI/CC) or enrollment code.' : 'Por favor ingresa tu documento de identidad (TI/CC) o código de estudiante.');
+        return;
+      }
+    } else if (regRole === 'teacher') {
+      if (!regTeacherCode.trim()) {
+        setRegError(isEn
+          ? 'Mandatory: You must enter the Teacher Linking Code issued by Academic Direction to prevent unauthorized faculty registration.'
+          : 'Obligatorio: Debes ingresar el Código de Vinculación Docente emitido por la Coordinación Académica para prevenir registros no autorizados.');
+        return;
+      }
+      if (!regEmployeeId.trim()) {
+        setRegError(isEn ? 'Please enter your Citizen ID number (CC).' : 'Por favor ingresa tu número de cédula de ciudadanía.');
+        return;
+      }
+    } else if (regRole === 'admin') {
+      if (!regAdminKey.trim()) {
+        setRegError(isEn
+          ? 'Mandatory: Administrative privileges require a valid Directive Authorization Key issued by Rectoría.'
+          : 'Obligatorio: Los privilegios administrativos exigen la Llave de Autorización Directiva emitida por Rectoría.');
+        return;
+      }
+      if (!regAdminDocId.trim()) {
+        setRegError(isEn ? 'Please enter your Citizen ID number (CC).' : 'Por favor ingresa tu cédula de ciudadanía.');
+        return;
+      }
+    } else if (regRole === 'family') {
+      if (!regRepresentedStudentCode.trim()) {
+        setRegError(isEn
+          ? 'Mandatory: Please enter the ID document or enrollment code of the represented student to verify institutional enrollment in the database.'
+          : 'Obligatorio: Debes ingresar el documento de identidad o matrícula del estudiante representado para verificar su matrícula en la base de datos.');
+        return;
+      }
+      if (!regRepresentedStudentName.trim()) {
+        setRegError(isEn ? 'Please enter the full name of the represented student.' : 'Por favor ingresa el nombre completo del estudiante representado.');
+        return;
+      }
+      if (!regGuardianDocId.trim()) {
+        setRegError(isEn ? 'Please enter your Guardian ID number.' : 'Por favor ingresa tu número de documento de identidad como acudiente.');
+        return;
+      }
     }
 
     // Password validations: minimum 8 characters, uppercase, lowercase, special character
     if (!passHasMinLength) {
-      setRegError('La contraseña debe tener un mínimo de 8 caracteres.');
+      setRegError(isEn ? 'Password must be at least 8 characters long.' : 'La contraseña debe tener un mínimo de 8 caracteres.');
       return;
     }
 
     if (!passHasUpper) {
-      setRegError('La contraseña debe incluir al menos una letra mayúscula (A-Z).');
+      setRegError(isEn ? 'Password must contain at least one uppercase letter (A-Z).' : 'La contraseña debe contener al menos una letra mayúscula (A-Z).');
       return;
     }
 
     if (!passHasLower) {
-      setRegError('La contraseña debe incluir al menos una letra minúscula (a-z).');
+      setRegError(isEn ? 'Password must contain at least one lowercase letter (a-z).' : 'La contraseña debe contener al menos una letra minúscula (a-z).');
       return;
     }
 
     if (!passHasSpecial) {
-      setRegError('La contraseña debe incluir al menos un carácter especial (ejemplo: !@#$%&*).');
+      setRegError(isEn ? 'Password must contain at least one special character (!@#$%&*).' : 'La contraseña debe contener al menos un carácter especial (ej. !@#$%&*).');
       return;
     }
 
     if (regPassword !== regConfirmPassword) {
-      setRegError('Las contraseñas no coinciden. Por favor verifícalas cuidadosamente.');
+      setRegError(isEn ? 'Passwords do not match. Please verify.' : 'Las contraseñas ingresadas no coinciden. Verifica e intenta nuevamente.');
       return;
     }
 
-    // Data treatment policy acceptance validation
     if (!acceptDataPolicy) {
-      setRegError('Debes marcar la casilla para aceptar la política de tratamiento y protección de datos.');
-      return;
-    }
-
-    // Role-specific validation
-    if (regRole === 'student' && !regStudentCode.trim()) {
-      setRegError('Por favor ingresa tu número de documento de identidad (TI / CC) o código estudiantil.');
-      return;
-    }
-
-    if (regRole === 'teacher' && !regEmployeeId.trim()) {
-      setRegError('Por favor ingresa tu número de documento de identidad (cédula).');
-      return;
-    }
-
-    if (regRole === 'family' && !regGuardianDocId.trim()) {
-      setRegError('Por favor ingresa tu número de documento de identidad como acudiente.');
-      return;
-    }
-
-    if (regRole === 'admin' && !regAdminDocId.trim()) {
-      setRegError('Por favor ingresa tu número de documento de identidad (cédula) de personal administrativo.');
+      setRegError(isEn ? 'You must accept the personal data processing policy.' : 'Debes aceptar la política de tratamiento de datos personales para continuar.');
       return;
     }
 
     setRegLoading(true);
 
     try {
-      const selectedDocId = 
-        regRole === 'student' ? regStudentCode.trim() :
-        regRole === 'teacher' ? regEmployeeId.trim() :
-        regRole === 'admin' ? regAdminDocId.trim() :
-        regGuardianDocId.trim() || regRepresentedStudentCode.trim();
+      const roleCode = regRole === 'teacher' ? regTeacherCode.trim() : regRole === 'admin' ? regAdminKey.trim() : undefined;
 
-      const newProfile = await registerNewUser({
-        email: regEmail,
+      const newUser = await registerNewUser({
+        fullName: regFullName.trim(),
+        email: regEmail.trim(),
         password: regPassword,
-        fullName: regFullName,
         role: regRole,
-        documentId: selectedDocId,
+        documentId: regRole === 'family'
+          ? regGuardianDocId.trim()
+          : regRole === 'teacher'
+            ? regEmployeeId.trim()
+            : regRole === 'admin'
+              ? regAdminDocId.trim()
+              : regStudentCode.trim(),
         gradeLevel: regRole === 'student' ? regGradeLevel : undefined,
-        studentCode: regRole === 'student' ? regStudentCode : undefined,
+        studentCode: regRole === 'student' ? regStudentCode.trim() : undefined,
         shift: regRole === 'student' ? regShift : undefined,
         subjectArea: regRole === 'teacher' ? regSubjectArea : undefined,
-        employeeId: regRole === 'teacher' ? regEmployeeId : regRole === 'admin' ? regAdminEmployeeCode : undefined,
-        assignedGrades: regRole === 'teacher' ? regAssignedGrades : undefined,
+        employeeId: regRole === 'teacher' ? regEmployeeId.trim() : regRole === 'admin' ? regAdminEmployeeCode.trim() : undefined,
+        assignedGrades: regRole === 'teacher' ? regAssignedGrades.trim() : undefined,
         relationship: regRole === 'family' ? regRelationship : undefined,
-        representedStudentName: regRole === 'family' ? regRepresentedStudentName : undefined,
-        representedStudentCode: regRole === 'family' ? regRepresentedStudentCode : undefined,
-        emergencyPhone: regRole === 'family' ? regEmergencyPhone : undefined,
+        emergencyPhone: regRole === 'family' ? regEmergencyPhone.trim() : undefined,
+        representedStudentName: regRole === 'family' ? regRepresentedStudentName.trim() : undefined,
+        representedStudentCode: regRole === 'family' ? regRepresentedStudentCode.trim() : undefined,
         adminPosition: regRole === 'admin' ? regAdminPosition : undefined,
-        department: regRole === 'admin' ? 'Dirección y Coordinación Institucional' : undefined
+        roleVerificationCode: roleCode,
+        lang: language,
       });
 
-      setRegSuccess('¡Cuenta registrada con éxito! Ingresando...');
+      setRegSuccess(isEn ? 'Account successfully registered and verified in the database! Signing in...' : '¡Cuenta registrada y verificada con éxito en la base de datos! Iniciando sesión...');
       setTimeout(() => {
         setIsRegisterModalOpen(false);
-        onLoginSuccess(newProfile);
-      }, 700);
+        onLoginSuccess(newUser);
+      }, 1000);
     } catch (err: any) {
-      setRegError(err.message || 'Error al completar el registro.');
+      setRegError(err.message || (isEn ? 'Error creating institutional account.' : 'Error al registrar la cuenta institucional.'));
     } finally {
       setRegLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#080d1a] via-[#0f172a] to-[#1e3a8a] text-slate-100 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-200 relative overflow-x-hidden">
-      
+    <div
+      className={`min-h-screen relative flex flex-col justify-between overflow-x-hidden transition-colors duration-300 ${
+        isDark
+          ? 'bg-gradient-to-b from-[#080d1a] via-[#0f172a] to-[#1e3a8a] text-slate-100'
+          : 'bg-gradient-to-b from-[#f8fafc] via-[#e2e8f0] to-[#cbd5e1] text-slate-900'
+      }`}
+    >
       {/* ========================================================================= */}
-      {/* 1. DYNAMIC CELESTIAL ATMOSPHERE: Radial Glows, Twinkling & Shooting Stars */}
+      {/* TOP INSTITUTIONAL BAR: Aesthetic, compact, non-intrusive control capsule  */}
       {/* ========================================================================= */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Deep ambient radial glows */}
-        <div className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full bg-cyan-600/15 blur-[120px]" />
-        <div className="absolute top-1/4 -right-32 w-[600px] h-[600px] rounded-full bg-blue-700/20 blur-[140px]" />
-        <div className="absolute bottom-10 left-1/3 w-[480px] h-[480px] rounded-full bg-teal-500/10 blur-[110px]" />
+      <header className="relative z-30 w-full max-w-[1160px] mx-auto px-4 sm:px-6 pt-3 sm:pt-4 pb-0 flex items-center justify-between">
+        {/* Left: Subtle institutional indicator */}
+        <div className="flex items-center gap-2">
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border transition-all duration-300 ${
+            isDark
+              ? 'bg-slate-900/60 border-slate-700/60 text-slate-300'
+              : 'bg-white/80 border-slate-200 text-slate-700 shadow-xs'
+          }`}>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold tracking-tight">I.E. Vallejuelos</span>
+            <span className="text-slate-400">•</span>
+            <span className="hidden sm:inline font-medium">Edulink School</span>
+          </div>
+        </div>
 
-        {/* Shooting Stars (Estrellas Fugaces) */}
-        <div className="absolute top-12 right-12 w-36 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-white rounded-full animate-shooting-star-1 opacity-0 shadow-[0_0_12px_#22d3ee]" />
-        <div className="absolute top-1/4 right-1/3 w-48 h-[2px] bg-gradient-to-r from-transparent via-teal-300 to-white rounded-full animate-shooting-star-2 opacity-0 shadow-[0_0_14px_#06b6d4]" />
-        <div className="absolute top-1/3 right-16 w-40 h-[2px] bg-gradient-to-r from-transparent via-blue-400 to-white rounded-full animate-shooting-star-3 opacity-0 shadow-[0_0_12px_#38bdf8]" />
+        {/* Right: Sleek, compact aesthetic control capsule */}
+        <div className={`flex items-center gap-1 p-1 rounded-full backdrop-blur-xl border shadow-sm transition-all duration-300 ${
+          isDark
+            ? 'bg-slate-900/85 border-cyan-500/25 shadow-black/30'
+            : 'bg-white/95 border-slate-200 shadow-slate-200/50'
+        }`}>
+          {/* Theme button: Compact, elegant toggle */}
+          <button
+            id="btn-toggle-theme"
+            type="button"
+            onClick={toggleTheme}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 ${
+              isDark
+                ? 'text-amber-300 hover:bg-slate-800/80 hover:text-amber-200'
+                : 'text-amber-600 hover:bg-slate-100 hover:text-amber-700'
+            }`}
+            title={isDark ? (isEn ? 'Switch to Light Mode' : 'Cambiar a Modo Claro') : (isEn ? 'Switch to Dark Mode' : 'Cambiar a Modo Oscuro')}
+            aria-label="Toggle Theme"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {isDark ? 'light_mode' : 'dark_mode'}
+            </span>
+            <span className="text-[11px] font-semibold hidden sm:inline">
+              {isDark ? (isEn ? 'Light' : 'Claro') : (isEn ? 'Dark' : 'Oscuro')}
+            </span>
+          </button>
 
-        {/* Floating Twinkling Stars (Electric Blue, Aquamarine, Cyan, White) */}
-        <div className="absolute top-16 left-20 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-twinkle-slow" />
-        <div className="absolute top-28 left-1/3 w-2 h-2 rounded-full bg-[#06b6d4] shadow-[0_0_10px_#06b6d4] animate-twinkle-fast" />
-        <div className="absolute top-44 left-1/4 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_#ffffff] animate-twinkle-slow" style={{ animationDelay: '1.2s' }} />
-        <div className="absolute top-14 right-1/4 w-1.5 h-1.5 rounded-full bg-teal-300 shadow-[0_0_8px_#5eead4] animate-twinkle-fast" style={{ animationDelay: '0.6s' }} />
-        <div className="absolute top-36 right-1/3 w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_#60a5fa] animate-twinkle-slow" style={{ animationDelay: '2.1s' }} />
-        <div className="absolute top-64 right-20 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9] animate-twinkle-fast" style={{ animationDelay: '1.7s' }} />
-        <div className="absolute top-80 left-16 w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_10px_#2dd4bf] animate-twinkle-slow" style={{ animationDelay: '0.9s' }} />
-        <div className="absolute top-96 left-2/5 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_#ffffff] animate-twinkle-fast" style={{ animationDelay: '2.5s' }} />
-        <div className="absolute bottom-40 left-24 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-twinkle-slow" style={{ animationDelay: '1.4s' }} />
-        <div className="absolute bottom-28 right-1/4 w-2 h-2 rounded-full bg-blue-300 shadow-[0_0_10px_#93c5fd] animate-twinkle-fast" style={{ animationDelay: '0.4s' }} />
-        <div className="absolute bottom-60 right-16 w-1 h-1 rounded-full bg-[#06b6d4] shadow-[0_0_6px_#06b6d4] animate-twinkle-slow" style={{ animationDelay: '1.9s' }} />
+          <span className={`w-[1px] h-3.5 mx-0.5 ${isDark ? 'bg-slate-700/80' : 'bg-slate-200'}`} />
+
+          {/* Language button: Compact, elegant toggle */}
+          <button
+            id="btn-toggle-language"
+            type="button"
+            onClick={toggleLanguage}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95 ${
+              isDark
+                ? 'text-cyan-300 hover:bg-slate-800/80 hover:text-cyan-200'
+                : 'text-blue-700 hover:bg-slate-100 hover:text-blue-800'
+            }`}
+            title={isEn ? 'Cambiar a Español' : 'Switch to English'}
+            aria-label="Toggle Language"
+          >
+            <span className="material-symbols-outlined text-[17px]">translate</span>
+            <span className="text-[11px] font-bold tracking-wider">
+              {isEn ? 'ES' : 'EN'}
+            </span>
+          </button>
+        </div>
+      </header>
+
+      {/* Atmospheric Celestial Backdrop */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Ambient celestial lights */}
+        <div className={`absolute -top-40 -left-40 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-opacity duration-500 ${
+          isDark ? 'bg-cyan-500/15 opacity-100' : 'bg-blue-400/15 opacity-60'
+        }`} />
+        <div className={`absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none transition-opacity duration-500 ${
+          isDark ? 'bg-blue-600/20 opacity-100' : 'bg-cyan-300/20 opacity-60'
+        }`} />
+        <div className={`absolute -bottom-32 left-1/3 w-[600px] h-96 rounded-full blur-3xl pointer-events-none transition-opacity duration-500 ${
+          isDark ? 'bg-teal-500/15 opacity-100' : 'bg-slate-300/30 opacity-40'
+        }`} />
+
+        {/* Twinkling star particles (Visible in dark mode, subtle in light) */}
+        {isDark && (
+          <>
+            <div className="absolute top-12 left-1/6 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9] animate-twinkle-fast" />
+            <div className="absolute top-24 right-1/4 w-2 h-2 rounded-full bg-white shadow-[0_0_10px_#ffffff] animate-twinkle-slow" style={{ animationDelay: '0.8s' }} />
+            <div className="absolute top-48 left-1/3 w-1 h-1 rounded-full bg-teal-300 shadow-[0_0_6px_#5eead4] animate-twinkle-fast" style={{ animationDelay: '1.2s' }} />
+            <div className="absolute top-80 right-1/5 w-1.5 h-1.5 rounded-full bg-blue-300 shadow-[0_0_8px_#93c5fd] animate-twinkle-slow" style={{ animationDelay: '2.1s' }} />
+            <div className="absolute bottom-40 left-24 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-twinkle-slow" style={{ animationDelay: '1.4s' }} />
+            <div className="absolute bottom-28 right-1/4 w-2 h-2 rounded-full bg-blue-300 shadow-[0_0_10px_#93c5fd] animate-twinkle-fast" style={{ animationDelay: '0.4s' }} />
+          </>
+        )}
       </div>
 
       {/* Main container: Two-column layout (Brand Identity + Glassmorphism Login Card) */}
-      <main className="relative z-10 w-full max-w-[1160px] mx-auto pt-8 sm:pt-12 lg:pt-14 pb-12 px-4 sm:px-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-10 lg:gap-12">
+      <main className="relative z-10 w-full max-w-[1160px] mx-auto pt-4 sm:pt-6 lg:pt-6 pb-12 px-4 sm:px-6 flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-10 lg:gap-12">
         
         {/* Left Column: Brand Identity, Free Floating Glowing Tree Logo, Content & Institutional Contact */}
         <section className="w-full lg:w-[620px] text-left flex flex-col items-center lg:items-start">
           
           {/* Top Institutional Eyebrow */}
           <div className="flex flex-wrap items-center gap-2 mb-3 justify-center lg:justify-start">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider shadow-xs">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-xs border ${
+              isDark
+                ? 'bg-cyan-500/15 border-cyan-400/30 text-cyan-300'
+                : 'bg-blue-100/90 border-blue-300 text-blue-800'
+            }`}>
               <span className="material-symbols-outlined text-[15px]">account_balance</span>
-              Portal Institucional Oficial
+              {isEn ? 'Official Institutional Portal' : 'Portal Institucional Oficial'}
             </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/60 border border-slate-700/60 text-slate-300 text-xs font-medium backdrop-blur-sm">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
+              isDark
+                ? 'bg-slate-900/60 border-slate-700/60 text-slate-300'
+                : 'bg-white/80 border-slate-300 text-slate-700'
+            }`}>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               I.E. Vallejuelos • Medellín
             </span>
@@ -263,56 +378,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
           {/* 1. Page Name: Title with Capital Initials "Edulink School" */}
           <div className="w-full flex items-center justify-center lg:justify-start gap-2.5 mb-1">
-            <span className="text-white font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md">
+            <span className={`font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
               Edulink
             </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-sky-300 font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-teal-400 to-sky-400 font-black text-4xl sm:text-5xl lg:text-[54px] tracking-tight leading-none drop-shadow-md">
               School
             </span>
           </div>
-          <p className="text-xs sm:text-sm font-semibold text-cyan-200/80 tracking-wide mb-3 text-center lg:text-left">
-            Sistema Integral de Gestión Académica y Comunitaria
+          <p className={`text-xs sm:text-sm font-semibold tracking-wide mb-3 text-center lg:text-left ${
+            isDark ? 'text-cyan-200/80' : 'text-blue-900/80'
+          }`}>
+            {isEn
+              ? 'Integrated Academic & Community Management System'
+              : 'Sistema Integral de Gestión Académica y Comunitaria'}
           </p>
 
           {/* 2. Logo: Free Floating Tree (No White Box), Glowing Leaves & Progressively Illuminated Cyan Roots */}
           <div className="w-full flex justify-center items-center my-3 relative py-4">
             {/* Ambient pulsating backdrop aura */}
-            <div className="absolute w-52 h-52 sm:w-64 sm:h-64 rounded-full bg-gradient-to-tr from-cyan-500/25 via-blue-600/30 to-teal-400/25 blur-3xl pointer-events-none animate-pulse-glow" />
+            <div className={`absolute w-52 h-52 sm:w-64 sm:h-64 rounded-full blur-3xl pointer-events-none animate-pulse-glow ${
+              isDark
+                ? 'bg-gradient-to-tr from-cyan-500/25 via-blue-600/30 to-teal-400/25'
+                : 'bg-gradient-to-tr from-cyan-400/20 via-blue-400/20 to-teal-300/20'
+            }`} />
 
             {/* Tree roots progressive aquamarine/cyan illumination glow */}
             <div className="absolute bottom-4 w-40 sm:w-56 h-14 bg-gradient-to-r from-teal-400/40 via-cyan-400/70 to-blue-500/40 rounded-full blur-xl pointer-events-none animate-root-pulse" />
 
-            {/* Sparkle 1: Top Right - Cyan */}
-            <div className="absolute -top-1 right-1/4 sm:right-1/3 text-cyan-300 animate-sparkle-1 pointer-events-none">
+            {/* Sparkles */}
+            <div className="absolute -top-1 right-1/4 sm:right-1/3 text-cyan-400 animate-sparkle-1 pointer-events-none">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
               </svg>
             </div>
-
-            {/* Sparkle 2: Top Left - Aquamarine */}
-            <div className="absolute top-2 left-1/4 sm:left-1/3 text-teal-300 animate-sparkle-2 pointer-events-none">
+            <div className="absolute top-2 left-1/4 sm:left-1/3 text-teal-400 animate-sparkle-2 pointer-events-none">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
-              </svg>
-            </div>
-
-            {/* Sparkle 3: Bottom Right - Electric Blue */}
-            <div className="absolute bottom-2 right-1/4 sm:right-1/3 text-blue-400 animate-sparkle-3 pointer-events-none">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
-              </svg>
-            </div>
-
-            {/* Sparkle 4: Bottom Left - Bright Cyan */}
-            <div className="absolute -bottom-1 left-1/4 sm:left-1/3 text-cyan-400 animate-sparkle-4 pointer-events-none">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
-              </svg>
-            </div>
-
-            {/* Sparkle 5: Far Right - Soft Ice Blue */}
-            <div className="absolute top-1/2 -right-1 sm:right-1/4 text-teal-200 animate-sparkle-5 pointer-events-none">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" />
               </svg>
             </div>
@@ -328,95 +430,133 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </div>
 
           {/* 3. Text below the Logo */}
-          <h2 className="text-white text-xl sm:text-2xl lg:text-[27px] font-bold leading-snug max-w-[560px] mb-3 tracking-tight text-center lg:text-left drop-shadow-sm">
-            Plataforma institucional de gestión curricular, calificaciones y comunidad académica.
+          <h2 className={`text-xl sm:text-2xl lg:text-[27px] font-bold leading-snug max-w-[560px] mb-3 tracking-tight text-center lg:text-left drop-shadow-sm ${
+            isDark ? 'text-white' : 'text-slate-900'
+          }`}>
+            {isEn
+              ? 'Institutional platform for curriculum management, grades, and academic community.'
+              : 'Plataforma institucional de gestión curricular, calificaciones y comunidad académica.'}
           </h2>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-[540px] mb-5 text-center lg:text-left">
-            Conecta en tiempo real a estudiantes, docentes, acudientes y equipo directivo en un entorno seguro y unificado.
+          <p className={`text-sm sm:text-base leading-relaxed max-w-[540px] mb-5 text-center lg:text-left ${
+            isDark ? 'text-slate-300' : 'text-slate-600'
+          }`}>
+            {isEn
+              ? 'Connecting students, teachers, families, and leadership in a unified, high-security environment.'
+              : 'Conecta en tiempo real a estudiantes, docentes, acudientes y equipo directivo en un entorno seguro y unificado.'}
           </p>
 
           {/* 4. Jornada & COMUNIDAD (Glassmorphism Cards) */}
           <div className="w-full max-w-[560px] mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* Jornada */}
-            <div className="p-4 rounded-2xl bg-slate-900/65 backdrop-blur-md border border-cyan-500/20 shadow-lg shadow-black/20 flex items-center gap-3.5 transition-all hover:border-cyan-400/40">
-              <div className="w-11 h-11 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0 shadow-inner">
+            <div className={`p-4 rounded-2xl backdrop-blur-md border shadow-lg transition-all ${
+              isDark
+                ? 'bg-slate-900/65 border-cyan-500/20 shadow-black/20 hover:border-cyan-400/40 text-slate-100'
+                : 'bg-white/85 border-slate-300/80 shadow-slate-300/30 hover:border-blue-400 text-slate-900'
+            } flex items-center gap-3.5`}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-inner border ${
+                isDark ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' : 'bg-blue-50 border-blue-200 text-blue-700'
+              }`}>
                 <span className="material-symbols-outlined text-[24px]">schedule</span>
               </div>
               <div>
-                <span className="block text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Jornada</span>
-                <span className="text-sm sm:text-base font-extrabold text-white">6:15 AM - 12:15 PM</span>
-                <span className="block text-[11px] text-slate-400">Jornada Mañana</span>
+                <span className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-cyan-400' : 'text-blue-700'}`}>
+                  {isEn ? 'Shift' : 'Jornada'}
+                </span>
+                <span className={`text-sm sm:text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  6:15 AM - 12:15 PM
+                </span>
+                <span className={`block text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {isEn ? 'Morning Shift' : 'Jornada Mañana'}
+                </span>
               </div>
             </div>
 
-            {/* COMUNIDAD (Un solo bloque limpio y directo) */}
-            <div className="p-4 rounded-2xl bg-slate-900/65 backdrop-blur-md border border-teal-500/25 shadow-lg shadow-black/20 flex items-start gap-3.5 transition-all hover:border-teal-400/45">
-              <div className="w-11 h-11 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-300 flex items-center justify-center shrink-0 shadow-inner mt-0.5">
+            {/* COMUNIDAD (Single Clean Direct Block) */}
+            <div className={`p-4 rounded-2xl backdrop-blur-md border shadow-lg transition-all ${
+              isDark
+                ? 'bg-slate-900/65 border-teal-500/25 shadow-black/20 hover:border-teal-400/45 text-slate-100'
+                : 'bg-white/85 border-slate-300/80 shadow-slate-300/30 hover:border-teal-400 text-slate-900'
+            } flex items-start gap-3.5`}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-inner mt-0.5 border ${
+                isDark ? 'bg-teal-500/15 border-teal-500/30 text-teal-300' : 'bg-teal-50 border-teal-200 text-teal-700'
+              }`}>
                 <span className="material-symbols-outlined text-[24px]">groups</span>
               </div>
               <div className="min-w-0">
-                <span className="block text-[11px] font-bold text-teal-400 uppercase tracking-wider">COMUNIDAD</span>
-                <span className="text-sm sm:text-base font-extrabold text-white block">Grados 6° a 11° y Grado Pensar</span>
-                <p className="text-[11px] text-slate-300 leading-snug mt-1 font-medium">
-                  Grupos: 6°1, 6°2, 7°1, 7°2, 8°1, 8°2, 9°1, 9°2, 10°1, 10°2, 11°1, 11°2 y Pensar.
+                <span className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
+                  {isEn ? 'COMMUNITY' : 'COMUNIDAD'}
+                </span>
+                <span className={`text-sm sm:text-base font-extrabold block ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {isEn ? 'Grades 6th to 11th & Pensar Grade' : 'Grados 6° a 11° y Grado Pensar'}
+                </span>
+                <p className={`text-[11px] leading-snug mt-1 font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {isEn
+                    ? 'Groups: 6°1, 6°2, 7°1, 7°2, 8°1, 8°2, 9°1, 9°2, 10°1, 10°2, 11°1, 11°2 and Pensar.'
+                    : 'Grupos: 6°1, 6°2, 7°1, 7°2, 8°1, 8°2, 9°1, 9°2, 10°1, 10°2, 11°1, 11°2 y Pensar.'}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* 5. Institutional Location & Contact Card (from Google Maps capture) */}
-          <div className="w-full max-w-[560px] bg-slate-900/65 backdrop-blur-md rounded-2xl border border-cyan-500/20 shadow-lg shadow-black/20 p-4 sm:p-5 text-left transition-all hover:border-cyan-400/35">
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 mb-3">
+          {/* 5. Institutional Location & Contact Card */}
+          <div className={`w-full max-w-[560px] rounded-2xl border shadow-lg backdrop-blur-md p-4 sm:p-5 text-left transition-all ${
+            isDark
+              ? 'bg-slate-900/65 border-cyan-500/20 shadow-black/20 hover:border-cyan-400/35'
+              : 'bg-white/85 border-slate-300/80 shadow-slate-300/30 hover:border-blue-400'
+          }`}>
+            <div className={`flex items-start justify-between gap-3 pb-3 border-b mb-3 ${
+              isDark ? 'border-slate-800/80' : 'border-slate-200'
+            }`}>
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                <h3 className={`text-base sm:text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Institución Educativa Vallejuelos
                 </h3>
-                <p className="text-xs sm:text-sm text-cyan-300/80 mt-0.5">
-                  Escuela de enseñanza general en Medellín
+                <p className={`text-xs sm:text-sm mt-0.5 ${isDark ? 'text-cyan-300/80' : 'text-blue-700'}`}>
+                  {isEn ? 'General Education School in Medellín' : 'Escuela de enseñanza general en Medellín'}
                 </p>
               </div>
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                isDark ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' : 'bg-blue-50 border-blue-200 text-blue-700'
+              }`}>
                 <span className="material-symbols-outlined text-[20px]">school</span>
               </div>
             </div>
 
             <div className="space-y-2.5 text-xs sm:text-sm">
-              {/* Dirección */}
               <div className="flex items-start gap-2.5">
-                <span className="material-symbols-outlined text-[20px] text-rose-400 shrink-0 mt-0.5">
+                <span className="material-symbols-outlined text-[20px] text-rose-500 shrink-0 mt-0.5">
                   location_on
                 </span>
-                <div className="text-slate-300 leading-relaxed">
-                  <strong className="text-white">Dirección:</strong> Cra. 104c #20, Santa Margarita, Medellín, Robledo, Medellín, Antioquia
+                <div className={`leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>{isEn ? 'Address:' : 'Dirección:'}</strong>{' '}
+                  Cra. 104c #20, Santa Margarita, Medellín, Robledo, Antioquia
                 </div>
               </div>
 
-              {/* Teléfono */}
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-[20px] text-cyan-400 shrink-0">
+                <span className="material-symbols-outlined text-[20px] text-cyan-500 shrink-0">
                   call
                 </span>
-                <div className="text-slate-300">
-                  <strong className="text-white">Teléfono:</strong>{' '}
+                <div className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>{isEn ? 'Phone:' : 'Teléfono:'}</strong>{' '}
                   <a
                     href="tel:3004175616"
-                    className="text-cyan-400 hover:text-cyan-300 font-semibold hover:underline cursor-pointer"
+                    className="text-cyan-500 hover:text-cyan-400 font-semibold hover:underline cursor-pointer"
                   >
                     300 4175616
                   </a>
                 </div>
               </div>
 
-              {/* Horario */}
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-[20px] text-teal-400 shrink-0">
+                <span className="material-symbols-outlined text-[20px] text-teal-500 shrink-0">
                   schedule
                 </span>
-                <div className="text-slate-300">
-                  <strong className="text-white">Horario:</strong>{' '}
-                  <span className="text-emerald-400 font-bold">Abierto</span>
-                  <span className="text-slate-400"> · Cierra a las 5:30 p.m.</span>
+                <div className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>{isEn ? 'Office Hours:' : 'Horario:'}</strong>{' '}
+                  <span className="text-emerald-500 font-bold">{isEn ? 'Open' : 'Abierto'}</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{isEn ? ' · Closes at 5:30 p.m.' : ' · Cierra a las 5:30 p.m.'}</span>
                 </div>
               </div>
             </div>
@@ -425,27 +565,37 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </section>
 
         {/* ========================================================================= */}
-        {/* Right Column: Glassmorphism Login Card with Aquamarine Glowing Accents   */}
+        {/* Right Column: Glassmorphism Login Card                                   */}
         {/* ========================================================================= */}
         <section className="w-full max-w-[440px] flex flex-col items-center">
-          <div className="bg-slate-900/70 backdrop-blur-xl rounded-3xl p-7 sm:p-9 w-full border border-cyan-500/30 shadow-[0_8px_32px_0_rgba(6,182,212,0.18)] flex flex-col gap-5 relative overflow-hidden transition-all duration-300 hover:border-cyan-400/50 hover:shadow-[0_12px_40px_0_rgba(6,182,212,0.25)]">
+          <div className={`backdrop-blur-xl rounded-3xl p-7 sm:p-9 w-full border shadow-2xl flex flex-col gap-5 relative overflow-hidden transition-all duration-300 ${
+            isDark
+              ? 'bg-slate-900/80 border-cyan-500/30 shadow-[0_8px_32px_0_rgba(6,182,212,0.18)] hover:border-cyan-400/50 hover:shadow-[0_12px_40px_0_rgba(6,182,212,0.25)]'
+              : 'bg-white/95 border-slate-200 shadow-[0_16px_40px_rgba(0,40,140,0.12)] hover:border-blue-400'
+          }`}>
             
-            {/* Soft aquamarine light bar along the top edge */}
+            {/* Soft decorative bar along the top edge */}
             <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent pointer-events-none" />
 
-            <div className="pb-1 border-b border-slate-800/80">
-              <h3 className="text-2xl font-bold text-white tracking-tight">Iniciar Sesión</h3>
-              <p className="text-sm text-slate-300 mt-1">Ingresa tus credenciales institucionales de acceso</p>
+            <div className={`pb-1 border-b ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+              <h3 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {isEn ? 'Sign In' : 'Iniciar Sesión'}
+              </h3>
+              <p className={`text-sm mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                {isEn ? 'Enter your institutional credentials' : 'Ingresa tus credenciales institucionales de acceso'}
+              </p>
             </div>
 
             {/* Login Form */}
             <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">
-                  Correo electrónico o documento de identidad
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                  isDark ? 'text-cyan-300' : 'text-blue-950'
+                }`}>
+                  {isEn ? 'Institutional Email or ID Document' : 'Correo electrónico o documento de identidad'}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-400/80">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-500">
                     badge
                   </span>
                   <input
@@ -453,7 +603,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder=""
-                    className="w-full pl-11 pr-4 py-3.5 text-base bg-slate-950/60 border border-slate-700/80 rounded-xl focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25 outline-none text-white transition-all"
+                    className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
+                        : 'bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20'
+                    }`}
                     autoComplete="username"
                     required
                   />
@@ -461,11 +615,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">
-                  Contraseña
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                  isDark ? 'text-cyan-300' : 'text-blue-950'
+                }`}>
+                  {isEn ? 'Password' : 'Contraseña'}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-400/80">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-500">
                     lock
                   </span>
                   <input
@@ -473,15 +629,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder=""
-                    className="w-full pl-11 pr-12 py-3.5 text-base bg-slate-950/60 border border-slate-700/80 rounded-xl focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25 outline-none text-white transition-all"
+                    className={`w-full pl-11 pr-12 py-3.5 text-base rounded-xl outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
+                        : 'bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20'
+                    }`}
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-300 p-1 cursor-pointer transition-colors"
-                    title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
+                      isDark ? 'text-slate-400 hover:text-cyan-300' : 'text-slate-500 hover:text-blue-700'
+                    }`}
+                    title={showPassword ? (isEn ? 'Hide password' : 'Ocultar contraseña') : (isEn ? 'Show password' : 'Ver contraseña')}
                   >
                     <span className="material-symbols-outlined text-[22px]">
                       {showPassword ? 'visibility_off' : 'visibility'}
@@ -490,18 +652,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Error message in dark rose glass style */}
+              {/* Error message */}
               {loginError && (
-                <div className="p-3.5 bg-rose-950/70 border border-rose-500/40 text-rose-200 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
-                  <span className="material-symbols-outlined text-[20px] text-rose-400 shrink-0 mt-0.5">error</span>
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/40 text-rose-600 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                  <span className="material-symbols-outlined text-[20px] text-rose-500 shrink-0 mt-0.5">error</span>
                   <div className="leading-snug">
-                    <strong className="block font-bold text-rose-100">Error de Acceso:</strong>
+                    <strong className="block font-bold">{isEn ? 'Access Error:' : 'Error de Acceso:'}</strong>
                     <span>{loginError}</span>
                   </div>
                 </div>
               )}
 
-              {/* Login Button with Blue-Aquamarine Gradient & Hover Elevation */}
+              {/* Login Button with Blue-Aquamarine Gradient */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -510,11 +672,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 {isLoading ? (
                   <>
                     <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Verificando credenciales...</span>
+                    <span>{isEn ? 'Verifying credentials...' : 'Verificando credenciales...'}</span>
                   </>
                 ) : (
                   <>
-                    <span>Iniciar sesión</span>
+                    <span>{isEn ? 'Enter Platform' : 'Iniciar sesión'}</span>
                     <span className="material-symbols-outlined text-[22px]">arrow_forward</span>
                   </>
                 )}
@@ -530,20 +692,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   setLoginError(null);
                   setIsRecoveryModalOpen(true);
                 }}
-                className="text-cyan-400 hover:text-cyan-300 text-sm font-semibold hover:underline cursor-pointer transition-colors"
+                className="text-cyan-500 hover:text-cyan-400 text-sm font-semibold hover:underline cursor-pointer transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                {isEn ? 'Forgot your password?' : '¿Olvidaste tu contraseña?'}
               </button>
             </div>
 
             {/* Divider line */}
             <div className="relative my-1">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-800" />
+                <div className={`w-full border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`} />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-900/95 px-3 text-slate-400 font-semibold text-xs tracking-wider border border-slate-800 rounded-full py-0.5">
-                  ¿Nuevo en Edulink School?
+                <span className={`px-3 text-xs tracking-wider border rounded-full py-0.5 font-semibold ${
+                  isDark ? 'bg-slate-900/95 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+                }`}>
+                  {isEn ? 'New to Edulink School?' : '¿Nuevo en Edulink School?'}
                 </span>
               </div>
             </div>
@@ -557,65 +721,87 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   setRegSuccess(null);
                   setIsRegisterModalOpen(true);
                 }}
-                className="w-full bg-slate-800/80 hover:bg-slate-700/80 active:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400/60 text-white font-bold text-base px-5 py-3.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm flex items-center justify-center gap-2 active:scale-[0.99] hover:shadow-cyan-500/10"
+                className={`w-full font-bold text-base px-5 py-3.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm flex items-center justify-center gap-2 active:scale-[0.99] border ${
+                  isDark
+                    ? 'bg-slate-800/80 hover:bg-slate-700/80 border-cyan-500/30 hover:border-cyan-400/60 text-white hover:shadow-cyan-500/10'
+                    : 'bg-slate-100 hover:bg-slate-200/90 border-slate-300 text-slate-900 hover:border-blue-400'
+                }`}
               >
-                <span className="material-symbols-outlined text-[22px] text-cyan-400">person_add</span>
-                <span>Crear cuenta nueva</span>
+                <span className="material-symbols-outlined text-[22px] text-cyan-500">person_add</span>
+                <span>{isEn ? 'Create New Account' : 'Crear cuenta nueva'}</span>
               </button>
             </div>
           </div>
 
           {/* Subtext below login card */}
-          <p className="text-xs text-slate-400 text-center mt-6 leading-relaxed max-w-[380px]">
-            Acceso institucional protegido mediante credenciales cifradas y validación oficial.
+          <p className={`text-xs text-center mt-6 leading-relaxed max-w-[380px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {isEn
+              ? 'Institutional access protected via encrypted credentials and database verification.'
+              : 'Acceso institucional protegido mediante credenciales cifradas y validación oficial.'}
           </p>
         </section>
       </main>
 
       {/* Institutional Footer */}
-      <footer className="relative z-10 w-full bg-slate-950/80 backdrop-blur-md border-t border-cyan-500/15 py-6 text-slate-400 text-sm">
+      <footer className={`relative z-10 w-full backdrop-blur-md border-t py-6 text-sm ${
+        isDark
+          ? 'bg-slate-950/80 border-cyan-500/15 text-slate-400'
+          : 'bg-white/80 border-slate-200 text-slate-600'
+      }`}>
         <div className="max-w-[1080px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex items-center gap-2 text-white font-semibold">
+          <div className={`flex items-center gap-2 font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <img src={ASSETS.logo} alt="" className="w-6 h-6 object-contain filter drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
             <span>Edulink School © 2026 • Institución Educativa Vallejuelos</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-slate-400">
-            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Manual de Convivencia</span>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm">
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">
+              {isEn ? 'Coexistence Manual' : 'Manual de Convivencia'}
+            </span>
             <span>•</span>
-            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Soporte Técnico</span>
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">
+              {isEn ? 'Technical Support' : 'Soporte Técnico'}
+            </span>
             <span>•</span>
-            <span className="hover:text-cyan-300 cursor-pointer transition-colors">Secretaría de Educación</span>
+            <span className="hover:text-cyan-500 cursor-pointer transition-colors">
+              {isEn ? 'Secretary of Education' : 'Secretaría de Educación'}
+            </span>
           </div>
         </div>
       </footer>
 
       {/* ========================================================================= */}
-      {/* REGISTRATION MODAL WITH 4 ROLES, DATA POLICY & HARDENED PASSWORD RULES     */}
+      {/* REGISTRATION MODAL WITH STRICT ROLE CONDITIONING & DATABASE VERIFICATION  */}
       {/* ========================================================================= */}
       {isRegisterModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0b1c30]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[620px] my-6 border border-[#e5eeff] overflow-hidden flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-[640px] my-6 border overflow-hidden flex flex-col max-h-[92vh] ${
+            isDark ? 'bg-slate-900 text-slate-100 border-cyan-500/30' : 'bg-white text-slate-900 border-slate-200'
+          }`}>
             
             {/* Modal Header */}
-            <div className="p-5 sm:p-6 flex items-start justify-between border-b border-[#e5eeff] bg-[#f8f9ff] shrink-0">
+            <div className={`p-5 sm:p-6 flex items-start justify-between border-b shrink-0 ${
+              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#00288e] text-white flex items-center justify-center shadow-sm shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-blue-700 text-white flex items-center justify-center shadow-sm shrink-0">
                   <span className="material-symbols-outlined text-[26px]">person_add</span>
                 </div>
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#0b1c30] leading-tight">
-                    Crear Cuenta Institucional
+                  <h3 className={`text-xl sm:text-2xl font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {isEn ? 'Create Institutional Account' : 'Crear Cuenta Institucional'}
                   </h3>
-                  <p className="text-sm text-[#444653] mt-1">
-                    Selecciona tu rol para configurar tu perfil institucional
+                  <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {isEn ? 'Select your role and provide required institutional verification' : 'Selecciona tu rol y suministra la información de verificación requerida'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsRegisterModalOpen(false)}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[#757684] hover:bg-[#e5eeff] hover:text-[#0b1c30] cursor-pointer transition-colors"
-                title="Cerrar"
+                className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
+                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+                title={isEn ? 'Close' : 'Cerrar'}
               >
                 <span className="material-symbols-outlined text-[24px]">close</span>
               </button>
@@ -626,15 +812,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               
               <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-5">
                 
-                {/* 1. SELECCIÓN DE LOS 4 ROLES (Estudiante, Docente, Acudiente, Administrativo) */}
-                <div className="bg-[#eff4ff] p-4 sm:p-5 rounded-2xl border border-[#dce9ff]">
+                {/* 1. SELECCIÓN DE LOS 4 ROLES */}
+                <div className={`p-4 sm:p-5 rounded-2xl border ${
+                  isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-blue-50/70 border-blue-100'
+                }`}>
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-bold text-[#00288e] uppercase tracking-wider flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[20px] text-[#00288e]">badge</span>
-                      <span>Rol con el que te registrarás:</span>
+                    <label className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
+                      isDark ? 'text-cyan-300' : 'text-blue-900'
+                    }`}>
+                      <span className="material-symbols-outlined text-[20px]">badge</span>
+                      <span>{isEn ? 'Registration Role:' : 'Rol con el que te registrarás:'}</span>
                     </label>
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-[#00288e]/10 text-[#00288e] font-bold">
-                      Obligatorio
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-600/15 text-blue-600 font-bold">
+                      {isEn ? 'Mandatory' : 'Obligatorio'}
                     </span>
                   </div>
 
@@ -645,13 +835,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onClick={() => setRegRole('student')}
                       className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         regRole === 'student'
-                          ? 'bg-white border-[#00288e] shadow-sm text-[#00288e] ring-2 ring-[#00288e]/20 font-bold'
-                          : 'bg-white/70 border-[#dce9ff] text-[#444653] hover:bg-white hover:text-[#0b1c30]'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-md font-bold'
+                          : isDark
+                            ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[26px]">school</span>
-                      <span className="text-sm font-bold leading-tight">Estudiante</span>
-                      <span className="text-xs text-[#757684]">Alumno</span>
+                      <span className="text-sm font-bold leading-tight">{isEn ? 'Student' : 'Estudiante'}</span>
+                      <span className={`text-xs ${regRole === 'student' ? 'text-blue-100' : 'text-slate-400'}`}>{isEn ? 'Learner' : 'Alumno'}</span>
                     </button>
 
                     <button
@@ -659,13 +851,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onClick={() => setRegRole('teacher')}
                       className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         regRole === 'teacher'
-                          ? 'bg-white border-[#00288e] shadow-sm text-[#00288e] ring-2 ring-[#00288e]/20 font-bold'
-                          : 'bg-white/70 border-[#dce9ff] text-[#444653] hover:bg-white hover:text-[#0b1c30]'
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-md font-bold'
+                          : isDark
+                            ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[26px]">menu_book</span>
-                      <span className="text-sm font-bold leading-tight">Docente</span>
-                      <span className="text-xs text-[#757684]">Profesor</span>
+                      <span className="text-sm font-bold leading-tight">{isEn ? 'Teacher' : 'Docente'}</span>
+                      <span className={`text-xs ${regRole === 'teacher' ? 'text-indigo-100' : 'text-slate-400'}`}>{isEn ? 'Protected' : 'Protegido'}</span>
                     </button>
 
                     <button
@@ -673,13 +867,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onClick={() => setRegRole('family')}
                       className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         regRole === 'family'
-                          ? 'bg-white border-[#00288e] shadow-sm text-[#00288e] ring-2 ring-[#00288e]/20 font-bold'
-                          : 'bg-white/70 border-[#dce9ff] text-[#444653] hover:bg-white hover:text-[#0b1c30]'
+                          ? 'bg-amber-600 text-white border-amber-500 shadow-md font-bold'
+                          : isDark
+                            ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[26px]">family_restroom</span>
-                      <span className="text-sm font-bold leading-tight">Acudiente</span>
-                      <span className="text-xs text-[#757684]">Familia</span>
+                      <span className="text-sm font-bold leading-tight">{isEn ? 'Family' : 'Acudiente'}</span>
+                      <span className={`text-xs ${regRole === 'family' ? 'text-amber-100' : 'text-slate-400'}`}>{isEn ? 'Guardian' : 'Familia'}</span>
                     </button>
 
                     <button
@@ -687,333 +883,569 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onClick={() => setRegRole('admin')}
                       className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         regRole === 'admin'
-                          ? 'bg-white border-[#00288e] shadow-sm text-[#00288e] ring-2 ring-[#00288e]/20 font-bold'
-                          : 'bg-white/70 border-[#dce9ff] text-[#444653] hover:bg-white hover:text-[#0b1c30]'
+                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-md font-bold'
+                          : isDark
+                            ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[26px]">admin_panel_settings</span>
-                      <span className="text-sm font-bold leading-tight">Administrativo</span>
-                      <span className="text-xs text-[#757684]">Coordinación</span>
+                      <span className="text-sm font-bold leading-tight">{isEn ? 'Staff / Admin' : 'Administrativo'}</span>
+                      <span className={`text-xs ${regRole === 'admin' ? 'text-emerald-100' : 'text-slate-400'}`}>{isEn ? 'Protected' : 'Protegido'}</span>
                     </button>
                   </div>
                 </div>
 
-                {/* 2. CAMPOS CORRESPONDIENTES AL ROL */}
+                {/* 2. CAMPOS CONDICIONADOS POR ROL */}
                 
                 {/* CASE A: ROL ESTUDIANTE */}
                 {regRole === 'student' && (
-                  <div className="bg-[#eff4ff] border border-[#b8c4ff] rounded-2xl p-5 flex flex-col gap-4 animate-in fade-in">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
+                    isDark ? 'bg-blue-950/30 border-blue-800/40 text-blue-100' : 'bg-blue-50 border-blue-200 text-blue-900'
+                  }`}>
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#00288e] text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                         <span className="material-symbols-outlined text-[20px]">school</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-[#00288e]">
-                          Información Académica del Estudiante
+                        <h4 className="text-sm font-bold">
+                          {isEn ? 'Student Academic Information' : 'Información Académica del Estudiante'}
                         </h4>
-                        <p className="text-xs text-[#444653] leading-relaxed mt-0.5">
-                          Acceso a asignaturas, calificaciones de los cuatro períodos, entrega de talleres y boletines escolares.
+                        <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {isEn
+                            ? 'Student scope: Access to enrolled subjects, period grades, workshops, and report cards. Strict prevention: Cannot access faculty evaluation rosters.'
+                            : 'Acceso a asignaturas, calificaciones de los cuatro períodos, entrega de talleres y boletines escolares. Rol escolar exclusivo sin acceso a planillas docentes.'}
                         </p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Grado y Grupo *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Grade & Official Group *' : 'Grado y Grupo Oficial *'}
                         </label>
                         <select
                           value={regGradeLevel}
                           onChange={(e) => setRegGradeLevel(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#dce9ff] rounded-xl focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                          }`}
                         >
                           {GRADE_OPTIONS.map(g => (
-                            <option key={g} value={g}>Grado {g}</option>
+                            <option key={g} value={g}>{isEn ? `Grade ${g}` : `Grado ${g}`}</option>
                           ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Documento de Identidad (TI / CC) o Código *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Student ID (TI / CC) or Enrollment Code *' : 'Documento de Identidad (TI / CC) o Código *'}
                         </label>
                         <input
                           type="text"
                           value={regStudentCode}
                           onChange={(e) => setRegStudentCode(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#dce9ff] rounded-xl focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                          }`}
                           required
                         />
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Jornada Escolar Oficial
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Official School Shift' : 'Jornada Escolar Oficial'}
                         </label>
                         <select
                           value={regShift}
                           onChange={(e) => setRegShift(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#dce9ff] rounded-xl focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                          }`}
                         >
-                          <option value="Jornada Mañana (6:15 AM - 12:15 PM)">Jornada Mañana (6:15 AM - 12:15 PM)</option>
-                          <option value="Jornada Tarde (12:15 PM - 6:15 PM)">Jornada Tarde (12:15 PM - 6:15 PM)</option>
-                          <option value="Jornada Única Institucional">Jornada Única Institucional</option>
+                          <option value="Jornada Mañana (6:15 AM - 12:15 PM)">
+                            {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
+                          </option>
+                          <option value="Jornada Tarde (12:15 PM - 6:15 PM)">
+                            {isEn ? 'Afternoon Shift (12:15 PM - 6:15 PM)' : 'Jornada Tarde (12:15 PM - 6:15 PM)'}
+                          </option>
+                          <option value="Jornada Única Institucional">
+                            {isEn ? 'Single School Day' : 'Jornada Única Institucional'}
+                          </option>
                         </select>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* CASE B: ROL DOCENTE */}
+                {/* CASE B: ROL DOCENTE (PROTECTED WITH LINKING CODE) */}
                 {regRole === 'teacher' && (
-                  <div className="bg-[#eef2ff] border border-[#c7d2fe] rounded-2xl p-5 flex flex-col gap-4 animate-in fade-in">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
+                    isDark ? 'bg-indigo-950/30 border-indigo-800/50 text-indigo-100' : 'bg-indigo-50 border-indigo-200 text-indigo-950'
+                  }`}>
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#1e40af] text-white flex items-center justify-center shrink-0 shadow-xs">
-                        <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                      <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <span className="material-symbols-outlined text-[20px]">verified_user</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-[#1e40af]">
-                          Información Docente y Grupos a Cargo
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                          <span>{isEn ? 'Faculty Verification & Protected Access' : 'Verificación Docente y Acceso Protegido'}</span>
+                          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold">
+                            {isEn ? 'Protected' : 'Protegido'}
+                          </span>
                         </h4>
-                        <p className="text-xs text-[#444653] leading-relaxed mt-0.5">
-                          Ingreso y registro de calificaciones en planilla oficial, control de asistencia y asignación de talleres para grupos 6°1 a 11°2.
+                        <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {isEn
+                            ? 'Security constraint: To register as a Teacher, you must provide the official Teacher Linking Code issued by Academic Direction. This code is verified in the database to prevent students or unauthorized persons from registering as teachers.'
+                            : 'Condición de seguridad: Para registrarte como Docente, debes ingresar el Código de Vinculación Docente emitido por la Coordinación Académica. Se valida en la base de datos institucional para impedir que estudiantes se registren como docentes.'}
                         </p>
+                      </div>
+                    </div>
+
+                    {/* Teacher Linking Code Input */}
+                    <div className={`p-3.5 rounded-xl border ${
+                      isDark ? 'bg-slate-900/90 border-indigo-500/40' : 'bg-white border-indigo-200 shadow-xs'
+                    }`}>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1.5 flex items-center justify-between">
+                        <span>{isEn ? 'Teacher Linking Code (From Academic Direction) *' : 'Código de Vinculación Docente (Emitido por Coordinación) *'}</span>
+                        <span className="material-symbols-outlined text-[16px]">key</span>
+                      </label>
+                      <input
+                        id="input-teacher-verification-code"
+                        type="text"
+                        value={regTeacherCode}
+                        onChange={(e) => setRegTeacherCode(e.target.value.toUpperCase())}
+                        placeholder={isEn ? 'e.g. DOC-VALLE-2026' : 'ej: DOC-VALLE-2026'}
+                        className={`w-full px-3.5 py-2.5 text-sm font-mono font-bold tracking-wider rounded-xl outline-none border transition-all ${
+                          isDark
+                            ? 'bg-slate-950 border-indigo-500/50 text-indigo-300 focus:border-indigo-400'
+                            : 'bg-indigo-50/50 border-indigo-300 text-indigo-900 focus:bg-white focus:border-indigo-600'
+                        }`}
+                        required
+                      />
+                      <div className="flex items-center justify-between mt-2 pt-1 text-[11px]">
+                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                          {isEn ? 'Validated against institutional database' : 'Validado en base de datos oficial'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setRegTeacherCode('DOC-VALLE-2026')}
+                          className="text-indigo-600 hover:text-indigo-500 font-bold underline cursor-pointer"
+                        >
+                          {isEn ? 'Fill test code (DOC-VALLE-2026)' : 'Autocompletar prueba (DOC-VALLE-2026)'}
+                        </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Área o Asignatura Principal *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Main Subject Area *' : 'Área o Asignatura Principal *'}
                         </label>
                         <select
                           value={regSubjectArea}
                           onChange={(e) => setRegSubjectArea(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#c7d2fe] rounded-xl focus:border-[#1e40af] focus:ring-1 focus:ring-[#1e40af] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600'
+                          }`}
                         >
-                          <option value="Tecnología e Informática">Tecnología e Informática</option>
-                          <option value="Matemáticas y Geometría">Matemáticas y Geometría</option>
-                          <option value="Ciencias Naturales y Química">Ciencias Naturales y Química</option>
-                          <option value="Lengua Castellana">Lengua Castellana</option>
-                          <option value="Ciencias Sociales e Historia">Ciencias Sociales e Historia</option>
-                          <option value="Inglés y Bilingüismo">Inglés y Bilingüismo</option>
-                          <option value="Educación Física y Deportes">Educación Física y Deportes</option>
+                          <option value="Tecnología e Informática">{isEn ? 'Technology & Computing' : 'Tecnología e Informática'}</option>
+                          <option value="Matemáticas y Geometría">{isEn ? 'Mathematics & Geometry' : 'Matemáticas y Geometría'}</option>
+                          <option value="Ciencias Naturales y Química">{isEn ? 'Natural Sciences & Chemistry' : 'Ciencias Naturales y Química'}</option>
+                          <option value="Lengua Castellana">{isEn ? 'Spanish & Literature' : 'Lengua Castellana'}</option>
+                          <option value="Ciencias Sociales e Historia">{isEn ? 'Social Studies & History' : 'Ciencias Sociales e Historia'}</option>
+                          <option value="Inglés y Bilingüismo">{isEn ? 'English & Bilingualism' : 'Inglés y Bilingüismo'}</option>
+                          <option value="Educación Física y Deportes">{isEn ? 'Physical Education & Sports' : 'Educación Física y Deportes'}</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Número de Documento de Identidad (Cédula) *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Teacher Citizen ID (CC) *' : 'Número de Cédula de Ciudadanía *'}
                         </label>
                         <input
                           type="text"
                           value={regEmployeeId}
                           onChange={(e) => setRegEmployeeId(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#c7d2fe] rounded-xl focus:border-[#1e40af] focus:ring-1 focus:ring-[#1e40af] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600'
+                          }`}
                           required
                         />
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Grupos Asignados (ej: 6°1, 6°2, 7°1)
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Assigned Groups (e.g., 6°1, 6°2, 7°1)' : 'Grupos Asignados (ej: 6°1, 6°2, 7°1)'}
                         </label>
                         <input
                           type="text"
                           value={regAssignedGrades}
                           onChange={(e) => setRegAssignedGrades(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#c7d2fe] rounded-xl focus:border-[#1e40af] focus:ring-1 focus:ring-[#1e40af] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600'
+                          }`}
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* CASE C: ROL ACUDIENTE / FAMILIA */}
+                {/* CASE C: ROL ACUDIENTE / FAMILIA (VERIFIED AGAINST ENROLLED STUDENT) */}
                 {regRole === 'family' && (
-                  <div className="bg-[#fff7ed] border border-[#ffedd5] rounded-2xl p-5 flex flex-col gap-4 animate-in fade-in">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
+                    isDark ? 'bg-amber-950/30 border-amber-800/50 text-amber-100' : 'bg-amber-50 border-amber-200 text-amber-950'
+                  }`}>
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#c2410c] text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                         <span className="material-symbols-outlined text-[20px]">family_restroom</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-[#9a3412]">
-                          Información Familiar y Estudiante a Cargo
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                          <span>{isEn ? 'Family Representation & Enrollment Verification' : 'Vinculación Familiar y Verificación de Matrícula'}</span>
                         </h4>
-                        <p className="text-xs text-[#444653] leading-relaxed mt-0.5">
-                          Consulta de boletín de notas, seguimiento de asistencia escolar, recepción de circulares oficiales y comunicación con docentes.
+                        <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {isEn
+                            ? 'Condition: Registration requires providing the document or enrollment code of the represented student. The system checks the database to ensure the student is enrolled.'
+                            : 'Condición: Para validar tu rol de acudiente, debes ingresar el documento o código del estudiante a representar. El sistema validará en la base de datos institucional que el estudiante esté registrado.'}
                         </p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Parentesco con el Estudiante *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Relationship with Student *' : 'Parentesco con el Estudiante *'}
                         </label>
                         <select
                           value={regRelationship}
                           onChange={(e) => setRegRelationship(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          }`}
                         >
-                          <option value="Madre de familia">Madre de familia</option>
-                          <option value="Padre de familia">Padre de familia</option>
-                          <option value="Acudiente Legal Autorizado">Acudiente Legal Autorizado</option>
-                          <option value="Tutor(a) / Familiar Cercano">Tutor(a) / Familiar Cercano</option>
+                          <option value="Madre de familia">{isEn ? 'Mother' : 'Madre de familia'}</option>
+                          <option value="Padre de familia">{isEn ? 'Father' : 'Padre de familia'}</option>
+                          <option value="Acudiente Legal Autorizado">{isEn ? 'Authorized Legal Guardian' : 'Acudiente Legal Autorizado'}</option>
+                          <option value="Tutor(a) / Familiar Cercano">{isEn ? 'Tutor / Close Relative' : 'Tutor(a) / Familiar Cercano'}</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Número de Documento de Identidad del Acudiente *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Guardian ID Document (CC) *' : 'Documento de Identidad del Acudiente *'}
                         </label>
                         <input
                           type="text"
                           value={regGuardianDocId}
                           onChange={(e) => setRegGuardianDocId(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          }`}
                           required
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Teléfono de Contacto Familiar *
-                        </label>
-                        <input
-                          type="text"
-                          value={regEmergencyPhone}
-                          onChange={(e) => setRegEmergencyPhone(e.target.value)}
-                          placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Documento de Identidad del Estudiante
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Represented Student ID / Enrollment Code *' : 'Documento o Matrícula del Estudiante Representado *'}
                         </label>
                         <input
                           type="text"
                           value={regRepresentedStudentCode}
                           onChange={(e) => setRegRepresentedStudentCode(e.target.value)}
-                          placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                          placeholder={isEn ? 'e.g. 1092837465' : 'ej: 1092837465'}
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border font-mono ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          }`}
+                          required
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRegRepresentedStudentCode('1092837465');
+                            setRegRepresentedStudentName('Miguel Ángel Jiménez');
+                          }}
+                          className="text-[11px] text-amber-600 hover:text-amber-500 font-bold underline cursor-pointer mt-1 block"
+                        >
+                          {isEn ? 'Fill enrolled demo student (1092837465)' : 'Autocompletar estudiante de prueba (1092837465)'}
+                        </button>
                       </div>
 
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Nombre Completo del Estudiante Representado *
+                      <div>
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Represented Student Full Name *' : 'Nombre Completo del Estudiante Representado *'}
                         </label>
                         <input
                           type="text"
                           value={regRepresentedStudentName}
                           onChange={(e) => setRegRepresentedStudentName(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#fed7aa] rounded-xl focus:border-[#c2410c] focus:ring-1 focus:ring-[#c2410c] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          }`}
                           required
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Family Contact Phone *' : 'Teléfono de Contacto Familiar *'}
+                        </label>
+                        <input
+                          type="text"
+                          value={regEmergencyPhone}
+                          onChange={(e) => setRegEmergencyPhone(e.target.value)}
+                          placeholder=""
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-amber-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                          }`}
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* CASE D: ROL ADMINISTRATIVO (4th Role) */}
+                {/* CASE D: ROL ADMINISTRATIVO (PROTECTED WITH DIRECTIVE KEY) */}
                 {regRole === 'admin' && (
-                  <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-2xl p-5 flex flex-col gap-4 animate-in fade-in">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
+                    isDark ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-100' : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                  }`}>
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#15803d] text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                         <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-[#15803d]">
-                          Información de Personal Administrativo y Directivo
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                          <span>{isEn ? 'Directive & Administrative Authorization Key' : 'Llave de Autorización Directiva y Administrativa'}</span>
+                          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold">
+                            {isEn ? 'High Privilege' : 'Alto Privilegio'}
+                          </span>
                         </h4>
-                        <p className="text-xs text-[#444653] leading-relaxed mt-0.5">
-                          Gestión institucional de la I.E. Vallejuelos, supervisión de grupos (6°1 a 11°2), jornada escolar (6:15 AM - 12:15 PM), expedición de certificados y circulares oficiales.
+                        <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {isEn
+                            ? 'Critical security constraint: Registration for leadership and staff roles requires an institutional Directive Key verified in the database. Protects rectoría and academic coordination privileges.'
+                            : 'Condición crítica de seguridad: El registro como directivo o administrativo exige la Llave de Autorización Directiva validada en la base de datos institucional. Protege las funciones de rectoría y coordinación.'}
                         </p>
+                      </div>
+                    </div>
+
+                    {/* Directive Security Key Input */}
+                    <div className={`p-3.5 rounded-xl border ${
+                      isDark ? 'bg-slate-900/90 border-emerald-500/40' : 'bg-white border-emerald-200 shadow-xs'
+                    }`}>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1.5 flex items-center justify-between">
+                        <span>{isEn ? 'Directive Authorization Key / Security Token *' : 'Llave de Autorización Directiva / Token de Seguridad *'}</span>
+                        <span className="material-symbols-outlined text-[16px]">lock</span>
+                      </label>
+                      <input
+                        id="input-admin-verification-code"
+                        type="text"
+                        value={regAdminKey}
+                        onChange={(e) => setRegAdminKey(e.target.value.toUpperCase())}
+                        placeholder={isEn ? 'e.g. ADM-DIR-2026-VALLE' : 'ej: ADM-DIR-2026-VALLE'}
+                        className={`w-full px-3.5 py-2.5 text-sm font-mono font-bold tracking-wider rounded-xl outline-none border transition-all ${
+                          isDark
+                            ? 'bg-slate-950 border-emerald-500/50 text-emerald-300 focus:border-emerald-400'
+                            : 'bg-emerald-50/50 border-emerald-300 text-emerald-900 focus:bg-white focus:border-emerald-600'
+                        }`}
+                        required
+                      />
+                      <div className="flex items-center justify-between mt-2 pt-1 text-[11px]">
+                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                          {isEn ? 'Verified in Firestore authorized_roles collection' : 'Validado en la colección authorized_roles de Firestore'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setRegAdminKey('ADM-DIR-2026-VALLE')}
+                          className="text-emerald-600 hover:text-emerald-500 font-bold underline cursor-pointer"
+                        >
+                          {isEn ? 'Fill test key (ADM-DIR-2026-VALLE)' : 'Autocompletar prueba (ADM-DIR-2026-VALLE)'}
+                        </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Cargo o Dependencia *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Position / Department *' : 'Cargo o Dependencia *'}
                         </label>
                         <select
                           value={regAdminPosition}
                           onChange={(e) => setRegAdminPosition(e.target.value)}
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#bbf7d0] rounded-xl focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                          }`}
                         >
-                          <option value="Coordinación Académica">Coordinación Académica</option>
-                          <option value="Rectoría General">Rectoría General</option>
-                          <option value="Coordinación de Convivencia">Coordinación de Convivencia</option>
-                          <option value="Secretaría General & Matrículas">Secretaría General & Matrículas</option>
-                          <option value="Orientación Escolar y Psicosocial">Orientación Escolar y Psicosocial</option>
+                          <option value="Coordinación Académica">{isEn ? 'Academic Coordination' : 'Coordinación Académica'}</option>
+                          <option value="Rectoría General">{isEn ? 'General Rectorate' : 'Rectoría General'}</option>
+                          <option value="Coordinación de Convivencia">{isEn ? 'Coexistence Coordination' : 'Coordinación de Convivencia'}</option>
+                          <option value="Secretaría General & Matrículas">{isEn ? 'General Secretariat & Admissions' : 'Secretaría General & Matrículas'}</option>
+                          <option value="Orientación Escolar y Psicosocial">{isEn ? 'School Guidance & Counseling' : 'Orientación Escolar y Psicosocial'}</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Documento de Identidad (Cédula de Ciudadanía) *
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Citizen ID (CC) *' : 'Documento de Identidad (Cédula) *'}
                         </label>
                         <input
                           type="text"
                           value={regAdminDocId}
                           onChange={(e) => setRegAdminDocId(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#bbf7d0] rounded-xl focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                          }`}
                           required
                         />
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                          Código de Empleado o Dependencia Institucional
+                        <label className="block text-xs font-bold mb-1.5">
+                          {isEn ? 'Institutional Employee Code' : 'Código de Empleado o Dependencia Institucional'}
                         </label>
                         <input
                           type="text"
                           value={regAdminEmployeeCode}
                           onChange={(e) => setRegAdminEmployeeCode(e.target.value)}
                           placeholder=""
-                          className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#bbf7d0] rounded-xl focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] outline-none text-[#0b1c30]"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-700 text-white focus:border-emerald-400'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                          }`}
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
+                {/* Optional Expandable Helper: View Institutional Authorized Codes for Testing */}
+                <div className={`p-3 rounded-xl border text-xs ${
+                  isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDemoCodes(!showDemoCodes)}
+                    className="w-full flex items-center justify-between text-left font-bold text-blue-600 hover:text-blue-500 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">info</span>
+                      <span>{isEn ? 'Testing role validation? View authorized institutional test codes' : '¿Deseas probar la validación de roles? Ver códigos autorizados en la base de datos'}</span>
+                    </span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      {showDemoCodes ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </button>
+
+                  {showDemoCodes && (
+                    <div className="pt-3 space-y-2.5 border-t border-slate-700/50 mt-2 animate-in fade-in">
+                      <div>
+                        <span className="font-bold block text-indigo-400 mb-1">{isEn ? 'Teacher Linking Codes:' : 'Códigos de Docente:'}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['DOC-VALLE-2026', 'DOC-TEC-8421', 'DOC-MAT-7139', 'DOC-CIEN-9312'].map((code) => (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => {
+                                setRegRole('teacher');
+                                setRegTeacherCode(code);
+                              }}
+                              className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 font-mono text-[11px] hover:bg-indigo-500/30 cursor-pointer"
+                            >
+                              {code}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="font-bold block text-emerald-400 mb-1">{isEn ? 'Staff / Admin Directive Keys:' : 'Llaves de Administrativo:'}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['ADM-DIR-2026-VALLE', 'ADM-COORD-2026', 'ADM-SEC-9876'].map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setRegRole('admin');
+                                setRegAdminKey(key);
+                              }}
+                              className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono text-[11px] hover:bg-emerald-500/30 cursor-pointer"
+                            >
+                              {key}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* 3. CAMPOS GENERALES DE CUENTA (Nombre, Correo, Contraseña) */}
                 <div className="flex flex-col gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                      Nombre Completo *
+                    <label className="block text-xs font-bold mb-1.5">
+                      {isEn ? 'Full Name *' : 'Nombre Completo *'}
                     </label>
                     <input
                       type="text"
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
                       placeholder=""
-                      className="w-full px-4 py-3 text-base bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                      className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
+                        isDark
+                          ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                      }`}
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                      Correo Electrónico *
+                    <label className="block text-xs font-bold mb-1.5">
+                      {isEn ? 'Email Address *' : 'Correo Electrónico *'}
                     </label>
                     <input
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       placeholder=""
-                      className="w-full px-4 py-3 text-base bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                      className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
+                        isDark
+                          ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                      }`}
                       required
                     />
                   </div>
@@ -1021,129 +1453,145 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   {/* Password with rules and validations */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                        Contraseña Nueva *
+                      <label className="block text-xs font-bold mb-1.5">
+                        {isEn ? 'New Password *' : 'Contraseña Nueva *'}
                       </label>
                       <input
                         type={showRegPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder=""
-                        className="w-full px-4 py-3 text-base bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                        className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
+                          isDark
+                            ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                            : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                        }`}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
-                        Confirmar Contraseña *
+                      <label className="block text-xs font-bold mb-1.5">
+                        {isEn ? 'Confirm Password *' : 'Confirmar Contraseña *'}
                       </label>
                       <input
                         type={showRegPassword ? 'text' : 'password'}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
                         placeholder=""
-                        className="w-full px-4 py-3 text-base bg-[#f8f9ff] border border-[#dce9ff] rounded-xl focus:bg-white focus:border-[#00288e] focus:ring-1 focus:ring-[#00288e] outline-none text-[#0b1c30]"
+                        className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
+                          isDark
+                            ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                            : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                        }`}
                         required
                       />
                     </div>
                   </div>
 
                   {/* Password Rule Requirements Checklist */}
-                  <div className="p-3.5 bg-[#f8f9ff] border border-[#dce9ff] rounded-xl text-xs space-y-1.5">
-                    <span className="font-bold text-[#0b1c30] block mb-1">
-                      Requisitos de seguridad para la contraseña:
+                  <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                    isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <span className="font-bold block mb-1">
+                      {isEn ? 'Password security requirements:' : 'Requisitos de seguridad para la contraseña:'}
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div className={`flex items-center gap-1.5 font-medium ${passHasMinLength ? 'text-emerald-700' : 'text-[#757684]'}`}>
+                      <div className={`flex items-center gap-1.5 font-medium ${passHasMinLength ? 'text-emerald-500' : 'text-slate-400'}`}>
                         <span className="material-symbols-outlined text-[16px]">
                           {passHasMinLength ? 'check_circle' : 'radio_button_unchecked'}
                         </span>
-                        <span>Mínimo 8 caracteres</span>
+                        <span>{isEn ? 'Minimum 8 characters' : 'Mínimo 8 caracteres'}</span>
                       </div>
-                      <div className={`flex items-center gap-1.5 font-medium ${passHasUpper ? 'text-emerald-700' : 'text-[#757684]'}`}>
+                      <div className={`flex items-center gap-1.5 font-medium ${passHasUpper ? 'text-emerald-500' : 'text-slate-400'}`}>
                         <span className="material-symbols-outlined text-[16px]">
                           {passHasUpper ? 'check_circle' : 'radio_button_unchecked'}
                         </span>
-                        <span>Una letra mayúscula (A-Z)</span>
+                        <span>{isEn ? 'One uppercase letter (A-Z)' : 'Una letra mayúscula (A-Z)'}</span>
                       </div>
-                      <div className={`flex items-center gap-1.5 font-medium ${passHasLower ? 'text-emerald-700' : 'text-[#757684]'}`}>
+                      <div className={`flex items-center gap-1.5 font-medium ${passHasLower ? 'text-emerald-500' : 'text-slate-400'}`}>
                         <span className="material-symbols-outlined text-[16px]">
                           {passHasLower ? 'check_circle' : 'radio_button_unchecked'}
                         </span>
-                        <span>Una letra minúscula (a-z)</span>
+                        <span>{isEn ? 'One lowercase letter (a-z)' : 'Una letra minúscula (a-z)'}</span>
                       </div>
-                      <div className={`flex items-center gap-1.5 font-medium ${passHasSpecial ? 'text-emerald-700' : 'text-[#757684]'}`}>
+                      <div className={`flex items-center gap-1.5 font-medium ${passHasSpecial ? 'text-emerald-500' : 'text-slate-400'}`}>
                         <span className="material-symbols-outlined text-[16px]">
                           {passHasSpecial ? 'check_circle' : 'radio_button_unchecked'}
                         </span>
-                        <span>Un carácter especial (!@#$%&*)</span>
+                        <span>{isEn ? 'One special character (!@#$%&*)' : 'Un carácter especial (!@#$%&*)'}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm text-[#444653]">
+                  <div className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       id="showRegPass"
                       checked={showRegPassword}
                       onChange={(e) => setShowRegPassword(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#00288e] focus:ring-0 cursor-pointer"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-0 cursor-pointer"
                     />
                     <label htmlFor="showRegPass" className="cursor-pointer font-medium select-none">
-                      Mostrar contraseñas
+                      {isEn ? 'Show passwords' : 'Mostrar contraseñas'}
                     </label>
                   </div>
                 </div>
 
-                {/* 4. CASILLA OBLIGATORIA: POLÍTICA DE USO DE DATOS (User Prompt Requirement) */}
-                <div className="flex items-start gap-3 p-4 bg-[#f8f9ff] border border-[#dce9ff] rounded-xl">
+                {/* 4. MANDATORY CASILLA: PERSONAL DATA TREATMENT POLICY */}
+                <div className={`flex items-start gap-3 p-4 rounded-xl border ${
+                  isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
                   <input
                     type="checkbox"
                     id="acceptDataPolicy"
                     checked={acceptDataPolicy}
                     onChange={(e) => setAcceptDataPolicy(e.target.checked)}
-                    className="mt-1 w-5 h-5 rounded border-gray-300 text-[#00288e] focus:ring-[#00288e] cursor-pointer shrink-0"
+                    className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer shrink-0"
                     required
                   />
-                  <label htmlFor="acceptDataPolicy" className="text-sm text-[#444653] leading-snug cursor-pointer select-none">
-                    Acepto la <span className="font-bold text-[#00288e]">política de uso y tratamiento de datos personales</span> y los términos del servicio educativo institucional de la Institución Educativa Vallejuelos.
+                  <label htmlFor="acceptDataPolicy" className="text-sm leading-snug cursor-pointer select-none">
+                    {isEn ? (
+                      <>I accept the <span className="font-bold text-blue-600">personal data protection and processing policy</span> and the institutional educational service terms of Institución Educativa Vallejuelos.</>
+                    ) : (
+                      <>Acepto la <span className="font-bold text-blue-600">política de uso y tratamiento de datos personales</span> y los términos del servicio educativo institucional de la Institución Educativa Vallejuelos.</>
+                    )}
                   </label>
                 </div>
 
-                {/* Error message displayed at the bottom right before the submit button */}
+                {/* Error message */}
                 {regError && (
-                  <div className="p-4 bg-[#ffdad6] border border-[#ba1a1a]/30 text-[#93000a] text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/40 text-rose-500 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
                     <span className="material-symbols-outlined text-[20px] shrink-0 mt-0.5">error</span>
                     <div className="leading-snug">
-                      <strong className="block font-bold">Error en el registro:</strong>
+                      <strong className="block font-bold">{isEn ? 'Registration Error:' : 'Error en el registro:'}</strong>
                       <span>{regError}</span>
                     </div>
                   </div>
                 )}
 
                 {regSuccess && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                  <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 text-emerald-500 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
                     <span className="material-symbols-outlined text-[20px] shrink-0 mt-0.5">check_circle</span>
                     <span>{regSuccess}</span>
                   </div>
                 )}
 
-                {/* Submit button: Says "registrando" when loading */}
+                {/* Submit button */}
                 <div className="text-center pt-2">
                   <button
                     type="submit"
                     disabled={regLoading}
-                    className="bg-[#00288e] hover:bg-[#001f70] active:bg-[#001453] text-white font-bold text-base py-3.5 px-10 rounded-xl shadow-md shadow-[#00288e]/20 cursor-pointer transition duration-150 active:scale-[0.98] disabled:opacity-75 flex items-center justify-center gap-2 mx-auto"
+                    className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-base py-3.5 px-10 rounded-xl shadow-md cursor-pointer transition duration-150 active:scale-[0.98] disabled:opacity-75 flex items-center justify-center gap-2 mx-auto"
                   >
                     {regLoading ? (
                       <>
                         <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>registrando</span>
+                        <span>{isEn ? 'Registering...' : 'registrando'}</span>
                       </>
                     ) : (
                       <>
-                        <span>Registrarse</span>
+                        <span>{isEn ? 'Sign Up' : 'Registrarse'}</span>
                         <span className="material-symbols-outlined text-[22px]">how_to_reg</span>
                       </>
                     )}
@@ -1154,6 +1602,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </div>
         </div>
       )}
+
       {/* Multi-Step Password Recovery Modal */}
       <PasswordRecoveryModal
         isOpen={isRecoveryModalOpen}

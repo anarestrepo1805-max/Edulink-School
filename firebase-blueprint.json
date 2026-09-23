@@ -40,6 +40,19 @@
         "registeredAt": { "type": "string" }
       },
       "required": ["email"]
+    },
+    "AuthorizedRoleVerification": {
+      "title": "Authorized Role Verification",
+      "description": "Pre-authorized institutional verification codes for teachers and administrators",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher", "admin"] },
+        "department": { "type": "string" },
+        "issuer": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["code", "role", "active"]
     }
   },
   "firestore": {
@@ -54,6 +67,10 @@
     "/registered_emails/{emailDoc}": {
       "schema": "RegisteredEmail",
       "description": "Lookup table of registered email addresses"
+    },
+    "/authorized_roles/{codeId}": {
+      "schema": "AuthorizedRoleVerification",
+      "description": "Pre-authorized institutional verification codes"
     }
   }
 }

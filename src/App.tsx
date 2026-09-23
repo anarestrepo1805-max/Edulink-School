@@ -9,8 +9,9 @@ import { FamilyDashboardView } from './components/FamilyDashboardView';
 import { FamilyMessagingView } from './components/FamilyMessagingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { getCurrentUser, logoutUser } from './services/authService';
+import { ThemeLanguageProvider } from './context/ThemeLanguageContext';
 
-export default function App() {
+function MainApp() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCurrentUser());
   // The first screen of the platform MUST be Login / Register as requested
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('login');
@@ -112,3 +113,12 @@ export default function App() {
     </NavigationShell>
   );
 }
+
+export default function App() {
+  return (
+    <ThemeLanguageProvider>
+      <MainApp />
+    </ThemeLanguageProvider>
+  );
+}
+

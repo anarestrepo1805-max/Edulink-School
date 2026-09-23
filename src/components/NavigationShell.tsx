@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveScreen, UserRole, UserProfile } from '../types';
 import { deleteUserAccount } from '../services/authService';
+import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface NavigationShellProps {
   currentScreen: ActiveScreen;
@@ -30,23 +31,10 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   const [showViewProfileModal, setShowViewProfileModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
-  // Theme state (claro / oscuro)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('edulink_theme') === 'dark' || document.documentElement.classList.contains('dark');
-    } catch {
-      return false;
-    }
-  });
-
-  // Language state (español / inglés)
-  const [currentLang, setCurrentLang] = useState<'es' | 'en'>(() => {
-    try {
-      return (localStorage.getItem('edulink_lang') as 'es' | 'en') || 'es';
-    } catch {
-      return 'es';
-    }
-  });
+  // Theme & Language context
+  const { theme, toggleTheme, language, toggleLanguage } = useThemeLanguage();
+  const isDarkMode = theme === 'dark';
+  const currentLang = language;
 
   // Notification for theme or language toggle
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -69,26 +57,15 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   }, []);
 
   const handleToggleTheme = () => {
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('edulink_theme', 'dark');
-      setToastMessage(currentLang === 'es' ? 'Tema Oscuro activado' : 'Dark Mode activated');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('edulink_theme', 'light');
-      setToastMessage(currentLang === 'es' ? 'Tema Claro activado' : 'Light Mode activated');
-    }
+    toggleTheme();
+    setToastMessage(!isDarkMode ? (currentLang === 'es' ? 'Tema Oscuro activado' : 'Dark Mode activated') : (currentLang === 'es' ? 'Tema Claro activado' : 'Light Mode activated'));
     setShowProfileMenu(false);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleToggleLanguage = () => {
-    const nextLang = currentLang === 'es' ? 'en' : 'es';
-    setCurrentLang(nextLang);
-    localStorage.setItem('edulink_lang', nextLang);
-    setToastMessage(nextLang === 'es' ? 'Idioma cambiado a Español' : 'Language changed to English');
+    toggleLanguage();
+    setToastMessage(currentLang === 'es' ? 'Language changed to English' : 'Idioma cambiado a Español');
     setShowProfileMenu(false);
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -207,6 +184,31 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 
           {/* User Session & Profile Menu Button */}
           <div className="flex items-center gap-2">
+            {/* Quick compact theme & language capsule */}
+            <div className="flex items-center bg-white/15 border border-white/20 rounded-full p-0.5 shadow-xs">
+              <button
+                type="button"
+                onClick={handleToggleTheme}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white/90 hover:text-amber-300 hover:bg-white/20 transition-all cursor-pointer"
+                title={isDarkMode ? (currentLang === 'es' ? 'Cambiar a Modo Claro' : 'Switch to Light Mode') : (currentLang === 'es' ? 'Cambiar a Modo Oscuro' : 'Switch to Dark Mode')}
+                aria-label="Toggle Theme"
+              >
+                <span className="material-symbols-outlined text-[17px]">
+                  {isDarkMode ? 'light_mode' : 'dark_mode'}
+                </span>
+              </button>
+              <span className="w-[1px] h-3.5 bg-white/25" />
+              <button
+                type="button"
+                onClick={handleToggleLanguage}
+                className="px-2 h-7 rounded-full flex items-center justify-center text-white/90 hover:text-cyan-200 hover:bg-white/20 text-[11px] font-bold tracking-wider transition-all cursor-pointer"
+                title={currentLang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+                aria-label="Toggle Language"
+              >
+                {currentLang === 'es' ? 'EN' : 'ES'}
+              </button>
+            </div>
+
             {currentUser ? (
               <div className="relative" ref={menuRef}>
                 {/* Profile Toggle Button with User Name */}

@@ -7,6 +7,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Pre-authorized institutional verification codes for role validation (Teacher/Admin)
+    match /authorized_roles/{codeDoc} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create, update: if true;
