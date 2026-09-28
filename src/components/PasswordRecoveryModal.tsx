@@ -174,16 +174,22 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       // 2. Genera un número aleatorio de 6 dígitos en JavaScript al presionar "Enviar código"
       const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+      // 1. Configura la variable del enlace usando la URL actual de la aplicación:
+      const resetLink = window.location.origin + '/?action=reset_password';
+
       // 4. Guarda ese código en memoria de la página para validarlo en la siguiente pantalla antes de permitir el cambio de contraseña
       setMemoryCode(randomCode);
 
-      // 3. Utiliza la función emailjs.send() para enviar el código generado al correo electrónico ingresado por el usuario
-      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
-      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+      // 2. Envía la variable 'resetLink' dentro del objeto de parámetros de EmailJS:
+      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_kvyxfzj';
+      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || '_ejs-test-mail-service__';
       const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
 
       const templateParams = {
         to_email: cleanEmail,
+        reset_link: resetLink,
+        resetLink: resetLink,
+        link: resetLink,
         recipient_email: cleanEmail,
         user_email: cleanEmail,
         code: randomCode,
@@ -192,7 +198,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         passcode: randomCode,
         app_name: 'Edulink School',
         institution: 'I.E. Vallejuelos',
-        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Es válido por 15 minutos.`
+        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Enlace directo: ${resetLink}`
       };
 
       try {
@@ -225,14 +231,18 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setErrorMessage(null);
     try {
       const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const resetLink = window.location.origin + '/?action=reset_password';
       setMemoryCode(randomCode);
 
-      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
-      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_kvyxfzj';
+      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || '_ejs-test-mail-service__';
       const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
 
       const templateParams = {
         to_email: email.trim(),
+        reset_link: resetLink,
+        resetLink: resetLink,
+        link: resetLink,
         recipient_email: email.trim(),
         user_email: email.trim(),
         code: randomCode,
@@ -241,7 +251,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         passcode: randomCode,
         app_name: 'Edulink School',
         institution: 'I.E. Vallejuelos',
-        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Es válido por 15 minutos.`
+        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Enlace directo: ${resetLink}`
       };
 
       try {

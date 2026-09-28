@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { ASSETS } from '../data/mockData';
 import {
@@ -150,8 +150,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [resetSuccessNotice, setResetSuccessNotice] = useState(false);
 
-  // Password Recovery Modal state
-  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
+  // Password Recovery Modal state - auto-opens if URL has ?action=reset_password
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('action') === 'reset_password';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('action') === 'reset_password') {
+        setIsRecoveryModalOpen(true);
+      }
+    }
+  }, []);
 
   // Registration Modal state (Facebook Style)
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);

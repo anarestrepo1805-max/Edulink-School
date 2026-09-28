@@ -761,16 +761,24 @@ export interface PasswordResetResult {
 }
 
 /**
- * Dispatches a password recovery email using EmailJS.
+ * Dispatches a password recovery email using EmailJS with dynamic reset_link.
  */
 export async function sendRecoveryEmailWithEmailJS(email: string, code: string): Promise<boolean> {
   const cleanEmail = email.trim().toLowerCase();
-  const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
-  const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+  // 1. Configura la variable del enlace usando la URL actual de la aplicación
+  const resetLink = typeof window !== 'undefined'
+    ? `${window.location.origin}/?action=reset_password`
+    : '/?action=reset_password';
+
+  const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_kvyxfzj';
+  const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || '_ejs-test-mail-service__';
   const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
 
+  // 2. Envía la variable 'reset_link' dentro del objeto de parámetros de EmailJS
   const templateParams = {
     to_email: cleanEmail,
+    reset_link: resetLink,
+    link: resetLink,
     recipient_email: cleanEmail,
     user_email: cleanEmail,
     passcode: code,
@@ -779,7 +787,7 @@ export async function sendRecoveryEmailWithEmailJS(email: string, code: string):
     code: code,
     app_name: 'Edulink School',
     school_name: 'I.E. Vallejuelos',
-    message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${code}. Es válido por 15 minutos.`
+    message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${code}. Enlace: ${resetLink}`
   };
 
   try {
