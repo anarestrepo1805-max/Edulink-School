@@ -26,8 +26,6 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [email, setEmail] = useState(initialEmail);
   const [verificationCode, setVerificationCode] = useState('');
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [firebaseDispatched, setFirebaseDispatched] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
 
   const [newPassword, setNewPassword] = useState('');
@@ -37,9 +35,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
-  // Dynamic error translation helper so changing language instantly updates displayed errors
+  // Dynamic error and alert translation helper so switching language immediately updates alerts
   const translateError = (msg: string | null): string | null => {
     if (!msg) return null;
     if (msg.includes('Contraseña incorrecta') || msg.includes('Incorrect password')) {
@@ -58,8 +55,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     }
     if (msg.includes('Código de verificación incorrecto') || msg.includes('Incorrect verification code')) {
       return isEn
-        ? 'Incorrect verification code. Please check the code sent to your registered email.'
-        : 'Código de verificación incorrecto. Por favor revisa el código enviado a tu correo registrado.';
+        ? 'Incorrect or expired verification code. Please check your email and try again.'
+        : 'Código de verificación incorrecto o expirado. Por favor revisa tu correo e intenta nuevamente.';
     }
     if (msg.includes('ha expirado') || msg.includes('expired')) {
       return isEn
@@ -76,7 +73,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       return isEn ? 'Password must contain at least one lowercase letter (a-z).' : 'La contraseña debe contener al menos una letra minúscula (a-z).';
     }
     if (msg.includes('especial') || msg.includes('special character')) {
-      return isEn ? 'La contraseña debe contener al menos un carácter especial (!@#$%).' : 'La contraseña debe contener al menos un carácter especial (!@#$%).';
+      return isEn ? 'Password must contain at least one special character (!@#$%).' : 'La contraseña debe contener al menos un carácter especial (!@#$%).';
     }
     if (msg.includes('no coinciden') || msg.includes('do not match')) {
       return isEn ? 'Passwords do not match. Please verify carefully.' : 'Las contraseñas no coinciden. Verifica e intenta nuevamente.';
@@ -90,12 +87,9 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       setStep(1);
       setEmail(initialEmail || '');
       setVerificationCode('');
-      setGeneratedCode(null);
-      setFirebaseDispatched(false);
       setNewPassword('');
       setConfirmPassword('');
       setErrorMessage(null);
-      setNoticeMessage(null);
       setResendTimer(60);
     }
   }, [isOpen, initialEmail]);
@@ -112,6 +106,22 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       if (interval) clearInterval(interval);
     };
   }, [isOpen, step, resendTimer]);
+
+  // Automatic redirect upon successful password reset in Step 4
+  useEffect(() => {
+    let timer: any = null;
+    if (isOpen && step === 4) {
+      timer = setTimeout(() => {
+        if (onPasswordResetSuccess) {
+          onPasswordResetSuccess(email);
+        }
+        onClose();
+      }, 2000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isOpen, step, email, onPasswordResetSuccess, onClose]);
 
   if (!isOpen) return null;
 
@@ -140,7 +150,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     return { label: isEn ? 'Very Strong' : 'Muy segura', color: 'text-emerald-400', bg: 'bg-emerald-400' };
   };
 
-  // STEP 1: Solicitud de código y enlace de restablecimiento
+  // 1. Pantalla 1: Solicitud de Correo -> Envío Simulado / Backend
+  // NO se muestra en pantalla ningún código de verificación ni contraseña temporal
   const handleSendRecoveryCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -158,17 +169,15 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
     setIsLoading(true);
     try {
-      const res = await requestPasswordReset(cleanEmail, language);
+      // Backend / simulation dispatch without exposing codes on screen
+      await requestPasswordReset(cleanEmail, language);
       setIsLoading(false);
       setStep(2);
       setResendTimer(60);
       setVerificationCode('');
-      setGeneratedCode(res.code || null);
-      setFirebaseDispatched(res.firebaseDispatched);
-      setNoticeMessage(res.message);
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMessage(err.message || (isEn ? 'Error sending recovery code.' : 'Error al enviar el código de recuperación.'));
+      setErrorMessage(err.message || (isEn ? 'Error sending recovery code.' : 'Error al enviar el código de verificación.'));
     }
   };
 
@@ -178,19 +187,16 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const res = await requestPasswordReset(email.trim(), language);
+      await requestPasswordReset(email.trim(), language);
       setIsLoading(false);
       setResendTimer(60);
-      setGeneratedCode(res.code || null);
-      setFirebaseDispatched(res.firebaseDispatched);
-      setNoticeMessage(res.message);
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMessage(err.message || (isEn ? 'Error resending recovery code.' : 'Error al reenviar el código.'));
+      setErrorMessage(err.message || (isEn ? 'Error resending code.' : 'Error al reenviar el código.'));
     }
   };
 
-  // STEP 2: Verificación de Código de 6 dígitos
+  // 2. Pantalla 2: Verificación de Código OTP
   const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -213,7 +219,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     }
   };
 
-  // STEP 3: Guardar y Restablecer Contraseña
+  // 3. Pantalla 3: Restablecer Contraseña
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -243,10 +249,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     try {
       await completePasswordReset(email, verificationCode, newPassword, language);
       setIsLoading(false);
+      // 4. Finalización: Modal limpio con confirmación y redirección automática a inicio de sesión
       setStep(4);
-      if (onPasswordResetSuccess) {
-        onPasswordResetSuccess(email);
-      }
     } catch (err: any) {
       setIsLoading(false);
       setErrorMessage(err.message || (isEn ? 'Error updating password.' : 'Error al actualizar la contraseña.'));
@@ -302,7 +306,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* PASO 1: Ingreso de correo electrónico registrado                           */}
+        {/* PANTALLA 1: Solicitud de Correo                                           */}
         {/* ========================================================================= */}
         {step === 1 && (
           <div>
@@ -315,8 +319,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {isEn
-                  ? 'Enter your registered email address. We will send you a 6-digit verification code and reset link.'
-                  : 'Ingresa tu correo electrónico registrado. Te enviaremos un código de verificación de 6 dígitos y enlace de restablecimiento.'}
+                  ? 'Enter your registered email address to receive a 6-digit verification code.'
+                  : 'Ingresa tu correo electrónico registrado para recibir el código de verificación de 6 dígitos.'}
               </p>
             </div>
 
@@ -337,7 +341,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       setEmail(e.target.value);
                       setErrorMessage(null);
                     }}
-                    placeholder={isEn ? 'your.name@edulink.edu.co' : 'tu.nombre@edulink.edu.co'}
+                    placeholder=""
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
@@ -366,11 +370,11 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Dispatching verification code...' : 'Enviando código de verificación...'}</span>
+                      <span>{isEn ? 'Dispatching verification code...' : 'Enviando enlace / código de verificación...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>{isEn ? 'Send verification code' : 'Enviar código de verificación'}</span>
+                      <span>{isEn ? 'Send link / verification code' : 'Enviar enlace / código de verificación'}</span>
                       <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}
@@ -381,7 +385,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* PASO 2: Verificación de Código de 6 dígitos recibido por correo            */}
+        {/* PANTALLA 2: Verificación de Código OTP o Enlace                           */}
         {/* ========================================================================= */}
         {step === 2 && (
           <div>
@@ -390,17 +394,17 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 <span className="material-symbols-outlined text-[26px]">pin</span>
               </div>
               <h3 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {isEn ? 'Enter Verification Code' : 'Ingresa el Código de Verificación'}
+                {isEn ? 'Verification Code' : 'Código de Verificación'}
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {isEn
-                  ? 'We have sent a 6-digit security code to your registered email address:'
-                  : 'Hemos enviado un código de seguridad de 6 dígitos a tu correo registrado:'}
+                  ? 'We have sent a 6-digit verification code to your registered email'
+                  : 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado'}
               </p>
             </div>
 
-            {/* Registered Email Card */}
-            <div className={`p-3.5 rounded-2xl border mb-3 flex items-center gap-3 ${
+            {/* Confirmation Banner with User Email */}
+            <div className={`p-3.5 rounded-2xl border mb-4 flex items-center gap-3 ${
               isDark ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200' : 'bg-cyan-50 border-cyan-200 text-cyan-950'
             }`}>
               <span className="material-symbols-outlined text-[22px] text-cyan-500 shrink-0">mark_email_read</span>
@@ -414,39 +418,14 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               </div>
             </div>
 
-            {/* Official Dispatch & Institutional Status */}
-            <div className={`p-3 rounded-xl border text-xs leading-relaxed mb-3 space-y-1 ${
-              isDark ? 'bg-slate-950/70 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}>
-              <div className="flex items-center gap-2 text-cyan-500 font-semibold">
-                <span className="material-symbols-outlined text-[16px]">verified</span>
-                <span>
-                  {firebaseDispatched
-                    ? (isEn ? 'Firebase Authentication link dispatched' : 'Enlace despachado vía Firebase Authentication')
-                    : (isEn ? 'Security service notification active' : 'Servicio de seguridad institucional activo')}
-                </span>
-              </div>
-              {generatedCode && (
-                <div className={`mt-1.5 p-2 rounded-lg font-mono text-xs flex items-center justify-between ${
-                  isDark ? 'bg-slate-900 border border-slate-700 text-slate-200' : 'bg-white border border-slate-200 text-slate-800'
-                }`}>
-                  <span className="text-[11px] opacity-75">
-                    {isEn ? 'Generated security code for session:' : 'Código de seguridad para tu sesión:'}
-                  </span>
-                  <span className="font-bold tracking-widest text-cyan-500 text-sm">{generatedCode}</span>
-                </div>
-              )}
-            </div>
-
             <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-cyan-300' : 'text-blue-900'}`}>
-                  {isEn ? '6-Digit Verification Code *' : 'Código de Verificación de 6 Dígitos *'}
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 text-center ${isDark ? 'text-cyan-300' : 'text-blue-900'}`}>
+                  {isEn ? 'Enter 6-Digit Code' : 'Ingresa el Código de 6 Dígitos'}
                 </label>
+                
+                {/* 6 Digit Input */}
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-500">
-                    pin
-                  </span>
                   <input
                     id="input-verification-code"
                     type="text"
@@ -459,8 +438,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       setVerificationCode(val);
                       setErrorMessage(null);
                     }}
-                    placeholder="000000"
-                    className={`w-full pl-11 pr-4 py-3.5 text-xl tracking-[0.4em] font-mono font-black text-center rounded-xl outline-none transition-all ${
+                    placeholder="______"
+                    className={`w-full py-3.5 text-2xl tracking-[0.5em] font-mono font-black text-center rounded-2xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/80 border border-slate-700/80 text-cyan-300 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
                         : 'bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/20'
@@ -468,6 +447,29 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                     required
                     autoFocus
                   />
+                </div>
+
+                {/* Visual Digit Cells */}
+                <div className="flex justify-center gap-2 mt-3">
+                  {[0, 1, 2, 3, 4, 5].map((idx) => {
+                    const digit = verificationCode[idx];
+                    return (
+                      <div
+                        key={idx}
+                        className={`w-10 h-12 sm:w-11 sm:h-14 rounded-xl flex items-center justify-center font-mono font-bold text-lg sm:text-xl border transition-all ${
+                          digit
+                            ? isDark
+                              ? 'bg-cyan-950/60 border-cyan-400 text-cyan-300 shadow-sm shadow-cyan-500/20'
+                              : 'bg-blue-50 border-blue-600 text-blue-900 shadow-xs'
+                            : isDark
+                            ? 'bg-slate-950/40 border-slate-700/60 text-slate-600'
+                            : 'bg-slate-100 border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {digit || '•'}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -497,7 +499,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       timer
                     </span>
                     <span>
-                      {isEn ? 'Resend code in' : 'Reenviar código en'}{' '}
+                      {isEn ? 'Resend code in ' : 'Reenviar código en '}
                       <strong className="text-cyan-500 font-mono font-bold">{resendTimer}s</strong>
                     </span>
                   </div>
@@ -510,14 +512,14 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                     className="inline-flex items-center gap-1 text-cyan-500 hover:text-cyan-400 font-bold hover:underline cursor-pointer transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">refresh</span>
-                    <span>{isEn ? 'Resend code now' : 'Reenviar código'}</span>
+                    <span>{isEn ? 'Resend code' : 'Reenviar código'}</span>
                   </button>
                 )}
               </div>
 
               <div className="pt-2">
                 <button
-                  id="btn-verify-recovery-code"
+                  id="btn-validate-code"
                   type="submit"
                   disabled={isLoading || verificationCode.length !== 6}
                   className="w-full bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:via-cyan-500 hover:to-teal-400 active:opacity-90 text-white font-bold text-base py-3.5 rounded-xl transition-all duration-200 cursor-pointer text-center shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
@@ -525,12 +527,12 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Verifying code...' : 'Verificando código...'}</span>
+                      <span>{isEn ? 'Validating code...' : 'Validando código...'}</span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[20px]">verified_user</span>
-                      <span>{isEn ? 'Verify Code and Continue' : 'Verificar Código y Continuar'}</span>
+                      <span>{isEn ? 'Validate code' : 'Validar código'}</span>
                     </>
                   )}
                 </button>
@@ -540,7 +542,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* PASO 3: Restablecer contraseña con indicador de fuerza                    */}
+        {/* PANTALLA 3: Restablecer Contraseña                                        */}
         {/* ========================================================================= */}
         {step === 3 && (
           <div>
@@ -549,12 +551,12 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 <span className="material-symbols-outlined text-[26px]">lock_reset</span>
               </div>
               <h3 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {isEn ? 'Create New Password' : 'Crear Nueva Contraseña'}
+                {isEn ? 'Reset Password' : 'Restablecer Contraseña'}
               </h3>
               <p className={`text-sm mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {isEn
-                  ? 'Identity verified! Define your new password for account:'
-                  : '¡Identidad verificada! Define tu nueva contraseña para la cuenta:'}{' '}
+                  ? 'Define your new password for account:'
+                  : 'Define tu nueva contraseña para la cuenta:'}{' '}
                 <strong className={isDark ? 'text-cyan-300 font-semibold' : 'text-blue-700 font-semibold'}>{email}</strong>
               </p>
             </div>
@@ -563,7 +565,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               {/* Nueva Contraseña */}
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-cyan-300' : 'text-blue-900'}`}>
-                  {isEn ? 'New Password' : 'Nueva Contraseña'}
+                  {isEn ? 'New password' : 'Nueva contraseña'}
                 </label>
                 <div className="relative">
                   <input
@@ -598,7 +600,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               {/* Confirmar Nueva Contraseña */}
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-cyan-300' : 'text-blue-900'}`}>
-                  {isEn ? 'Confirm New Password' : 'Confirmar Nueva Contraseña'}
+                  {isEn ? 'Confirm new password' : 'Confirmar nueva contraseña'}
                 </label>
                 <div className="relative">
                   <input
@@ -634,7 +636,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 <div className="space-y-2 pt-1">
                   <div className="flex justify-between items-center text-xs">
                     <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-                      {isEn ? 'Password strength:' : 'Seguridad:'}
+                      {isEn ? 'Password strength:' : 'Nivel de seguridad:'}
                     </span>
                     <span className={`font-bold ${getStrengthLabel().color}`}>
                       {getStrengthLabel().label}
@@ -671,7 +673,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       <span className="material-symbols-outlined text-[14px]">
                         {hasSpecial ? 'check_circle' : 'radio_button_unchecked'}
                       </span>
-                      <span>{isEn ? 'Special (!@#$)' : 'Especial (!@#$)'}</span>
+                      <span>{isEn ? 'Special (!@#$)' : 'Carácter especial (!@#$)'}</span>
                     </div>
                   </div>
                 </div>
@@ -694,12 +696,12 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Updating password...' : 'Actualizando contraseña...'}</span>
+                      <span>{isEn ? 'Saving password...' : 'Guardando y actualizando contraseña...'}</span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[20px]">save</span>
-                      <span>{isEn ? 'Save New Password' : 'Guardar y Actualizar Contraseña'}</span>
+                      <span>{isEn ? 'Save and update password' : 'Guardar y actualizar contraseña'}</span>
                     </>
                   )}
                 </button>
@@ -709,34 +711,37 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* PASO 4: Confirmación de Éxito                                             */}
+        {/* 5. FINALIZACIÓN: Alerta modal limpia y redirección automática             */}
         {/* ========================================================================= */}
         {step === 4 && (
-          <div className="text-center py-4 animate-in zoom-in-95 duration-300">
+          <div className="text-center py-6 animate-in zoom-in-95 duration-300">
             <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-400 flex items-center justify-center mx-auto mb-4 shadow-[0_0_24px_rgba(16,185,129,0.35)]">
               <span className="material-symbols-outlined text-[44px]">check_circle</span>
             </div>
             
             <h3 className={`text-2xl sm:text-3xl font-black tracking-tight mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {isEn ? 'Password Updated Successfully!' : '¡Contraseña actualizada correctamente!'}
+              {isEn ? 'Password updated successfully!' : '¡Contraseña actualizada con éxito!'}
             </h3>
             
             <p className={`text-sm sm:text-base max-w-sm mx-auto mb-6 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              {isEn ? (
-                <>Your institutional password for <strong className="text-cyan-500 font-semibold">{email}</strong> has been updated. You can now log in with your new password.</>
-              ) : (
-                <>Tu contraseña institucional para la cuenta <strong className="text-cyan-500 font-semibold">{email}</strong> ha sido restablecida con éxito. Ya puedes ingresar con tu nueva clave.</>
-              )}
+              {isEn
+                ? 'Your password has been changed. Redirecting automatically to sign in...'
+                : 'Tu contraseña ha sido modificada. Redirigiendo automáticamente a la pantalla de iniciar sesión...'}
             </p>
 
             <button
               id="btn-back-to-login"
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                if (onPasswordResetSuccess) {
+                  onPasswordResetSuccess(email);
+                }
+                onClose();
+              }}
               className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:via-teal-500 hover:to-cyan-500 active:opacity-90 text-white font-bold text-base py-3.5 rounded-xl transition-all duration-200 cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-[20px]">login</span>
-              <span>{isEn ? 'Back to Sign In' : 'Regresar al Inicio de Sesión'}</span>
+              <span>{isEn ? 'Sign in now' : 'Iniciar sesión ahora'}</span>
             </button>
           </div>
         )}

@@ -915,7 +915,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     type="email"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder={isEn ? 'e.g. name@edulink.edu.co' : 'ejemplo: nombre@edulink.edu.co'}
+                    placeholder=""
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
