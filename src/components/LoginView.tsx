@@ -36,7 +36,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.';
     }
     if (msg.includes('correo electrónico válido') || msg.includes('valid email address')) {
-      return isEn ? 'Please enter a valid email address (e.g. user@edulink.edu.co).' : 'Por favor ingresa un correo electrónico válido (ej. usuario@edulink.edu.co).';
+      return isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido.';
     }
     if (msg.includes('ingresa tu contraseña') || msg.includes('enter your password')) {
       return isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.';
@@ -406,7 +406,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
 
     if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setLoginError(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido (ej. usuario@edulink.edu.co).');
+      setLoginError(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido.');
       return;
     }
 

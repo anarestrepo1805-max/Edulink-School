@@ -446,7 +446,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                     </>
                   ) : (
                     <>
-                      <span>{isEn ? 'Send code' : 'Enviar código'}</span>
+                      <span>{isEn ? 'Send link / verification code' : 'Enviar enlace / código de verificación'}</span>
                       <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}
@@ -510,7 +510,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       setVerificationCode(val);
                       setErrorMessage(null);
                     }}
-                    placeholder="______"
+                    placeholder=""
                     className={`w-full py-3.5 text-2xl tracking-[0.5em] font-mono font-black text-center rounded-2xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/80 border border-slate-700/80 text-cyan-300 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
@@ -538,7 +538,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                             : 'bg-slate-100 border-slate-200 text-slate-400'
                         }`}
                       >
-                        {digit || '•'}
+                        {digit || ''}
                       </div>
                     );
                   })}
