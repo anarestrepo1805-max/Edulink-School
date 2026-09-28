@@ -6,7 +6,8 @@ import {
   registerNewUser,
   getTeacherAssignmentByCode,
   getAdminAssignmentByCode,
-  lookupEnrolledStudent
+  lookupEnrolledStudent,
+  isUserRegisteredInDatabase
 } from '../services/authService';
 import { PasswordRecoveryModal } from './PasswordRecoveryModal';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
@@ -21,8 +22,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  // Login form states
-  const [identifier, setIdentifier] = useState('');
+  // Login form states: Verified strictly by Email and Password
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,10 +43,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [acceptDataPolicy, setAcceptDataPolicy] = useState(false);
 
   // Dynamic role-specific fields
-  // Student fields
-  const [regGradeLevel, setRegGradeLevel] = useState('6°1');
+  // Student fields: Census-driven registration
+  const [regGradeLevel, setRegGradeLevel] = useState('');
   const [regStudentCode, setRegStudentCode] = useState('');
   const [regShift, setRegShift] = useState('Jornada Mañana (6:15 AM - 12:15 PM)');
+  const [studentDocFeedback, setStudentDocFeedback] = useState<{
+    status: 'idle' | 'found' | 'not_found' | 'already_registered';
+    message: string;
+  }>({ status: 'idle', message: '' });
 
   // Teacher fields + Role Verification Code
   const [regTeacherCode, setRegTeacherCode] = useState('');
@@ -204,6 +209,58 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const passHasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(regPassword);
   const passHasMinLength = regPassword.length >= 8;
 
+  // Real-time lookup for Student Document Number in Census
+  const handleStudentDocChange = async (val: string) => {
+    const clean = val.trim();
+    setRegStudentCode(clean);
+    setRegError(null);
+    if (!clean) {
+      setStudentDocFeedback({ status: 'idle', message: '' });
+      setRegFullName('');
+      setRegGradeLevel('');
+      setRegShift('Jornada Mañana (6:15 AM - 12:15 PM)');
+      return;
+    }
+    // Check if this student document is already registered
+    const isReg = await isUserRegisteredInDatabase(clean);
+    if (isReg.registered) {
+      setStudentDocFeedback({
+        status: 'already_registered',
+        message: isEn
+          ? 'This student document is already registered with an active account. Please sign in.'
+          : 'Este estudiante ya cuenta con un usuario registrado en la plataforma. Por favor inicia sesión.'
+      });
+      return;
+    }
+
+    const student = await lookupEnrolledStudent(clean);
+    if (student) {
+      setRegFullName(student.fullName);
+      setRegGradeLevel(student.gradeLevel);
+      setRegShift(student.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)');
+      if (!regEmail || regEmail.includes('@edulink.edu.co') || !regEmail.includes('@')) {
+        setRegEmail(student.email);
+      }
+      setStudentDocFeedback({
+        status: 'found',
+        message: isEn
+          ? `Verified Enrolled Student: ${student.fullName} • Grade ${student.gradeLevel} • Morning Shift (6:15 AM - 12:15 PM)`
+          : `Estudiante matriculado verificado: ${student.fullName} • Grado ${student.gradeLevel} • Jornada Mañana (6:15 AM - 12:15 PM)`
+      });
+    } else if (clean.length >= 4) {
+      setRegFullName('');
+      setRegGradeLevel('');
+      setStudentDocFeedback({
+        status: 'not_found',
+        message: isEn
+          ? 'Document not found in official institutional enrollment census. Check your number.'
+          : 'Documento no encontrado en el censo oficial de matrículas de la I.E. Vallejuelos. Verifica tu número de documento.'
+      });
+    } else {
+      setStudentDocFeedback({ status: 'idle', message: '' });
+    }
+  };
+
   // Grade options: Grados 6° a 11° (grupos 1 y 2) y Pensar
   const GRADE_OPTIONS = [
     '6°1', '6°2',
@@ -215,25 +272,32 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     'Pensar'
   ];
 
-  // Handle Login submission
+  // Handle Login submission: Validated strictly by registered email and password
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
-    if (!identifier.trim()) {
-      setLoginError(isEn ? 'Please enter your institutional email or ID document number.' : 'Por favor ingresa tu correo electrónico o número de documento de identidad.');
+    const cleanEmail = loginEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setLoginError(isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.');
+      return;
+    }
+
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setLoginError(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido (ej. usuario@edulink.edu.co).');
       return;
     }
 
     if (!loginPassword) {
-      setLoginError(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña.');
+      setLoginError(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const userProfile = await loginUser(identifier, loginPassword);
+      const userProfile = await loginUser(cleanEmail, loginPassword, language);
       onLoginSuccess(userProfile);
     } catch (err: any) {
       setLoginError(err.message || (isEn ? 'Error signing in to the platform.' : 'Error al iniciar sesión en la plataforma.'));
@@ -261,7 +325,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     // Role-specific strict validations
     if (regRole === 'student') {
       if (!regStudentCode.trim()) {
-        setRegError(isEn ? 'Please enter your Student ID (TI/CC) or enrollment code.' : 'Por favor ingresa tu documento de identidad (TI/CC) o código de estudiante.');
+        setRegError(isEn ? 'Please enter your Student ID (TI/CC).' : 'Por favor ingresa tu documento de identidad (TI/CC).');
+        return;
+      }
+      if (!regFullName.trim() || !regGradeLevel.trim() || studentDocFeedback.status === 'not_found') {
+        setRegError(isEn
+          ? 'The entered student document is not registered in the official enrollment census. You cannot register in a grade you do not belong to.'
+          : 'El documento ingresado no se encuentra en el censo oficial de matrículas de la I.E. Vallejuelos. Debes ingresar un documento válido para asociar tu grado oficial.');
+        return;
+      }
+      if (studentDocFeedback.status === 'already_registered') {
+        setRegError(isEn
+          ? 'This student document is already registered with an active account. Please sign in.'
+          : 'Este documento de estudiante ya se encuentra registrado con una cuenta activa. Por favor inicia sesión.');
         return;
       }
     } else if (regRole === 'teacher') {
@@ -708,23 +784,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
                   isDark ? 'text-cyan-300' : 'text-blue-950'
                 }`}>
-                  {isEn ? 'Institutional Email or ID Document' : 'Correo electrónico o documento de identidad'}
+                  {isEn ? 'Institutional Email' : 'Correo electrónico'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-500">
-                    badge
+                    alternate_email
                   </span>
                   <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder=""
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder={isEn ? 'e.g. name@edulink.edu.co' : 'ejemplo: nombre@edulink.edu.co'}
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
                         : 'bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20'
                     }`}
-                    autoComplete="username"
+                    autoComplete="username email"
                     required
                   />
                 </div>
@@ -1014,88 +1090,92 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                 {/* 2. CAMPOS CONDICIONADOS POR ROL */}
                 
-                {/* CASE A: ROL ESTUDIANTE */}
+                {/* CASE A: ROL ESTUDIANTE (VALIDACIÓN PREVIA POR DOCUMENTO DE IDENTIDAD EN CENSO) */}
                 {regRole === 'student' && (
                   <div className={`rounded-2xl p-5 flex flex-col gap-4 border ${
                     isDark ? 'bg-blue-950/30 border-blue-800/40 text-blue-100' : 'bg-blue-50 border-blue-200 text-blue-900'
                   }`}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                        <span className="material-symbols-outlined text-[20px]">school</span>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold">
-                          {isEn ? 'Student Academic Information' : 'Información Académica del Estudiante'}
-                        </h4>
-                        <p className={`text-xs leading-relaxed mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {isEn
-                            ? 'Student scope: Access to enrolled subjects, period grades, workshops, and report cards. Strict prevention: Cannot access faculty evaluation rosters.'
-                            : 'Acceso a asignaturas, calificaciones de los cuatro períodos, entrega de talleres y boletines escolares. Rol escolar exclusivo sin acceso a planillas docentes.'}
-                        </p>
-                      </div>
+                    {/* Student Document Input (First Step: Identificación oficial) */}
+                    <div className={`p-4 rounded-xl border ${
+                      isDark ? 'bg-slate-900/90 border-blue-500/40' : 'bg-white border-blue-200 shadow-xs'
+                    }`}>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-blue-600 mb-1.5 flex items-center justify-between">
+                        <span>{isEn ? 'Student ID Document (TI / CC) *' : 'Documento de Identidad del Estudiante (TI / CC) *'}</span>
+                        <span className="material-symbols-outlined text-[18px]">badge</span>
+                      </label>
+                      <input
+                        id="input-student-document-lookup"
+                        type="text"
+                        autoComplete="off"
+                        value={regStudentCode}
+                        onChange={(e) => handleStudentDocChange(e.target.value)}
+                        placeholder={isEn ? 'Enter your student ID number' : 'Ingresa tu número de documento de identidad'}
+                        className={`w-full px-3.5 py-2.5 text-sm font-mono font-bold tracking-wider rounded-xl outline-none border transition-all ${
+                          studentDocFeedback.status === 'found'
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                            : studentDocFeedback.status === 'not_found' || studentDocFeedback.status === 'already_registered'
+                              ? 'bg-rose-500/10 border-rose-500 text-rose-400'
+                              : isDark
+                                ? 'bg-slate-950 border-blue-500/50 text-blue-300 focus:border-blue-400'
+                                : 'bg-blue-50/50 border-blue-300 text-blue-900 focus:bg-white focus:border-blue-600'
+                        }`}
+                        required
+                      />
+
+                      {/* Real-time verification feedback */}
+                      {studentDocFeedback.message && (
+                        <div className={`mt-2 p-2 rounded-lg text-xs flex items-center gap-2 ${
+                          studentDocFeedback.status === 'found'
+                            ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold'
+                            : 'bg-rose-500/15 border border-rose-500/30 text-rose-400 font-medium'
+                        }`}>
+                          <span className="material-symbols-outlined text-[16px] shrink-0">
+                            {studentDocFeedback.status === 'found' ? 'verified' : 'error'}
+                          </span>
+                          <span>{studentDocFeedback.message}</span>
+                        </div>
+                      )}
                     </div>
 
+                    {/* Pre-populated Academic Information (Readonly) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Grade & Official Group *' : 'Grado y Grupo Oficial *'}
-                        </label>
-                        <select
-                          value={regGradeLevel}
-                          onChange={(e) => setRegGradeLevel(e.target.value)}
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
-                            isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
-                          }`}
-                        >
-                          {GRADE_OPTIONS.map(g => (
-                            <option key={g} value={g}>{isEn ? `Grade ${g}` : `Grado ${g}`}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Student ID (TI / CC) or Enrollment Code *' : 'Documento de Identidad (TI / CC) o Código *'}
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Official Grade & Group' : 'Grado y Grupo Oficial'}</span>
+                          <span className="text-[10px] text-blue-500 font-semibold">
+                            {isEn ? 'Locked by enrollment census' : 'Asignado por censo oficial'}
+                          </span>
                         </label>
                         <input
                           type="text"
-                          value={regStudentCode}
-                          onChange={(e) => setRegStudentCode(e.target.value)}
-                          placeholder=""
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
-                            isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                          readOnly
+                          value={regGradeLevel ? (isEn ? `Grade ${regGradeLevel}` : `Grado ${regGradeLevel}`) : ''}
+                          placeholder={isEn ? 'Auto-filled upon entering document' : 'Se asigna automáticamente'}
+                          className={`w-full px-3.5 py-2.5 text-sm font-bold rounded-xl outline-none border cursor-not-allowed ${
+                            regGradeLevel
+                              ? isDark ? 'bg-slate-950/80 border-emerald-500/60 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                              : isDark ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
                           }`}
-                          required
                         />
                       </div>
 
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold mb-1.5">
-                          {isEn ? 'Official School Shift' : 'Jornada Escolar Oficial'}
+                      <div>
+                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                          <span>{isEn ? 'Official Institutional Shift' : 'Jornada Escolar Institucional'}</span>
+                          <span className="text-[10px] text-blue-500 font-semibold">
+                            {isEn ? 'Official Schedule' : 'Horario Oficial'}
+                          </span>
                         </label>
-                        <select
-                          value={regShift}
-                          onChange={(e) => setRegShift(e.target.value)}
-                          className={`w-full px-3.5 py-2.5 text-sm rounded-xl outline-none border ${
+                        <input
+                          type="text"
+                          readOnly
+                          value={isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
+                          className={`w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl outline-none border cursor-not-allowed ${
                             isDark
-                              ? 'bg-slate-900 border-slate-700 text-white focus:border-cyan-400'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                              ? 'bg-slate-950/80 border-slate-700 text-blue-300'
+                              : 'bg-slate-100 border-slate-300 text-slate-800'
                           }`}
-                        >
-                          <option value="Jornada Mañana (6:15 AM - 12:15 PM)">
-                            {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
-                          </option>
-                          <option value="Jornada Tarde (12:15 PM - 6:15 PM)">
-                            {isEn ? 'Afternoon Shift (12:15 PM - 6:15 PM)' : 'Jornada Tarde (12:15 PM - 6:15 PM)'}
-                          </option>
-                          <option value="Jornada Única Institucional">
-                            {isEn ? 'Single School Day' : 'Jornada Única Institucional'}
-                          </option>
-                        </select>
+                        />
                       </div>
                     </div>
                   </div>
@@ -1502,18 +1582,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 {/* 3. CAMPOS GENERALES DE CUENTA (Nombre, Correo, Contraseña) */}
                 <div className="flex flex-col gap-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5">
-                      {isEn ? 'Full Name *' : 'Nombre Completo *'}
+                    <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                      <span>{isEn ? 'Full Name *' : 'Nombre Completo *'}</span>
+                      {regRole === 'student' && regFullName && (
+                        <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px]">verified</span>
+                          {isEn ? 'Census verified' : 'Verificado en censo escolar'}
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
+                      readOnly={regRole === 'student' && Boolean(regFullName)}
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
-                      placeholder=""
+                      placeholder={regRole === 'student' ? (isEn ? 'Auto-filled upon entering document' : 'Se autocompleta con tu documento') : ''}
                       className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
-                        isDark
-                          ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
-                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                        regRole === 'student' && regFullName
+                          ? isDark ? 'bg-slate-950/80 border-emerald-500/60 text-emerald-400 font-semibold cursor-not-allowed' : 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold cursor-not-allowed'
+                          : isDark
+                            ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                            : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
                       }`}
                       required
                     />
@@ -1694,9 +1783,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <PasswordRecoveryModal
         isOpen={isRecoveryModalOpen}
         onClose={() => setIsRecoveryModalOpen(false)}
-        initialEmail={identifier.includes('@') ? identifier : ''}
+        initialEmail={loginEmail.includes('@') ? loginEmail : ''}
         onPasswordResetSuccess={(resetEmail) => {
-          setIdentifier(resetEmail);
+          setLoginEmail(resetEmail);
           setLoginPassword('');
           setLoginError(null);
         }}

@@ -199,6 +199,8 @@ export interface EnrolledStudentDirectoryRecord {
   fullName: string;
   gradeLevel: string;
   studentCode: string;
+  shift: string;
+  email: string;
 }
 
 // Institutional Teacher Registry: Each code is UNIQUE & IRREPETIBLE and has fixed assigned subjects & grades
@@ -293,43 +295,105 @@ export const ENROLLED_STUDENTS_DIRECTORY: Record<string, EnrolledStudentDirector
     documentId: '1092837465',
     fullName: 'Miguel Ángel Jiménez',
     gradeLevel: '11°1',
-    studentCode: 'EST-2026-042'
+    studentCode: 'EST-2026-042',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'miguel.jimenez@edulink.edu.co'
   },
   '1092837466': {
     documentId: '1092837466',
     fullName: 'Sofía Álvarez Restrepo',
     gradeLevel: '6°1',
-    studentCode: 'EST-2026-089'
+    studentCode: 'EST-2026-089',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'sofia.alvarez@edulink.edu.co'
   },
   '1092837467': {
     documentId: '1092837467',
     fullName: 'Carlos Andrés Mendoza',
     gradeLevel: '8°2',
-    studentCode: 'EST-2026-114'
+    studentCode: 'EST-2026-114',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'carlos.mendoza@edulink.edu.co'
   },
   '1092837468': {
     documentId: '1092837468',
     fullName: 'Valentina Ortiz Gómez',
     gradeLevel: '9°1',
-    studentCode: 'EST-2026-155'
+    studentCode: 'EST-2026-155',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'valentina.ortiz@edulink.edu.co'
   },
   '1092837469': {
     documentId: '1092837469',
     fullName: 'Santiago Henao Villa',
     gradeLevel: '10°2',
-    studentCode: 'EST-2026-203'
+    studentCode: 'EST-2026-203',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'santiago.henao@edulink.edu.co'
   },
   '1092837470': {
     documentId: '1092837470',
     fullName: 'Isabella Quintero Ríos',
     gradeLevel: '7°1',
-    studentCode: 'EST-2026-248'
+    studentCode: 'EST-2026-248',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'isabella.quintero@edulink.edu.co'
   },
   '1092837471': {
     documentId: '1092837471',
     fullName: 'Mateo Salazar Morales',
     gradeLevel: 'Pensar',
-    studentCode: 'EST-2026-310'
+    studentCode: 'EST-2026-310',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'mateo.salazar@edulink.edu.co'
+  },
+  '1092837472': {
+    documentId: '1092837472',
+    fullName: 'Mariana Duque Londoño',
+    gradeLevel: '6°2',
+    studentCode: 'EST-2026-095',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'mariana.duque@edulink.edu.co'
+  },
+  '1092837473': {
+    documentId: '1092837473',
+    fullName: 'Daniel Esteban Giraldo',
+    gradeLevel: '7°2',
+    studentCode: 'EST-2026-252',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'daniel.giraldo@edulink.edu.co'
+  },
+  '1092837474': {
+    documentId: '1092837474',
+    fullName: 'Camila Andrea Betancur',
+    gradeLevel: '8°1',
+    studentCode: 'EST-2026-118',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'camila.betancur@edulink.edu.co'
+  },
+  '1092837475': {
+    documentId: '1092837475',
+    fullName: 'Juan José Cano Montoya',
+    gradeLevel: '9°2',
+    studentCode: 'EST-2026-160',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'juan.cano@edulink.edu.co'
+  },
+  '1092837476': {
+    documentId: '1092837476',
+    fullName: 'Samuel David Toro Higuita',
+    gradeLevel: '10°1',
+    studentCode: 'EST-2026-210',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'samuel.toro@edulink.edu.co'
+  },
+  '1092837477': {
+    documentId: '1092837477',
+    fullName: 'Laura Vanesa Rúa Peláez',
+    gradeLevel: '11°2',
+    studentCode: 'EST-2026-050',
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: 'laura.rua@edulink.edu.co'
   }
 };
 
@@ -450,7 +514,9 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
       documentId: s.documentId || clean,
       fullName: s.fullName,
       gradeLevel: s.gradeLevel || '11°1',
-      studentCode: s.studentCode || clean
+      studentCode: s.studentCode || clean,
+      shift: s.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)',
+      email: s.email
     };
   }
 
@@ -465,7 +531,9 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
           documentId: clean,
           fullName: data.fullName,
           gradeLevel: data.gradeLevel || '6°1',
-          studentCode: data.studentCode || clean
+          studentCode: data.studentCode || clean,
+          shift: data.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)',
+          email: data.email || ''
         };
       }
     }
@@ -484,7 +552,9 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
             documentId: u.documentId || clean,
             fullName: u.fullName,
             gradeLevel: u.gradeLevel || '6°1',
-            studentCode: u.studentCode || clean
+            studentCode: u.studentCode || clean,
+            shift: u.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)',
+            email: u.email || ''
           };
         }
       }
@@ -733,11 +803,45 @@ export async function requestPasswordResetLink(email: string, lang: 'es' | 'en' 
   };
 }
 
+// Default passwords for institutional demo accounts
+export const DEFAULT_PASSWORDS: Record<string, string> = {
+  'miguel.jimenez@edulink.edu.co': 'Vallejuelos2026*',
+  'daniela.alvarez@edulink.edu.co': 'Vallejuelos2026*',
+  'elena.jimenez@vallejuelos.edu.co': 'Vallejuelos2026*',
+  'carlos.coordinacion@edulink.edu.co': 'Vallejuelos2026*'
+};
+
+export function getStoredUserPassword(email: string): string | null {
+  const clean = email.trim().toLowerCase();
+  try {
+    const raw = localStorage.getItem('edulink_user_passwords');
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map[clean]) return map[clean];
+    }
+  } catch {}
+  if (DEFAULT_PASSWORDS[clean]) return DEFAULT_PASSWORDS[clean];
+  return null;
+}
+
+export function setStoredUserPassword(email: string, password: string): void {
+  const clean = email.trim().toLowerCase();
+  try {
+    const raw = localStorage.getItem('edulink_user_passwords');
+    const map = raw ? JSON.parse(raw) : {};
+    map[clean] = password;
+    localStorage.setItem('edulink_user_passwords', JSON.stringify(map));
+  } catch {}
+}
+
 /**
  * Updates a user's password directly in the institutional database.
  */
 export async function updateUserPasswordDirectly(email: string, newPassword: string): Promise<boolean> {
   const cleanEmail = email.trim().toLowerCase();
+
+  // Save in local passwords store
+  setStoredUserPassword(cleanEmail, newPassword);
 
   // 1. Touch Firestore records
   try {
@@ -1194,6 +1298,9 @@ export async function registerNewUser(params: {
     console.warn('Firestore write warning:', fsErr);
   }
 
+  // Save password in local store and user credentials
+  setStoredUserPassword(cleanEmail, params.password);
+
   // Also save to localStorage fallback so user is always recognized in this client
   try {
     const localAccountsStr = localStorage.getItem('edulink_registered_users');
@@ -1221,35 +1328,62 @@ export async function registerNewUser(params: {
 
 /**
  * Logs in a user.
- * Accepts either email or identity document number.
- * STRICT ENFORCEMENT: If the user is NOT registered in the database,
- * throws an explicit error: "El usuario no está registrado en la plataforma."
+ * STRICT ENFORCEMENT: Validated strictly by registered institutional email and respective password.
+ * "VERIFICACIÓN DE ACCESO: El inicio de sesión debe ser validado por correo y contraseña. Es decir, el correo con su respectiva contraseña."
  */
-export async function loginUser(identifier: string, password?: string): Promise<UserProfile> {
-  const cleanId = identifier.trim();
+export async function loginUser(emailInput: string, passwordInput?: string, lang: 'es' | 'en' = 'es'): Promise<UserProfile> {
+  const isEn = lang === 'en';
+  const cleanEmail = (emailInput || '').trim().toLowerCase();
   
-  if (!cleanId) {
-    throw new Error('Por favor ingrese su correo electrónico o número de documento de identidad.');
+  if (!cleanEmail) {
+    throw new Error(isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.');
   }
 
-  // 1. Verify if user is registered in the database (by email or document number)
-  const status = await isUserRegisteredInDatabase(cleanId);
+  if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    throw new Error(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido con su dominio institucional.');
+  }
+
+  if (!passwordInput || passwordInput.trim() === '') {
+    throw new Error(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.');
+  }
+
+  // 1. Verify if user is registered in the database by email
+  const status = await isUserRegisteredInDatabase(cleanEmail);
   if (!status.registered || !status.profile) {
-    // STRICT REQUIREMENT: If not registered, display that they are not registered!
-    throw new Error('El usuario no está registrado en la plataforma. Por favor regístrese para continuar.');
+    // STRICT REQUIREMENT: If not registered, throw clear error
+    throw new Error(isEn
+      ? 'The user is not registered on the platform. Please register to continue.'
+      : 'El usuario no está registrado en la plataforma. Por favor regístrese para continuar.');
   }
 
-  // 2. Try Firebase Auth sign in with email or mapped profile email
-  const authEmail = cleanId.includes('@') ? cleanId.toLowerCase() : status.profile.email;
-  if (authEmail && password) {
+  // 2. Validate user password
+  const storedPassword = getStoredUserPassword(cleanEmail);
+  let isPasswordValid = false;
+
+  if (storedPassword) {
+    if (storedPassword === passwordInput) {
+      isPasswordValid = true;
+    } else {
+      throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
+    }
+  }
+
+  // Also verify via Firebase Auth if not already confirmed
+  if (!isPasswordValid) {
     try {
-      await signInWithEmailAndPassword(auth, authEmail, password);
+      await signInWithEmailAndPassword(auth, cleanEmail, passwordInput);
+      isPasswordValid = true;
+      // Store verified password locally for seamless offline/fast access
+      setStoredUserPassword(cleanEmail, passwordInput);
     } catch (authErr: any) {
       if (authErr.code === 'auth/wrong-password') {
-        throw new Error('Contraseña incorrecta. Por favor verifique sus datos.');
+        throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
       }
-      console.debug('Firebase Auth note during sign-in:', authErr.message);
     }
+  }
+
+  if (!isPasswordValid) {
+    throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
   }
 
   // Persist session
