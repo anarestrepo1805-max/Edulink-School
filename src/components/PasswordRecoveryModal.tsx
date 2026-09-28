@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import emailjs from '@emailjs/browser';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import {
   requestPasswordReset,
@@ -26,6 +27,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [email, setEmail] = useState(initialEmail);
   const [verificationCode, setVerificationCode] = useState('');
+  const [memoryCode, setMemoryCode] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
 
   const [newPassword, setNewPassword] = useState('');
@@ -150,7 +152,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     return { label: isEn ? 'Very Strong' : 'Muy segura', color: 'text-emerald-400', bg: 'bg-emerald-400' };
   };
 
-  // 1. Pantalla 1: Solicitud de Correo -> Envío Simulado / Backend
+  // 1. Pantalla 1: Solicitud de Correo -> Envío con EmailJS y Backend
   // NO se muestra en pantalla ningún código de verificación ni contraseña temporal
   const handleSendRecoveryCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,8 +171,43 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
     setIsLoading(true);
     try {
+      // 2. Genera un número aleatorio de 6 dígitos en JavaScript al presionar "Enviar código"
+      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // 4. Guarda ese código en memoria de la página para validarlo en la siguiente pantalla antes de permitir el cambio de contraseña
+      setMemoryCode(randomCode);
+
+      // 3. Utiliza la función emailjs.send() para enviar el código generado al correo electrónico ingresado por el usuario
+      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
+      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+      const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
+
+      const templateParams = {
+        to_email: cleanEmail,
+        recipient_email: cleanEmail,
+        user_email: cleanEmail,
+        code: randomCode,
+        verification_code: randomCode,
+        recovery_code: randomCode,
+        passcode: randomCode,
+        app_name: 'Edulink School',
+        institution: 'I.E. Vallejuelos',
+        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Es válido por 15 minutos.`
+      };
+
+      try {
+        const globalEmailJS = typeof window !== 'undefined' ? (window as any).emailjs : null;
+        if (globalEmailJS && typeof globalEmailJS.send === 'function') {
+          await globalEmailJS.send(serviceId, templateId, templateParams, publicKey);
+        } else if (emailjs && typeof emailjs.send === 'function') {
+          await emailjs.send(serviceId, templateId, templateParams, publicKey);
+        }
+      } catch (emailErr) {
+        console.warn('EmailJS delivery notice:', emailErr);
+      }
+
       // Backend / simulation dispatch without exposing codes on screen
-      await requestPasswordReset(cleanEmail, language);
+      await requestPasswordReset(cleanEmail, language, randomCode);
       setIsLoading(false);
       setStep(2);
       setResendTimer(60);
@@ -187,7 +224,38 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      await requestPasswordReset(email.trim(), language);
+      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setMemoryCode(randomCode);
+
+      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
+      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+      const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
+
+      const templateParams = {
+        to_email: email.trim(),
+        recipient_email: email.trim(),
+        user_email: email.trim(),
+        code: randomCode,
+        verification_code: randomCode,
+        recovery_code: randomCode,
+        passcode: randomCode,
+        app_name: 'Edulink School',
+        institution: 'I.E. Vallejuelos',
+        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Es válido por 15 minutos.`
+      };
+
+      try {
+        const globalEmailJS = typeof window !== 'undefined' ? (window as any).emailjs : null;
+        if (globalEmailJS && typeof globalEmailJS.send === 'function') {
+          await globalEmailJS.send(serviceId, templateId, templateParams, publicKey);
+        } else if (emailjs && typeof emailjs.send === 'function') {
+          await emailjs.send(serviceId, templateId, templateParams, publicKey);
+        }
+      } catch (emailErr) {
+        console.warn('EmailJS delivery notice:', emailErr);
+      }
+
+      await requestPasswordReset(email.trim(), language, randomCode);
       setIsLoading(false);
       setResendTimer(60);
     } catch (err: any) {
@@ -209,6 +277,10 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
     setIsLoading(true);
     try {
+      // Validar código en memoria de la página antes de permitir el cambio de contraseña
+      if (memoryCode && cleanCode !== memoryCode) {
+        throw new Error(isEn ? 'Incorrect or expired verification code. Please check your email and try again.' : 'Código de verificación incorrecto o expirado. Por favor revisa tu correo e intenta nuevamente.');
+      }
       await verifyPasswordResetCode(email, cleanCode, language);
       setIsLoading(false);
       setStep(3);
@@ -370,11 +442,11 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{isEn ? 'Dispatching verification code...' : 'Enviando enlace / código de verificación...'}</span>
+                      <span>{isEn ? 'Dispatching code...' : 'Enviando código...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>{isEn ? 'Send link / verification code' : 'Enviar enlace / código de verificación'}</span>
+                      <span>{isEn ? 'Send code' : 'Enviar código'}</span>
                       <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}

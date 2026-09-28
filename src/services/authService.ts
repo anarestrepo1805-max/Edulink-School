@@ -4,6 +4,7 @@ import {
   signOut as fbSignOut,
   sendPasswordResetEmail
 } from 'firebase/auth';
+import emailjs from '@emailjs/browser';
 import {
   doc,
   getDoc,
@@ -760,15 +761,54 @@ export interface PasswordResetResult {
 }
 
 /**
+ * Dispatches a password recovery email using EmailJS.
+ */
+export async function sendRecoveryEmailWithEmailJS(email: string, code: string): Promise<boolean> {
+  const cleanEmail = email.trim().toLowerCase();
+  const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_edulink';
+  const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || 'template_recovery';
+  const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
+
+  const templateParams = {
+    to_email: cleanEmail,
+    recipient_email: cleanEmail,
+    user_email: cleanEmail,
+    passcode: code,
+    verification_code: code,
+    recovery_code: code,
+    code: code,
+    app_name: 'Edulink School',
+    school_name: 'I.E. Vallejuelos',
+    message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${code}. Es válido por 15 minutos.`
+  };
+
+  try {
+    const globalEmailJS = typeof window !== 'undefined' ? (window as any).emailjs : null;
+    if (globalEmailJS && typeof globalEmailJS.send === 'function') {
+      await globalEmailJS.send(serviceId, templateId, templateParams, publicKey);
+      return true;
+    }
+    if (emailjs && typeof emailjs.send === 'function') {
+      await emailjs.send(serviceId, templateId, templateParams, publicKey);
+      return true;
+    }
+  } catch (err) {
+    console.warn('EmailJS email delivery notice:', err);
+  }
+  return false;
+}
+
+/**
  * Requests an official password reset for the specified email.
  * 1. Checks that the user is registered in the institutional system.
  * 2. Generates a secure 6-digit numeric verification code (valid for 15 minutes).
- * 3. Persists the reset token in Firestore under `password_resets/{normalizedEmail}` and localStorage.
- * 4. Dispatches the official password reset email via Firebase Authentication to the registered inbox.
+ * 3. Dispatches email via EmailJS and Firebase Authentication.
+ * 4. Persists the reset token in Firestore under `password_resets/{normalizedEmail}` and localStorage.
  */
 export async function requestPasswordReset(
   email: string,
-  lang: 'es' | 'en' = 'es'
+  lang: 'es' | 'en' = 'es',
+  customCode?: string
 ): Promise<PasswordResetResult> {
   const cleanEmail = email.trim().toLowerCase();
   const isEn = lang === 'en';
@@ -791,12 +831,19 @@ export async function requestPasswordReset(
     );
   }
 
-  // 2. Generate secure 6-digit code and 15-minute expiration
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  // 2. Generate secure 6-digit code (or use supplied code) and 15-minute expiration
+  const code = customCode || Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   let firebaseDispatched = false;
 
-  // 3. Dispatch official password reset email via Firebase Auth
+  // 3. Dispatch recovery email via EmailJS (as requested by user)
+  try {
+    await sendRecoveryEmailWithEmailJS(cleanEmail, code);
+  } catch (e) {
+    console.debug('EmailJS dispatch attempt:', e);
+  }
+
+  // 4. Also dispatch official password reset email via Firebase Auth
   try {
     await sendPasswordResetEmail(auth, cleanEmail);
     firebaseDispatched = true;
@@ -814,7 +861,7 @@ export async function requestPasswordReset(
     }
   }
 
-  // 4. Store pending reset request in Firestore
+  // 5. Store pending reset request in Firestore
   try {
     const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
     await setDoc(resetRef, {
