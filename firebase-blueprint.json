@@ -8,7 +8,7 @@
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "fullName": { "type": "string" },
-        "role": { "type": "string", "enum": ["student", "teacher", "family"] },
+        "role": { "type": "string", "enum": ["student", "teacher", "family", "admin"] },
         "createdAt": { "type": "string" },
         "hasConfigured": { "type": "boolean" },
         "institution": { "type": "string" }
@@ -53,6 +53,19 @@
         "active": { "type": "boolean" }
       },
       "required": ["code", "role", "active"]
+    },
+    "PasswordReset": {
+      "title": "Password Reset Request",
+      "description": "Pending password reset requests with verification code",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "code": { "type": "string" },
+        "requestedAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["email", "code", "expiresAt"]
     }
   },
   "firestore": {
@@ -71,6 +84,10 @@
     "/authorized_roles/{codeId}": {
       "schema": "AuthorizedRoleVerification",
       "description": "Pre-authorized institutional verification codes"
+    },
+    "/password_resets/{resetId}": {
+      "schema": "PasswordReset",
+      "description": "Temporary password reset requests and verification codes"
     }
   }
 }

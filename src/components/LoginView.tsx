@@ -22,12 +22,133 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
+  // Dynamic error and alert translation helper so switching language immediately updates alerts
+  const translateErrorMessage = (msg: string | null): string => {
+    if (!msg) return '';
+    // Login / Credentials
+    if (msg.includes('Contraseña incorrecta') || msg.includes('Incorrect password')) {
+      return isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.';
+    }
+    if (msg.includes('no está registrado') || msg.includes('not registered on the platform')) {
+      return isEn ? 'The user is not registered on the platform. Please register to continue.' : 'El usuario no está registrado en la plataforma. Por favor regístrese para continuar.';
+    }
+    if (msg.includes('ingresa tu correo electrónico institucional') || msg.includes('enter your institutional email')) {
+      return isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.';
+    }
+    if (msg.includes('correo electrónico válido') || msg.includes('valid email address')) {
+      return isEn ? 'Please enter a valid email address (e.g. user@edulink.edu.co).' : 'Por favor ingresa un correo electrónico válido (ej. usuario@edulink.edu.co).';
+    }
+    if (msg.includes('ingresa tu contraseña') || msg.includes('enter your password')) {
+      return isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.';
+    }
+    if (msg.includes('Error al iniciar sesión') || msg.includes('Error signing in')) {
+      return isEn ? 'Error signing in to the platform.' : 'Error al iniciar sesión en la plataforma.';
+    }
+
+    // Registration general
+    if (msg.includes('nombre completo') || msg.includes('full name')) {
+      return isEn ? 'Please enter your full name.' : 'Por favor ingresa tu nombre completo.';
+    }
+    if (msg.includes('correo electrónico institucional o personal') || msg.includes('institutional or personal email')) {
+      return isEn ? 'Please enter your institutional or personal email.' : 'Por favor ingresa tu correo electrónico institucional o personal.';
+    }
+    if (msg.includes('documento de identidad (TI/CC)') || msg.includes('Student ID (TI/CC)')) {
+      return isEn ? 'Please enter your Student ID (TI/CC).' : 'Por favor ingresa tu documento de identidad (TI/CC).';
+    }
+    if (msg.includes('censo oficial de matrículas') || msg.includes('official enrollment census')) {
+      return isEn
+        ? 'The entered student document is not registered in the official enrollment census. You cannot register in a grade you do not belong to.'
+        : 'El documento ingresado no se encuentra en el censo oficial de matrículas de la I.E. Vallejuelos. Debes ingresar un documento válido para asociar tu grado oficial.';
+    }
+    if (msg.includes('ya se encuentra registrado con una cuenta activa') || msg.includes('already registered with an active account')) {
+      return isEn
+        ? 'This student document is already registered with an active account. Please sign in.'
+        : 'Este documento de estudiante ya se encuentra registrado con una cuenta activa. Por favor inicia sesión.';
+    }
+    if (msg.includes('ya cuenta con un usuario registrado') || msg.includes('already registered with an active account. Please sign in')) {
+      return isEn
+        ? 'This student is already registered in the platform. Please sign in.'
+        : 'Este estudiante ya cuenta con un usuario registrado en la plataforma. Por favor inicia sesión.';
+    }
+
+    // Teacher registration
+    if (msg.includes('Código de Vinculación Docente') || msg.includes('Teacher Linking Code')) {
+      return isEn
+        ? 'Mandatory: You must enter the Teacher Linking Code issued by Academic Direction.'
+        : 'Obligatorio: Debes ingresar el Código de Vinculación Docente emitido por la Coordinación Académica.';
+    }
+    if (msg.includes('cédula de ciudadanía de docente') || msg.includes('Teacher Citizen ID')) {
+      return isEn ? 'Please enter your Teacher Citizen ID (CC).' : 'Por favor ingresa tu cédula de ciudadanía de docente.';
+    }
+    if (msg.includes('código de docente no es válido') || msg.includes('Teacher code not found') || msg.includes('Código de docente no encontrado')) {
+      return isEn
+        ? 'Teacher code not found in institutional faculty registry. Verify your code.'
+        : 'El código de docente no es válido o no existe en la base de datos de vinculación.';
+    }
+    if (msg.includes('ya fue utilizado') || msg.includes('already claimed')) {
+      return isEn
+        ? 'This teacher code was already claimed by another faculty member. Codes are unique and single-use.'
+        : 'Este código de docente ya fue utilizado por otro educador registrado. Los códigos son únicos e irrepetibles.';
+    }
+
+    // Family registration
+    if (msg.includes('documento de identidad del acudiente') || msg.includes('Guardian ID Document')) {
+      return isEn ? 'Please enter the Guardian ID Document (CC).' : 'Por favor ingresa el documento de identidad del acudiente.';
+    }
+    if (msg.includes('documento del estudiante a representar') || msg.includes('student ID document to represent')) {
+      return isEn ? 'Please enter the student ID document to represent.' : 'Por favor ingresa el documento del estudiante a representar.';
+    }
+    if (msg.includes('estudiante a representar no existe') || msg.includes('represented student is not registered')) {
+      return isEn
+        ? 'The represented student is not registered in the institutional census.'
+        : 'El estudiante a representar no existe en el censo de matrícula escolar.';
+    }
+
+    // Admin registration
+    if (msg.includes('código de verificación directiva') || msg.includes('directive verification code')) {
+      return isEn ? 'Please enter your directive verification code.' : 'Por favor ingresa tu código de verificación directiva.';
+    }
+    if (msg.includes('cédula de directivo o administrativo') || msg.includes('Staff Citizen ID')) {
+      return isEn ? 'Please enter your Staff Citizen ID (CC).' : 'Por favor ingresa tu cédula de directivo o administrativo.';
+    }
+    if (msg.includes('código directivo no es válido') || msg.includes('Directive verification code is not valid')) {
+      return isEn
+        ? 'Directive verification code is not valid in the institutional leadership registry.'
+        : 'El código directivo no es válido o no existe en la base de datos institucional.';
+    }
+
+    // Passwords
+    if (msg.includes('menos 8 caracteres') || msg.includes('at least 8 characters')) {
+      return isEn ? 'Password must be at least 8 characters long.' : 'La contraseña debe tener al menos 8 caracteres.';
+    }
+    if (msg.includes('letra mayúscula') || msg.includes('uppercase letter')) {
+      return isEn ? 'Password must contain at least one uppercase letter (A-Z).' : 'La contraseña debe contener al menos una letra mayúscula (A-Z).';
+    }
+    if (msg.includes('letra minúscula') || msg.includes('lowercase letter')) {
+      return isEn ? 'Password must contain at least one lowercase letter (a-z).' : 'La contraseña debe contener al menos una letra minúscula (a-z).';
+    }
+    if (msg.includes('carácter especial') || msg.includes('special character')) {
+      return isEn ? 'Password must contain at least one special character (!@#$%).' : 'La contraseña debe contener al menos un carácter especial (!@#$%).';
+    }
+    if (msg.includes('contraseñas no coinciden') || msg.includes('Passwords do not match')) {
+      return isEn ? 'Passwords do not match. Please verify carefully.' : 'Las contraseñas no coinciden. Verifica e intenta nuevamente.';
+    }
+    if (msg.includes('términos y la política') || msg.includes('terms and policy')) {
+      return isEn
+        ? 'You must accept the personal data protection policy to register.'
+        : 'Debes aceptar los términos y la política de tratamiento de datos personales para registrarte.';
+    }
+
+    return msg;
+  };
+
   // Login form states: Verified strictly by Email and Password
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [resetSuccessNotice, setResetSuccessNotice] = useState(false);
 
   // Password Recovery Modal state
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
@@ -844,13 +965,24 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
+              {/* Success notification after password reset */}
+              {resetSuccessNotice && (
+                <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                  <span className="material-symbols-outlined text-[20px] text-emerald-500 shrink-0 mt-0.5">check_circle</span>
+                  <div className="leading-snug">
+                    <strong className="block font-bold">{isEn ? 'Password Updated!' : '¡Contraseña Actualizada!'}</strong>
+                    <span>{isEn ? 'Your password has been successfully updated. Enter your new password to sign in.' : 'Tu contraseña ha sido actualizada con éxito. Ingresa tu nueva contraseña para iniciar sesión.'}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Error message */}
               {loginError && (
                 <div className="p-3.5 bg-rose-500/10 border border-rose-500/40 text-rose-600 text-sm rounded-xl flex items-start gap-2.5 animate-in fade-in">
                   <span className="material-symbols-outlined text-[20px] text-rose-500 shrink-0 mt-0.5">error</span>
                   <div className="leading-snug">
                     <strong className="block font-bold">{isEn ? 'Access Error:' : 'Error de Acceso:'}</strong>
-                    <span>{loginError}</span>
+                    <span>{translateErrorMessage(loginError)}</span>
                   </div>
                 </div>
               )}
@@ -1132,7 +1264,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           <span className="material-symbols-outlined text-[16px] shrink-0">
                             {studentDocFeedback.status === 'found' ? 'verified' : 'error'}
                           </span>
-                          <span>{studentDocFeedback.message}</span>
+                          <span>{translateErrorMessage(studentDocFeedback.message)}</span>
                         </div>
                       )}
                     </div>
@@ -1244,7 +1376,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           <span className="material-symbols-outlined text-[16px] shrink-0">
                             {teacherFeedback.status === 'valid' ? 'check_circle' : 'error'}
                           </span>
-                          <span>{teacherFeedback.message}</span>
+                          <span>{translateErrorMessage(teacherFeedback.message)}</span>
                         </div>
                       )}
                     </div>
@@ -1404,7 +1536,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                             <span className="material-symbols-outlined text-[15px] shrink-0">
                               {studentLookupFeedback.status === 'found' ? 'verified' : 'cancel'}
                             </span>
-                            <span>{studentLookupFeedback.message}</span>
+                            <span>{translateErrorMessage(studentLookupFeedback.message)}</span>
                           </div>
                         )}
                       </div>
@@ -1514,7 +1646,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           <span className="material-symbols-outlined text-[16px] shrink-0">
                             {adminFeedback.status === 'valid' ? 'check_circle' : 'error'}
                           </span>
-                          <span>{adminFeedback.message}</span>
+                          <span>{translateErrorMessage(adminFeedback.message)}</span>
                         </div>
                       )}
                     </div>
@@ -1741,7 +1873,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     <span className="material-symbols-outlined text-[20px] shrink-0 mt-0.5">error</span>
                     <div className="leading-snug">
                       <strong className="block font-bold">{isEn ? 'Registration Error:' : 'Error en el registro:'}</strong>
-                      <span>{regError}</span>
+                      <span>{translateErrorMessage(regError)}</span>
                     </div>
                   </div>
                 )}
@@ -1788,6 +1920,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           setLoginEmail(resetEmail);
           setLoginPassword('');
           setLoginError(null);
+          setResetSuccessNotice(true);
         }}
       />
     </div>

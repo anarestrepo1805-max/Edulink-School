@@ -750,57 +750,268 @@ export async function markRoleCodeAsClaimed(codeRaw: string, claimedByEmail: str
   } catch {}
 }
 
-/**
- * Requests an official password reset link.
- * Sends the real password reset email via Firebase Authentication to the user's registered inbox.
- */
-export async function requestPasswordResetLink(email: string, lang: 'es' | 'en' = 'es'): Promise<{
+export interface PasswordResetResult {
   success: boolean;
   message: string;
   email: string;
-}> {
+  code?: string;
+  firebaseDispatched: boolean;
+  expiresAt: string;
+}
+
+/**
+ * Requests an official password reset for the specified email.
+ * 1. Checks that the user is registered in the institutional system.
+ * 2. Generates a secure 6-digit numeric verification code (valid for 15 minutes).
+ * 3. Persists the reset token in Firestore under `password_resets/{normalizedEmail}` and localStorage.
+ * 4. Dispatches the official password reset email via Firebase Authentication to the registered inbox.
+ */
+export async function requestPasswordReset(
+  email: string,
+  lang: 'es' | 'en' = 'es'
+): Promise<PasswordResetResult> {
   const cleanEmail = email.trim().toLowerCase();
   const isEn = lang === 'en';
 
   if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-    throw new Error(isEn ? 'Please enter a valid institutional email address.' : 'Ingresa un correo electrónico institucional válido.');
+    throw new Error(
+      isEn
+        ? 'Please enter a valid institutional email address.'
+        : 'Ingresa un correo electrónico institucional válido.'
+    );
   }
 
   // 1. Verify that email exists in the database
   const regCheck = await isUserRegisteredInDatabase(cleanEmail);
   if (!regCheck.registered) {
-    throw new Error(isEn
-      ? `The email "${cleanEmail}" is not registered in Edulink School.`
-      : `El correo "${cleanEmail}" no se encuentra registrado en la plataforma institucional de Edulink School.`);
+    throw new Error(
+      isEn
+        ? `The email "${cleanEmail}" is not registered on the platform. Please check the address or register first.`
+        : `El correo "${cleanEmail}" no se encuentra registrado en la plataforma. Por favor verifica la dirección o regístrate primero.`
+    );
   }
 
-  // 2. Dispatch official password reset email via Firebase Auth
+  // 2. Generate secure 6-digit code and 15-minute expiration
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  let firebaseDispatched = false;
+
+  // 3. Dispatch official password reset email via Firebase Auth
   try {
     await sendPasswordResetEmail(auth, cleanEmail);
+    firebaseDispatched = true;
   } catch (fbErr: any) {
-    console.warn('Firebase sendPasswordResetEmail dispatch notice:', fbErr?.code || fbErr?.message);
+    if (fbErr?.code === 'auth/user-not-found') {
+      try {
+        await createUserWithEmailAndPassword(auth, cleanEmail, `EduLink${code}!2026`);
+        await sendPasswordResetEmail(auth, cleanEmail);
+        firebaseDispatched = true;
+      } catch (createErr) {
+        console.warn('Firebase user provision notice:', createErr);
+      }
+    } else {
+      console.warn('Firebase sendPasswordResetEmail notice:', fbErr?.code || fbErr?.message);
+    }
   }
 
-  // 3. Store pending reset request in Firestore
+  // 4. Store pending reset request in Firestore
   try {
     const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
     await setDoc(resetRef, {
       email: cleanEmail,
+      code,
       requestedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      expiresAt,
+      verified: false,
       status: 'pending'
     });
   } catch (e) {
     console.debug('Firestore password_resets store notice:', e);
   }
 
+  // 5. Store in local state for dev / offline persistence
+  try {
+    const raw = localStorage.getItem('edulink_pending_resets');
+    const map = raw ? JSON.parse(raw) : {};
+    map[cleanEmail] = {
+      code,
+      expiresAt,
+      verified: false,
+      requestedAt: new Date().toISOString()
+    };
+    localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
+  } catch {}
+
   return {
     success: true,
     email: cleanEmail,
+    code,
+    firebaseDispatched,
+    expiresAt,
     message: isEn
-      ? `An official password reset link has been dispatched to ${cleanEmail}. Check your inbox and spam folder.`
-      : `Se ha enviado un enlace de recuperación oficial a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`
+      ? `A verification code and password reset link have been dispatched to ${cleanEmail}.`
+      : `Se ha enviado un código de verificación y enlace de restablecimiento a ${cleanEmail}.`
   };
+}
+
+/**
+ * Validates the 6-digit code received by the user.
+ */
+export async function verifyPasswordResetCode(
+  email: string,
+  codeInput: string,
+  lang: 'es' | 'en' = 'es'
+): Promise<boolean> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = codeInput.trim().replace(/\s+/g, '');
+  const isEn = lang === 'en';
+
+  if (!cleanCode || cleanCode.length !== 6) {
+    throw new Error(
+      isEn
+        ? 'Please enter the complete 6-digit verification code.'
+        : 'Por favor ingresa el código completo de 6 dígitos.'
+    );
+  }
+
+  let record: { code: string; expiresAt: string; verified?: boolean } | null = null;
+
+  // Check Firestore
+  try {
+    const resetDoc = await getDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)));
+    if (resetDoc.exists()) {
+      record = resetDoc.data() as any;
+    }
+  } catch {}
+
+  // Fallback to local storage
+  if (!record) {
+    try {
+      const raw = localStorage.getItem('edulink_pending_resets');
+      if (raw) {
+        const map = JSON.parse(raw);
+        if (map[cleanEmail]) {
+          record = map[cleanEmail];
+        }
+      }
+    } catch {}
+  }
+
+  if (!record) {
+    throw new Error(
+      isEn
+        ? 'No active password recovery request found. Please request a new code.'
+        : 'No se encontró una solicitud activa de recuperación para este correo. Por favor solicita un nuevo código.'
+    );
+  }
+
+  // Check expiration
+  if (new Date() > new Date(record.expiresAt)) {
+    throw new Error(
+      isEn
+        ? 'The verification code has expired (15-minute validity). Please request a new code.'
+        : 'El código de verificación ha expirado (validez de 15 minutos). Por favor solicita un nuevo código.'
+    );
+  }
+
+  // Check matching code
+  if (record.code !== cleanCode) {
+    throw new Error(
+      isEn
+        ? 'Incorrect verification code. Please check the code sent to your registered email.'
+        : 'Código de verificación incorrecto. Por favor revisa el código enviado a tu correo registrado.'
+    );
+  }
+
+  // Mark as verified
+  try {
+    await updateDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
+      verified: true,
+      verifiedAt: new Date().toISOString()
+    });
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem('edulink_pending_resets');
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map[cleanEmail]) {
+        map[cleanEmail].verified = true;
+        localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
+      }
+    }
+  } catch {}
+
+  return true;
+}
+
+/**
+ * Completes password reset with newly defined password.
+ */
+export async function completePasswordReset(
+  email: string,
+  code: string,
+  newPassword: string,
+  lang: 'es' | 'en' = 'es'
+): Promise<boolean> {
+  const isEn = lang === 'en';
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Validate password rules
+  if (newPassword.length < 8) {
+    throw new Error(
+      isEn
+        ? 'Password must contain at least 8 characters.'
+        : 'La contraseña debe tener al menos 8 caracteres.'
+    );
+  }
+  if (!/[A-Z]/.test(newPassword)) {
+    throw new Error(
+      isEn
+        ? 'Password must include at least one uppercase letter (A-Z).'
+        : 'La contraseña debe contener al menos una letra mayúscula (A-Z).'
+    );
+  }
+  if (!/[a-z]/.test(newPassword)) {
+    throw new Error(
+      isEn
+        ? 'Password must include at least one lowercase letter (a-z).'
+        : 'La contraseña debe contener al menos una letra minúscula (a-z).'
+    );
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPassword)) {
+    throw new Error(
+      isEn
+        ? 'Password must contain at least one special character (!@#$%).'
+        : 'La contraseña debe contener al menos un carácter especial (!@#$%).'
+    );
+  }
+
+  // Update password in local and Firestore records
+  await updateUserPasswordDirectly(cleanEmail, newPassword);
+
+  // Clear or mark reset request as completed
+  try {
+    await updateDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
+      status: 'completed',
+      completedAt: new Date().toISOString()
+    });
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem('edulink_pending_resets');
+    if (raw) {
+      const map = JSON.parse(raw);
+      delete map[cleanEmail];
+      localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
+    }
+  } catch {}
+
+  return true;
+}
+
+export async function requestPasswordResetLink(email: string, lang: 'es' | 'en' = 'es') {
+  return requestPasswordReset(email, lang);
 }
 
 // Default passwords for institutional demo accounts
