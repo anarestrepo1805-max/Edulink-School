@@ -100,7 +100,7 @@ function getResendClient(): Resend | null {
 async function sendRecoveryEmailViaResend(
   recipientEmail: string,
   code: string
-): Promise<{ success: boolean; resendDispatched: boolean; error?: string; notice?: string; dispatchedTo?: string }> {
+): Promise<{ success: boolean; resendDispatched: boolean; error?: string }> {
   const resend = getResendClient();
   let fromEmail = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
   if (!fromEmail.includes('<') && !fromEmail.includes('>')) {
@@ -118,9 +118,11 @@ async function sendRecoveryEmailViaResend(
   const subject = 'Código de recuperación - EDULINK SCHOOL';
 
   const textBody = `EDULINK SCHOOL
+
 Recuperación de contraseña
 
 Tu código de recuperación es:
+
 ${code}
 
 Este código es válido durante 10 minutos.
@@ -149,16 +151,16 @@ Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.`;
 
     <!-- Main Content -->
     <div style="margin-bottom: 28px;">
-      <h2 style="margin: 0 0 12px 0; font-size: 19px; font-weight: 700; color: #ffffff;">
+      <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #ffffff;">
         Recuperación de contraseña
       </h2>
-      <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
-        Has recibido este correo porque se solicitó restablecer la contraseña para tu cuenta institucional. Tu código de verificación es:
+      <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+        Tu código de recuperación es:
       </p>
 
       <!-- 6-digit Code Box -->
       <div style="background-color: #030712; border: 2px dashed #0284c7; border-radius: 14px; padding: 20px; text-align: center; margin: 24px 0;">
-        <span style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #38bdf8; display: inline-block;">
+        <span style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #38bdf8; display: inline-block;">
           ${code}
         </span>
       </div>
@@ -173,7 +175,7 @@ Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.`;
     <!-- Security Notice -->
     <div style="border-top: 1px solid #1e293b; padding-top: 20px;">
       <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #64748b;">
-        Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje de forma segura. Tu contraseña actual no cambiará sin este código.
+        Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.
       </p>
     </div>
 
@@ -194,42 +196,6 @@ Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.`;
     });
 
     if (response.error) {
-      const errMsg = response.error.message || '';
-      // If unverified domain in sandbox mode, attempt sending to owner account anarestrepo1805@gmail.com
-      if (
-        (errMsg.includes('Invalid `to` field') || errMsg.includes('testing email address') || errMsg.includes('only send testing emails')) &&
-        recipientEmail !== 'anarestrepo1805@gmail.com'
-      ) {
-        try {
-          const fallbackRes = await resend.emails.send({
-            from: fromEmail,
-            to: ['anarestrepo1805@gmail.com'],
-            subject: `[PRUEBA] Código de recuperación para ${recipientEmail} - EDULINK SCHOOL`,
-            text: `EDULINK SCHOOL (Modo Prueba Resend)
-Recuperación de contraseña para: ${recipientEmail}
-
-Tu código de recuperación es:
-${code}
-
-Este código es válido durante 10 minutos.
-
-Nota: Recibes este correo en anarestrepo1805@gmail.com porque el dominio institucional aún está en modo de prueba en Resend.`,
-            html: htmlBody.replace(
-              'Recuperación de contraseña',
-              `Recuperación de contraseña <br><span style="font-size: 13px; color: #38bdf8;">(Para la cuenta: ${recipientEmail})</span>`
-            )
-          });
-
-          if (!fallbackRes.error) {
-            return {
-              success: true,
-              resendDispatched: true,
-              notice: `En modo de prueba de Resend, el código para "${recipientEmail}" fue enviado a tu correo registrado de Resend (anarestrepo1805@gmail.com).`
-            };
-          }
-        } catch {}
-      }
-
       return {
         success: false,
         resendDispatched: false,
@@ -326,16 +292,12 @@ app.post('/api/auth/request-password-reset', async (req: Request, res: Response)
     }
 
     // Return response without leaking sensitive info (NO sensitive data in response)
-    const successMsg = (emailResult as any).notice
-      ? (emailResult as any).notice
-      : 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado.';
-
     return res.json({
       success: true,
       email: cleanEmail,
       resendDispatched: true,
       expiresInMinutes: 10,
-      message: successMsg
+      message: 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado.'
     });
   } catch (error: any) {
     return res.status(500).json({
