@@ -2,7 +2,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as fbSignOut,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  confirmPasswordReset,
+  verifyPasswordResetCode as fbVerifyResetCode
 } from 'firebase/auth';
 import emailjs from '@emailjs/browser';
 import {
@@ -821,108 +823,109 @@ export async function sendRecoveryEmailWithEmailJS(email: string, code: string):
 }
 
 /**
- * Requests an official password reset for the specified email.
- * 1. Checks that the user is registered in the institutional system.
- * 2. Backend generates a cryptographically secure 6-digit code with 10-minute validity.
- * 3. Sends email automatically via official Resend API SDK.
- * 4. Protects against excessive requests (rate-limiting).
+ * Sends an official password reset email using Firebase Authentication.
+ * - Validates email format.
+ * - Uses existing Firebase Auth instance from src/lib/firebase.ts.
+ * - Handles Firebase errors and translates them to friendly messages in Spanish/English.
+ * - Returns a generic message to prevent email enumeration attacks.
+ */
+export async function sendFirebasePasswordReset(
+  email: string,
+  lang: 'es' | 'en' = 'es'
+): Promise<{ success: boolean; message: string }> {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const isEn = lang === 'en';
+
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+    throw new Error(
+      isEn
+        ? 'Please enter a valid email address.'
+        : 'Por favor ingresa un correo electrónico con un formato válido.'
+    );
+  }
+
+  try {
+    // Optional ActionCodeSettings pointing back to the app URL
+    const actionCodeSettings = typeof window !== 'undefined' ? {
+      url: `${window.location.origin}/?action=reset_password&email=${encodeURIComponent(cleanEmail)}`,
+      handleCodeInApp: true
+    } : undefined;
+
+    try {
+      if (actionCodeSettings) {
+        await sendPasswordResetEmail(auth, cleanEmail, actionCodeSettings);
+      } else {
+        await sendPasswordResetEmail(auth, cleanEmail);
+      }
+    } catch (urlErr: any) {
+      // If the domain is not in Firebase Auth authorized domains list, fallback to standard sendPasswordResetEmail
+      await sendPasswordResetEmail(auth, cleanEmail);
+    }
+
+    return {
+      success: true,
+      message: isEn
+        ? 'If this email address is registered on the platform, you will receive an official Firebase email shortly with instructions to reset your password. Please check your inbox and spam folder.'
+        : 'Si este correo electrónico está registrado en la plataforma, recibirás en breve un mensaje con el enlace oficial de Firebase para restablecer tu contraseña. Por favor revisa tu bandeja de entrada y la carpeta de spam.'
+    };
+  } catch (err: any) {
+    // Anti-enumeration: if user not found, treat as generic success
+    if (err?.code === 'auth/user-not-found') {
+      return {
+        success: true,
+        message: isEn
+          ? 'If this email address is registered on the platform, you will receive an official Firebase email shortly with instructions to reset your password. Please check your inbox and spam folder.'
+          : 'Si este correo electrónico está registrado en la plataforma, recibirás en breve un mensaje con el enlace oficial de Firebase para restablecer tu contraseña. Por favor revisa tu bandeja de entrada y la carpeta de spam.'
+      };
+    }
+
+    if (err?.code === 'auth/invalid-email') {
+      throw new Error(
+        isEn ? 'The email address format is invalid.' : 'El formato del correo electrónico ingresado no es válido.'
+      );
+    }
+    if (err?.code === 'auth/too-many-requests') {
+      throw new Error(
+        isEn
+          ? 'Too many reset requests have been made. For your security, please wait a few minutes before trying again.'
+          : 'Has realizado demasiadas solicitudes recientemente. Por motivos de seguridad, por favor espera unos minutos antes de intentar de nuevo.'
+      );
+    }
+    if (err?.code === 'auth/network-request-failed') {
+      throw new Error(
+        isEn
+          ? 'Network connection error. Please verify your internet connection.'
+          : 'No se pudo conectar con el servidor de autenticación. Por favor verifica tu conexión a internet.'
+      );
+    }
+
+    throw new Error(
+      isEn
+        ? 'An error occurred while sending the recovery email. Please try again later.'
+        : 'Ocurrió un error al enviar el correo de recuperación. Por favor intenta más tarde.'
+    );
+  }
+}
+
+/**
+ * Requests an official password reset for the specified email using Firebase Authentication.
  */
 export async function requestPasswordReset(
   email: string,
   lang: 'es' | 'en' = 'es',
-  customCode?: string
+  _customCode?: string
 ): Promise<PasswordResetResult> {
   const cleanEmail = email.trim().toLowerCase();
-  const isEn = lang === 'en';
-
-  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-    throw new Error(
-      isEn
-        ? 'Please enter a valid institutional email address.'
-        : 'Ingresa un correo electrónico institucional válido.'
-    );
-  }
-
-  // 1. Verify that email exists in the database
-  const regCheck = await isUserRegisteredInDatabase(cleanEmail);
-  if (!regCheck.registered) {
-    throw new Error(
-      isEn
-        ? `The email "${cleanEmail}" is not registered on the platform. Please check the address or register first.`
-        : `El correo "${cleanEmail}" no se encuentra registrado en la plataforma. Por favor verifica la dirección o regístrate primero.`
-    );
-  }
-
-  let resendDispatched = false;
-  let backendSuccess = false;
-  let customBackendMessage = '';
-
-  // 2. Dispatch via backend with Resend integration
-  try {
-    const res = await fetch('/api/auth/request-password-reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      backendSuccess = true;
-      resendDispatched = !!data.resendDispatched;
-      if (data.message) {
-        customBackendMessage = data.message;
-      }
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      if (errData.message) {
-        throw new Error(errData.message);
-      }
-    }
-  } catch (backendErr: any) {
-    if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('NetworkError')) {
-      throw backendErr;
-    }
-    console.warn('Backend request reset notice:', backendErr);
-  }
-
-  // 3. Fallback / offline persistence: 10-minute expiration
-  const code = customCode || Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-  if (!backendSuccess) {
-    try {
-      const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
-      await setDoc(resetRef, {
-        email: cleanEmail,
-        code,
-        requestedAt: new Date().toISOString(),
-        expiresAt,
-        verified: false,
-        status: 'pending'
-      });
-    } catch {}
-
-    try {
-      const raw = localStorage.getItem('edulink_pending_resets');
-      const map = raw ? JSON.parse(raw) : {};
-      map[cleanEmail] = {
-        code,
-        expiresAt,
-        verified: false,
-        requestedAt: new Date().toISOString()
-      };
-      localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
-    } catch {}
-  }
+  const result = await sendFirebasePasswordReset(cleanEmail, lang);
 
   return {
     success: true,
     email: cleanEmail,
-    firebaseDispatched: resendDispatched || backendSuccess,
-    expiresAt,
-    message: customBackendMessage || (isEn
-      ? `We have dispatched a 6-digit verification code to ${cleanEmail} (valid for 10 minutes).`
-      : `Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado (válido durante 10 minutos).`)
+    firebaseDispatched: true,
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    message: result.message
   };
 }
 
@@ -1071,7 +1074,21 @@ export async function completePasswordReset(
 
   const token = resetToken || sessionStorage.getItem('edulink_active_reset_token') || undefined;
 
-  // 1. Submit to backend to securely hash password and invalidate code/token
+  // 1. If code is an oobCode from Firebase email action link, confirm directly with Firebase Auth
+  if (code && code !== 'email_link_verified' && code.length > 10) {
+    try {
+      await confirmPasswordReset(auth, code, newPassword);
+    } catch (fbErr: any) {
+      if (fbErr?.code === 'auth/expired-action-code') {
+        throw new Error(isEn ? 'The password reset link has expired. Please request a new one.' : 'El enlace de recuperación ha expirado. Por favor solicita uno nuevo.');
+      }
+      if (fbErr?.code === 'auth/invalid-action-code') {
+        throw new Error(isEn ? 'The reset link is invalid or has already been used.' : 'El enlace de recuperación es inválido o ya ha sido utilizado.');
+      }
+    }
+  }
+
+  // 2. Submit to backend to securely hash password and invalidate code/token
   try {
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',

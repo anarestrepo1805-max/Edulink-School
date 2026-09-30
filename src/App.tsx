@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActiveScreen, UserRole, UserProfile } from './types';
 import { NavigationShell } from './components/NavigationShell';
 import { LoginView } from './components/LoginView';
+import { ResetPasswordView } from './components/ResetPasswordView';
 import { StudentDashboardView } from './components/StudentDashboardView';
 import { StudentAssignmentView } from './components/StudentAssignmentView';
 import { TeacherGradesView } from './components/TeacherGradesView';
@@ -16,6 +17,15 @@ function MainApp() {
   // The first screen of the platform MUST be Login / Register as requested
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>('login');
   const [userRole, setUserRole] = useState<UserRole>(() => currentUser?.role || 'student');
+
+  // Detect if user navigated from a Firebase password reset email link
+  const [isResetPasswordAction, setIsResetPasswordAction] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('action') === 'reset_password' || params.get('mode') === 'resetPassword';
+    }
+    return false;
+  });
 
   const handleLoginSuccess = (user: UserProfile) => {
     setCurrentUser(user);
@@ -40,6 +50,22 @@ function MainApp() {
   const handleUpdateUser = (updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
   };
+
+  // Render Reset Password View when accessed via Firebase Auth reset link
+  if (isResetPasswordAction) {
+    return (
+      <ResetPasswordView
+        onSuccess={() => {
+          setIsResetPasswordAction(false);
+          setCurrentScreen('login');
+        }}
+        onBackToLogin={() => {
+          setIsResetPasswordAction(false);
+          setCurrentScreen('login');
+        }}
+      />
+    );
+  }
 
   // The first interface corresponds STRICTLY to the Facebook-style login/registration,
   // with no buttons or tabs from other sections visible.

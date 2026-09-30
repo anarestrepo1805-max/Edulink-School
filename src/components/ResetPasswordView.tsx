@@ -27,6 +27,14 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
     return '';
   });
 
+  const [oobCode] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('oobCode') || params.get('code') || '';
+    }
+    return '';
+  });
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -100,7 +108,7 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
 
     setIsLoading(true);
     try {
-      await completePasswordReset(cleanEmail, 'email_link_verified', newPassword, language);
+      await completePasswordReset(cleanEmail, oobCode || 'email_link_verified', newPassword, language);
       setIsLoading(false);
       setIsSuccess(true);
     } catch (err: any) {
