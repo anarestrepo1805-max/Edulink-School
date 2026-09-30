@@ -60,8 +60,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     }
     if (msg.includes('ha expirado') || msg.includes('expired')) {
       return isEn
-        ? 'The verification code has expired (15-minute validity). Please request a new code.'
-        : 'El código de verificación ha expirado (validez de 15 minutos). Por favor solicita un nuevo código.';
+        ? 'The verification code has expired (10-minute validity). Please request a new code.'
+        : 'El código de verificación ha expirado (validez de 10 minutos). Por favor solicita un nuevo código.';
     }
     if (msg.includes('menos 8 caracteres') || msg.includes('at least 8 characters')) {
       return isEn ? 'Password must be at least 8 characters long.' : 'La contraseña debe tener al menos 8 caracteres.';

@@ -101,13 +101,16 @@ async function sendRecoveryEmailViaResend(
   code: string
 ): Promise<{ success: boolean; resendDispatched: boolean; error?: string }> {
   const resend = getResendClient();
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'EDULINK SCHOOL <onboarding@resend.dev>';
+  let fromEmail = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
+  if (!fromEmail.includes('<') && !fromEmail.includes('>')) {
+    fromEmail = `EDULINK SCHOOL <${fromEmail}>`;
+  }
 
   if (!resend) {
     return {
-      success: true,
+      success: false,
       resendDispatched: false,
-      error: 'RESEND_API_KEY no está configurada aún en las variables de entorno. Puedes agregarla en los secretos del proyecto.'
+      error: 'RESEND_API_KEY no está configurada en las variables de entorno. Por favor agrégala como secreto en Google AI Studio.'
     };
   }
 
@@ -262,12 +265,34 @@ app.post('/api/auth/request-password-reset', async (req: Request, res: Response)
     // Send email via Resend SDK
     const emailResult = await sendRecoveryEmailViaResend(cleanEmail, code);
 
+    if (!emailResult.resendDispatched) {
+      let friendlyError = emailResult.error || 'Error al despachar el correo con Resend.';
+      if (
+        friendlyError.includes('testing email address') ||
+        friendlyError.includes('only send testing emails') ||
+        friendlyError.includes('Invalid `to` field')
+      ) {
+        friendlyError = 'Resend (Modo Prueba): En modo de prueba con onboarding@resend.dev solo puedes enviar correos a la dirección de tu cuenta de Resend. Para enviar a cualquier otro correo institucional (@edulink.edu.co, etc.), debes verificar tu dominio en resend.com/domains.';
+      } else if (
+        friendlyError.includes('API key') ||
+        friendlyError.includes('unauthorized') ||
+        friendlyError.includes('restricted')
+      ) {
+        friendlyError = 'Error de autenticación con Resend: La API Key configurada no es válida o ha sido revocada.';
+      }
+
+      return res.status(422).json({
+        success: false,
+        resendDispatched: false,
+        message: friendlyError
+      });
+    }
+
     // Return response without leaking sensitive info (NO sensitive data in response)
     return res.json({
       success: true,
       email: cleanEmail,
-      resendDispatched: emailResult.resendDispatched,
-      resendNotice: emailResult.error || null,
+      resendDispatched: true,
       expiresInMinutes: 10,
       message: 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado.'
     });
