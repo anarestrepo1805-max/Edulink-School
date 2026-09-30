@@ -162,6 +162,20 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     hasConfigured: true,
     institution: 'I.E. Vallejuelos',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+  },
+  'anarestrepo1805@gmail.com': {
+    id: 'demo-admin-ana',
+    email: 'anarestrepo1805@gmail.com',
+    fullName: 'Ana Restrepo',
+    role: 'admin',
+    documentId: '1020304050',
+    employeeId: 'ADM-2026-002',
+    adminPosition: 'Dirección General & Administración',
+    department: 'Dirección General y Rectoría',
+    createdAt: '2026-01-01T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
   }
 };
 
@@ -841,6 +855,7 @@ export async function requestPasswordReset(
 
   let resendDispatched = false;
   let backendSuccess = false;
+  let customBackendMessage = '';
 
   // 2. Dispatch via backend with Resend integration
   try {
@@ -854,6 +869,9 @@ export async function requestPasswordReset(
       const data = await res.json();
       backendSuccess = true;
       resendDispatched = !!data.resendDispatched;
+      if (data.message) {
+        customBackendMessage = data.message;
+      }
     } else {
       const errData = await res.json().catch(() => ({}));
       if (errData.message) {
@@ -902,9 +920,9 @@ export async function requestPasswordReset(
     email: cleanEmail,
     firebaseDispatched: resendDispatched || backendSuccess,
     expiresAt,
-    message: isEn
+    message: customBackendMessage || (isEn
       ? `We have dispatched a 6-digit verification code to ${cleanEmail} (valid for 10 minutes).`
-      : `Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado (válido durante 10 minutos).`
+      : `Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado (válido durante 10 minutos).`)
   };
 }
 
@@ -1112,7 +1130,8 @@ export const DEFAULT_PASSWORDS: Record<string, string> = {
   'miguel.jimenez@edulink.edu.co': 'Vallejuelos2026*',
   'daniela.alvarez@edulink.edu.co': 'Vallejuelos2026*',
   'elena.jimenez@vallejuelos.edu.co': 'Vallejuelos2026*',
-  'carlos.coordinacion@edulink.edu.co': 'Vallejuelos2026*'
+  'carlos.coordinacion@edulink.edu.co': 'Vallejuelos2026*',
+  'anarestrepo1805@gmail.com': 'Vallejuelos2026*'
 };
 
 export function getStoredUserPassword(email: string): string | null {

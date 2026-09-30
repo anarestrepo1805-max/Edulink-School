@@ -72,7 +72,8 @@ const INITIAL_DEMO_ACCOUNTS = [
   'miguel.jimenez@edulink.edu.co',
   'daniela.alvarez@edulink.edu.co',
   'elena.jimenez@vallejuelos.edu.co',
-  'carlos.coordinacion@edulink.edu.co'
+  'carlos.coordinacion@edulink.edu.co',
+  'anarestrepo1805@gmail.com'
 ];
 
 for (const demoEmail of INITIAL_DEMO_ACCOUNTS) {
@@ -99,7 +100,7 @@ function getResendClient(): Resend | null {
 async function sendRecoveryEmailViaResend(
   recipientEmail: string,
   code: string
-): Promise<{ success: boolean; resendDispatched: boolean; error?: string }> {
+): Promise<{ success: boolean; resendDispatched: boolean; error?: string; notice?: string; dispatchedTo?: string }> {
   const resend = getResendClient();
   let fromEmail = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
   if (!fromEmail.includes('<') && !fromEmail.includes('>')) {
@@ -193,6 +194,42 @@ Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.`;
     });
 
     if (response.error) {
+      const errMsg = response.error.message || '';
+      // If unverified domain in sandbox mode, attempt sending to owner account anarestrepo1805@gmail.com
+      if (
+        (errMsg.includes('Invalid `to` field') || errMsg.includes('testing email address') || errMsg.includes('only send testing emails')) &&
+        recipientEmail !== 'anarestrepo1805@gmail.com'
+      ) {
+        try {
+          const fallbackRes = await resend.emails.send({
+            from: fromEmail,
+            to: ['anarestrepo1805@gmail.com'],
+            subject: `[PRUEBA] Código de recuperación para ${recipientEmail} - EDULINK SCHOOL`,
+            text: `EDULINK SCHOOL (Modo Prueba Resend)
+Recuperación de contraseña para: ${recipientEmail}
+
+Tu código de recuperación es:
+${code}
+
+Este código es válido durante 10 minutos.
+
+Nota: Recibes este correo en anarestrepo1805@gmail.com porque el dominio institucional aún está en modo de prueba en Resend.`,
+            html: htmlBody.replace(
+              'Recuperación de contraseña',
+              `Recuperación de contraseña <br><span style="font-size: 13px; color: #38bdf8;">(Para la cuenta: ${recipientEmail})</span>`
+            )
+          });
+
+          if (!fallbackRes.error) {
+            return {
+              success: true,
+              resendDispatched: true,
+              notice: `En modo de prueba de Resend, el código para "${recipientEmail}" fue enviado a tu correo registrado de Resend (anarestrepo1805@gmail.com).`
+            };
+          }
+        } catch {}
+      }
+
       return {
         success: false,
         resendDispatched: false,
@@ -289,12 +326,16 @@ app.post('/api/auth/request-password-reset', async (req: Request, res: Response)
     }
 
     // Return response without leaking sensitive info (NO sensitive data in response)
+    const successMsg = (emailResult as any).notice
+      ? (emailResult as any).notice
+      : 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado.';
+
     return res.json({
       success: true,
       email: cleanEmail,
       resendDispatched: true,
       expiresInMinutes: 10,
-      message: 'Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado.'
+      message: successMsg
     });
   } catch (error: any) {
     return res.status(500).json({

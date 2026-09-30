@@ -35,6 +35,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoNotice, setInfoNotice] = useState<string | null>(null);
 
   // Dynamic error and alert translation helper so switching language immediately updates alerts
   const translateError = (msg: string | null): string | null => {
@@ -170,11 +171,14 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setIsLoading(true);
     try {
       // Backend generates 6-digit code with 10-minute expiry and dispatches via Resend
-      await requestPasswordReset(cleanEmail, language);
+      const result = await requestPasswordReset(cleanEmail, language);
       setIsLoading(false);
       setStep(2);
       setResendTimer(60);
       setVerificationCode('');
+      if (result.message) {
+        setInfoNotice(result.message);
+      }
     } catch (err: any) {
       setIsLoading(false);
       setErrorMessage(err.message || (isEn ? 'Error sending recovery code.' : 'Error al enviar el código de verificación.'));
@@ -419,12 +423,33 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
             </div>
 
             {/* 10-Minute Expiration Notice */}
-            <div className={`p-2.5 rounded-xl border mb-4 flex items-center justify-center gap-2 text-xs font-semibold ${
+            <div className={`p-2.5 rounded-xl border mb-3 flex items-center justify-center gap-2 text-xs font-semibold ${
               isDark ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' : 'bg-blue-50 border-blue-200 text-blue-900'
             }`}>
               <span className="material-symbols-outlined text-[16px] text-cyan-500">schedule</span>
               <span>{isEn ? 'This code is valid for 10 minutes.' : 'Este código es válido durante 10 minutos.'}</span>
             </div>
+
+            {/* Spam folder tip */}
+            <div className={`p-2.5 rounded-xl border mb-4 flex items-start gap-2 text-xs ${
+              isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}>
+              <span className="material-symbols-outlined text-[18px] text-amber-500 shrink-0 mt-0.5">info</span>
+              <span>
+                {isEn
+                  ? 'If you do not see the email in your primary inbox, please check your Spam or Junk folder.'
+                  : 'Si no ves el correo en tu bandeja principal, por favor revisa tu carpeta de Spam o Correo no deseado.'}
+              </span>
+            </div>
+
+            {infoNotice && (
+              <div className={`p-3 rounded-xl border mb-4 flex items-start gap-2 text-xs ${
+                isDark ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
+              }`}>
+                <span className="material-symbols-outlined text-[18px] text-cyan-500 shrink-0 mt-0.5">mark_email_read</span>
+                <span>{infoNotice}</span>
+              </div>
+            )}
 
             <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">
               <div>
