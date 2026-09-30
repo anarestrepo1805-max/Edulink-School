@@ -44,6 +44,38 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  // Verify action code on mount if user arrived from Firebase email link
+  useEffect(() => {
+    if (oobCode) {
+      import('../lib/firebase').then(({ auth }) => {
+        import('firebase/auth').then(({ verifyPasswordResetCode }) => {
+          verifyPasswordResetCode(auth, oobCode)
+            .then((verifiedEmail) => {
+              if (verifiedEmail) {
+                setEmail(verifiedEmail);
+              }
+            })
+            .catch((err) => {
+              console.warn('Action code check notice:', err);
+              if (err?.code === 'auth/expired-action-code') {
+                setErrorMessage(
+                  isEn
+                    ? 'This password reset link has expired. Please request a new one.'
+                    : 'Este enlace de recuperación ha expirado. Por favor solicita uno nuevo.'
+                );
+              } else if (err?.code === 'auth/invalid-action-code') {
+                setErrorMessage(
+                  isEn
+                    ? 'This reset link is invalid or has already been used.'
+                    : 'Este enlace de recuperación es inválido o ya ha sido utilizado.'
+                );
+              }
+            });
+        });
+      });
+    }
+  }, [oobCode, isEn]);
+
   // Password rules validation
   const hasMinLength = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
