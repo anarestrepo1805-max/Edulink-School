@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import emailjs from '@emailjs/browser';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import {
   requestPasswordReset,
@@ -27,7 +26,6 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [email, setEmail] = useState(initialEmail);
   const [verificationCode, setVerificationCode] = useState('');
-  const [memoryCode, setMemoryCode] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
 
   const [newPassword, setNewPassword] = useState('');
@@ -152,7 +150,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     return { label: isEn ? 'Very Strong' : 'Muy segura', color: 'text-emerald-400', bg: 'bg-emerald-400' };
   };
 
-  // 1. Pantalla 1: Solicitud de Correo -> Envío con EmailJS y Backend
+  // 1. Pantalla 1: Solicitud de Correo -> Envío con Resend desde el Backend
   // NO se muestra en pantalla ningún código de verificación ni contraseña temporal
   const handleSendRecoveryCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,49 +169,8 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
     setIsLoading(true);
     try {
-      // 2. Genera un número aleatorio de 6 dígitos en JavaScript al presionar "Enviar código"
-      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // 1. Configura la variable del enlace usando la URL actual de la aplicación:
-      const resetLink = window.location.origin + '/?action=reset_password';
-
-      // 4. Guarda ese código en memoria de la página para validarlo en la siguiente pantalla antes de permitir el cambio de contraseña
-      setMemoryCode(randomCode);
-
-      // 2. Envía la variable 'resetLink' dentro del objeto de parámetros de EmailJS:
-      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_kvyxfzj';
-      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || '_ejs-test-mail-service__';
-      const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
-
-      const templateParams = {
-        to_email: cleanEmail,
-        reset_link: resetLink,
-        resetLink: resetLink,
-        link: resetLink,
-        recipient_email: cleanEmail,
-        user_email: cleanEmail,
-        code: randomCode,
-        verification_code: randomCode,
-        recovery_code: randomCode,
-        passcode: randomCode,
-        app_name: 'Edulink School',
-        institution: 'I.E. Vallejuelos',
-        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Enlace directo: ${resetLink}`
-      };
-
-      try {
-        const globalEmailJS = typeof window !== 'undefined' ? (window as any).emailjs : null;
-        if (globalEmailJS && typeof globalEmailJS.send === 'function') {
-          await globalEmailJS.send(serviceId, templateId, templateParams, publicKey);
-        } else if (emailjs && typeof emailjs.send === 'function') {
-          await emailjs.send(serviceId, templateId, templateParams, publicKey);
-        }
-      } catch (emailErr) {
-        console.warn('EmailJS delivery notice:', emailErr);
-      }
-
-      // Backend / simulation dispatch without exposing codes on screen
-      await requestPasswordReset(cleanEmail, language, randomCode);
+      // Backend generates 6-digit code with 10-minute expiry and dispatches via Resend
+      await requestPasswordReset(cleanEmail, language);
       setIsLoading(false);
       setStep(2);
       setResendTimer(60);
@@ -230,42 +187,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const resetLink = window.location.origin + '/?action=reset_password';
-      setMemoryCode(randomCode);
-
-      const serviceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || 'service_kvyxfzj';
-      const templateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || '_ejs-test-mail-service__';
-      const publicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || 'default_public_key';
-
-      const templateParams = {
-        to_email: email.trim(),
-        reset_link: resetLink,
-        resetLink: resetLink,
-        link: resetLink,
-        recipient_email: email.trim(),
-        user_email: email.trim(),
-        code: randomCode,
-        verification_code: randomCode,
-        recovery_code: randomCode,
-        passcode: randomCode,
-        app_name: 'Edulink School',
-        institution: 'I.E. Vallejuelos',
-        message: `Tu código de verificación de 6 dígitos para restablecer tu contraseña en Edulink School es: ${randomCode}. Enlace directo: ${resetLink}`
-      };
-
-      try {
-        const globalEmailJS = typeof window !== 'undefined' ? (window as any).emailjs : null;
-        if (globalEmailJS && typeof globalEmailJS.send === 'function') {
-          await globalEmailJS.send(serviceId, templateId, templateParams, publicKey);
-        } else if (emailjs && typeof emailjs.send === 'function') {
-          await emailjs.send(serviceId, templateId, templateParams, publicKey);
-        }
-      } catch (emailErr) {
-        console.warn('EmailJS delivery notice:', emailErr);
-      }
-
-      await requestPasswordReset(email.trim(), language, randomCode);
+      await requestPasswordReset(email.trim(), language);
       setIsLoading(false);
       setResendTimer(60);
     } catch (err: any) {
@@ -287,17 +209,13 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 
     setIsLoading(true);
     try {
-      // Validar código en memoria de la página antes de permitir el cambio de contraseña
-      if (memoryCode && cleanCode !== memoryCode) {
-        throw new Error(isEn ? 'Incorrect or expired verification code. Please check your email and try again.' : 'Código de verificación incorrecto o expirado. Por favor revisa tu correo e intenta nuevamente.');
-      }
       await verifyPasswordResetCode(email, cleanCode, language);
       setIsLoading(false);
       setStep(3);
       setErrorMessage(null);
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMessage(err.message || (isEn ? 'Invalid verification code.' : 'Código de verificación incorrecto.'));
+      setErrorMessage(err.message || (isEn ? 'Invalid verification code.' : 'Código de verificación incorrecto o expirado.'));
     }
   };
 
@@ -486,7 +404,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
             </div>
 
             {/* Confirmation Banner with User Email */}
-            <div className={`p-3.5 rounded-2xl border mb-4 flex items-center gap-3 ${
+            <div className={`p-3.5 rounded-2xl border mb-3 flex items-center gap-3 ${
               isDark ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200' : 'bg-cyan-50 border-cyan-200 text-cyan-950'
             }`}>
               <span className="material-symbols-outlined text-[22px] text-cyan-500 shrink-0">mark_email_read</span>
@@ -498,6 +416,14 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                   {email}
                 </span>
               </div>
+            </div>
+
+            {/* 10-Minute Expiration Notice */}
+            <div className={`p-2.5 rounded-xl border mb-4 flex items-center justify-center gap-2 text-xs font-semibold ${
+              isDark ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}>
+              <span className="material-symbols-outlined text-[16px] text-cyan-500">schedule</span>
+              <span>{isEn ? 'This code is valid for 10 minutes.' : 'Este código es válido durante 10 minutos.'}</span>
             </div>
 
             <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">

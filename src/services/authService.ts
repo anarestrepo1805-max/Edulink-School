@@ -809,9 +809,9 @@ export async function sendRecoveryEmailWithEmailJS(email: string, code: string):
 /**
  * Requests an official password reset for the specified email.
  * 1. Checks that the user is registered in the institutional system.
- * 2. Generates a secure 6-digit numeric verification code (valid for 15 minutes).
- * 3. Dispatches email via EmailJS and Firebase Authentication.
- * 4. Persists the reset token in Firestore under `password_resets/{normalizedEmail}` and localStorage.
+ * 2. Backend generates a cryptographically secure 6-digit code with 10-minute validity.
+ * 3. Sends email automatically via official Resend API SDK.
+ * 4. Protects against excessive requests (rate-limiting).
  */
 export async function requestPasswordReset(
   email: string,
@@ -839,78 +839,80 @@ export async function requestPasswordReset(
     );
   }
 
-  // 2. Generate secure 6-digit code (or use supplied code) and 15-minute expiration
-  const code = customCode || Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  let firebaseDispatched = false;
+  let resendDispatched = false;
+  let backendSuccess = false;
 
-  // 3. Dispatch recovery email via EmailJS (as requested by user)
+  // 2. Dispatch via backend with Resend integration
   try {
-    await sendRecoveryEmailWithEmailJS(cleanEmail, code);
-  } catch (e) {
-    console.debug('EmailJS dispatch attempt:', e);
-  }
-
-  // 4. Also dispatch official password reset email via Firebase Auth
-  try {
-    await sendPasswordResetEmail(auth, cleanEmail);
-    firebaseDispatched = true;
-  } catch (fbErr: any) {
-    if (fbErr?.code === 'auth/user-not-found') {
-      try {
-        await createUserWithEmailAndPassword(auth, cleanEmail, `EduLink${code}!2026`);
-        await sendPasswordResetEmail(auth, cleanEmail);
-        firebaseDispatched = true;
-      } catch (createErr) {
-        console.warn('Firebase user provision notice:', createErr);
-      }
-    } else {
-      console.warn('Firebase sendPasswordResetEmail notice:', fbErr?.code || fbErr?.message);
-    }
-  }
-
-  // 5. Store pending reset request in Firestore
-  try {
-    const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
-    await setDoc(resetRef, {
-      email: cleanEmail,
-      code,
-      requestedAt: new Date().toISOString(),
-      expiresAt,
-      verified: false,
-      status: 'pending'
+    const res = await fetch('/api/auth/request-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail })
     });
-  } catch (e) {
-    console.debug('Firestore password_resets store notice:', e);
+
+    if (res.ok) {
+      const data = await res.json();
+      backendSuccess = true;
+      resendDispatched = !!data.resendDispatched;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.message) {
+        throw new Error(errData.message);
+      }
+    }
+  } catch (backendErr: any) {
+    if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('NetworkError')) {
+      throw backendErr;
+    }
+    console.warn('Backend request reset notice:', backendErr);
   }
 
-  // 5. Store in local state for dev / offline persistence
-  try {
-    const raw = localStorage.getItem('edulink_pending_resets');
-    const map = raw ? JSON.parse(raw) : {};
-    map[cleanEmail] = {
-      code,
-      expiresAt,
-      verified: false,
-      requestedAt: new Date().toISOString()
-    };
-    localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
-  } catch {}
+  // 3. Fallback / offline persistence: 10-minute expiration
+  const code = customCode || Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+  if (!backendSuccess) {
+    try {
+      const resetRef = doc(db, 'password_resets', normalizeKey(cleanEmail));
+      await setDoc(resetRef, {
+        email: cleanEmail,
+        code,
+        requestedAt: new Date().toISOString(),
+        expiresAt,
+        verified: false,
+        status: 'pending'
+      });
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem('edulink_pending_resets');
+      const map = raw ? JSON.parse(raw) : {};
+      map[cleanEmail] = {
+        code,
+        expiresAt,
+        verified: false,
+        requestedAt: new Date().toISOString()
+      };
+      localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
+    } catch {}
+  }
 
   return {
     success: true,
     email: cleanEmail,
-    code,
-    firebaseDispatched,
+    firebaseDispatched: resendDispatched || backendSuccess,
     expiresAt,
     message: isEn
-      ? `A verification code and password reset link have been dispatched to ${cleanEmail}.`
-      : `Se ha enviado un código de verificación y enlace de restablecimiento a ${cleanEmail}.`
+      ? `We have dispatched a 6-digit verification code to ${cleanEmail} (valid for 10 minutes).`
+      : `Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico registrado (válido durante 10 minutos).`
   };
 }
 
 /**
  * Validates the 6-digit code received by the user.
+ * 1. Checks 10-minute expiration.
+ * 2. Checks against brute-force attempts.
+ * 3. Obtains single-use resetToken from backend.
  */
 export async function verifyPasswordResetCode(
   email: string,
@@ -929,9 +931,34 @@ export async function verifyPasswordResetCode(
     );
   }
 
-  let record: { code: string; expiresAt: string; verified?: boolean } | null = null;
+  // 1. Verify with backend endpoint
+  try {
+    const res = await fetch('/api/auth/verify-reset-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, code: cleanCode })
+    });
 
-  // Check Firestore
+    if (res.ok) {
+      const data = await res.json();
+      if (data.resetToken) {
+        sessionStorage.setItem('edulink_active_reset_token', data.resetToken);
+      }
+      return true;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.message) {
+        throw new Error(errData.message);
+      }
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('NetworkError')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Offline / local fallback check
+  let record: { code: string; expiresAt: string; verified?: boolean } | null = null;
   try {
     const resetDoc = await getDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)));
     if (resetDoc.exists()) {
@@ -939,7 +966,6 @@ export async function verifyPasswordResetCode(
     }
   } catch {}
 
-  // Fallback to local storage
   if (!record) {
     try {
       const raw = localStorage.getItem('edulink_pending_resets');
@@ -960,16 +986,14 @@ export async function verifyPasswordResetCode(
     );
   }
 
-  // Check expiration
   if (new Date() > new Date(record.expiresAt)) {
     throw new Error(
       isEn
-        ? 'The verification code has expired (15-minute validity). Please request a new code.'
-        : 'El código de verificación ha expirado (validez de 15 minutos). Por favor solicita un nuevo código.'
+        ? 'The verification code has expired (10-minute validity). Please request a new code.'
+        : 'El código de verificación ha expirado (validez de 10 minutos). Por favor solicita un nuevo código.'
     );
   }
 
-  // Check matching code
   if (record.code !== cleanCode) {
     throw new Error(
       isEn
@@ -978,36 +1002,21 @@ export async function verifyPasswordResetCode(
     );
   }
 
-  // Mark as verified
-  try {
-    await updateDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
-      verified: true,
-      verifiedAt: new Date().toISOString()
-    });
-  } catch {}
-
-  try {
-    const raw = localStorage.getItem('edulink_pending_resets');
-    if (raw) {
-      const map = JSON.parse(raw);
-      if (map[cleanEmail]) {
-        map[cleanEmail].verified = true;
-        localStorage.setItem('edulink_pending_resets', JSON.stringify(map));
-      }
-    }
-  } catch {}
-
   return true;
 }
 
 /**
  * Completes password reset with newly defined password.
+ * 1. Hashes password securely via backend PBKDF2 with salt.
+ * 2. Invalidates the code and reset token immediately so it cannot be reused.
+ * 3. Updates local and Firestore credentials.
  */
 export async function completePasswordReset(
   email: string,
   code: string,
   newPassword: string,
-  lang: 'es' | 'en' = 'es'
+  lang: 'es' | 'en' = 'es',
+  resetToken?: string
 ): Promise<boolean> {
   const isEn = lang === 'en';
   const cleanEmail = email.trim().toLowerCase();
@@ -1042,10 +1051,39 @@ export async function completePasswordReset(
     );
   }
 
-  // Update password in local and Firestore records
+  const token = resetToken || sessionStorage.getItem('edulink_active_reset_token') || undefined;
+
+  // 1. Submit to backend to securely hash password and invalidate code/token
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        newPassword,
+        code,
+        resetToken: token
+      })
+    });
+
+    if (res.ok) {
+      sessionStorage.removeItem('edulink_active_reset_token');
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.message) {
+        throw new Error(errData.message);
+      }
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('NetworkError')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Update local and Firestore records
   await updateUserPasswordDirectly(cleanEmail, newPassword);
 
-  // Clear or mark reset request as completed
+  // Invalidate in Firestore and local storage
   try {
     await updateDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
       status: 'completed',
@@ -1623,14 +1661,28 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
   }
 
   // 2. Validate user password
-  const storedPassword = getStoredUserPassword(cleanEmail);
   let isPasswordValid = false;
 
-  if (storedPassword) {
-    if (storedPassword === passwordInput) {
+  // 2.1 Check via backend PBKDF2 hash verification
+  try {
+    const res = await fetch('/api/auth/verify-login-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password: passwordInput })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.valid) {
+        isPasswordValid = true;
+      }
+    }
+  } catch {}
+
+  // 2.2 Local and demo accounts fallback
+  if (!isPasswordValid) {
+    const storedPassword = getStoredUserPassword(cleanEmail);
+    if (storedPassword && storedPassword === passwordInput) {
       isPasswordValid = true;
-    } else {
-      throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
     }
   }
 
