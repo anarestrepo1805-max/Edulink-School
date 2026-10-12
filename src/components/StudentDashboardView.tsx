@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActiveScreen, Subject, UpcomingAssignment, UserProfile } from '../types';
 import { ASSETS, INITIAL_SUBJECTS, INITIAL_UPCOMING_ASSIGNMENTS } from '../data/mockData';
+import { OFFICIAL_SCHEDULE_11_1 } from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
@@ -44,6 +45,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Schedule modal state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Subject creation modal state
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
@@ -225,7 +229,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
               <span>{isEn ? 'Grades' : 'Calificaciones'}</span>
             </button>
             <button
-              onClick={() => showToast(isEn ? `Institutional Schedule: ${shift}` : `Horario institucional: ${shift}`)}
+              onClick={() => setShowScheduleModal(true)}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
@@ -1078,6 +1082,126 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Official Schedule Modal */}
+      {showScheduleModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            className={`relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl border overflow-hidden ${
+              isDark
+                ? 'bg-slate-900 border-slate-700 text-white shadow-cyan-950/40'
+                : 'bg-white border-slate-200 text-slate-900 shadow-slate-300/60'
+            }`}
+          >
+            {/* Header */}
+            <div className={`p-5 sm:p-6 border-b flex items-center justify-between shrink-0 ${
+              isDark ? 'border-slate-800 bg-slate-950/50' : 'border-[#eff4ff] bg-[#f8faff]'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+                  isDark ? 'bg-cyan-950 text-cyan-300' : 'bg-[#dce9ff] text-[#00288e]'
+                }`}>
+                  <span className="material-symbols-outlined text-[24px]">calendar_month</span>
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold leading-tight">
+                    {isEn ? 'Official Institutional Schedule' : 'Horario Escolar Oficial'}
+                  </h3>
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
+                    {gradeLevel} • {shift} • I.E. Vallejuelos
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Schedule Table Body */}
+            <div className="p-4 sm:p-6 overflow-x-auto overflow-y-auto flex-1">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
+                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
+                  }`}>
+                    <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Tuesday' : 'Martes'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Wednesday' : 'Miércoles'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Thursday' : 'Jueves'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                  {OFFICIAL_SCHEDULE_11_1.map((slot) => (
+                    <tr
+                      key={slot.period}
+                      className={`transition-colors ${
+                        isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
+                      }`}
+                    >
+                      <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400">
+                        <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
+                          {isEn ? `Period ${slot.period}` : `Hora ${slot.period}`}
+                        </div>
+                        <div>{slot.time}</div>
+                      </td>
+                      {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
+                        <td key={idx} className="py-2.5 px-3 align-top">
+                          <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
+                            isDark
+                              ? 'bg-slate-800/80 border-slate-700/60'
+                              : 'bg-white border-slate-200/80 shadow-2xs'
+                          }`}>
+                            <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
+                              {cell.subject}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                              {cell.teacher}
+                            </span>
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className={`p-4 border-t flex items-center justify-between text-xs shrink-0 ${
+              isDark ? 'border-slate-800 bg-slate-950/40 text-slate-400' : 'border-slate-200 bg-slate-50 text-[#757684]'
+            }`}>
+              <span>
+                {isEn
+                  ? 'Official Schedule source: Academic Direction • FET Schedule Generator'
+                  : 'Fuente oficial: Coordinación Académica • Plan de Estudios Institucional'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                }`}
+              >
+                {isEn ? 'Close' : 'Cerrar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

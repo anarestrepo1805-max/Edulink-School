@@ -1283,48 +1283,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         </div>
                       )}
                     </div>
-
-                    {/* Pre-populated Academic Information (Readonly) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
-                          <span>{isEn ? 'Official Grade & Group' : 'Grado y Grupo Oficial'}</span>
-                          <span className="text-[10px] text-blue-500 font-semibold">
-                            {isEn ? 'Locked by enrollment census' : 'Asignado por censo oficial'}
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={regGradeLevel ? (isEn ? `Grade ${regGradeLevel}` : `Grado ${regGradeLevel}`) : ''}
-                          placeholder={isEn ? 'Auto-filled upon entering document' : 'Se asigna automáticamente'}
-                          className={`w-full px-3.5 py-2.5 text-sm font-bold rounded-xl outline-none border cursor-not-allowed ${
-                            regGradeLevel
-                              ? isDark ? 'bg-slate-950/80 border-emerald-500/60 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                              : isDark ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
-                          <span>{isEn ? 'Official Institutional Shift' : 'Jornada Escolar Institucional'}</span>
-                          <span className="text-[10px] text-blue-500 font-semibold">
-                            {isEn ? 'Official Schedule' : 'Horario Oficial'}
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
-                          className={`w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl outline-none border cursor-not-allowed ${
-                            isDark
-                              ? 'bg-slate-950/80 border-slate-700 text-blue-300'
-                              : 'bg-slate-100 border-slate-300 text-slate-800'
-                          }`}
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
 

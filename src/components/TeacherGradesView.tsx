@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ActiveScreen, StudentGradeRecord, UserProfile } from '../types';
 import { ASSETS, INITIAL_STUDENT_GRADES } from '../data/mockData';
+import { OFFICIAL_SCHEDULE_11_1 } from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
@@ -36,6 +37,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   const [lastSaved, setLastSaved] = useState(isEn ? 'Today, 10:42 AM' : 'Hoy, 10:42 AM');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isConfiguringDemo, setIsConfiguringDemo] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -203,6 +205,15 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
             >
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
               <span className="text-xs font-bold">{isEn ? 'Attendance' : 'Asistencia'}</span>
+            </button>
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
+                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-xl">calendar_month</span>
+              <span className="text-xs font-bold">{isEn ? 'Institutional Schedule' : 'Horario Institucional'}</span>
             </button>
             <button
               onClick={() => onNavigate('student_assignment')}
@@ -1025,6 +1036,120 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           </div>
         </main>
       </div>
+
+      {/* INSTITUTIONAL SCHEDULE MODAL */}
+      {showScheduleModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className={`relative w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl border flex flex-col overflow-hidden transition-all ${
+            isDark ? 'bg-slate-900 border-slate-700/80 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            {/* Modal Header */}
+            <div className={`p-4 sm:p-6 border-b flex items-center justify-between shrink-0 ${
+              isDark ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-slate-50/80'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                  isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-[#00288e]'
+                }`}>
+                  <span className="material-symbols-outlined text-[24px]">calendar_month</span>
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold leading-tight">
+                    {isEn ? 'Official Institutional Schedule - Academic Term' : 'Horario Escolar Oficial - Jornada Institucional'}
+                  </h3>
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
+                    {isEn ? 'School Day: Morning Shift (6:15 AM - 12:15 PM) • FET Official Master Plan' : 'Jornada Mañana (6:15 AM - 12:15 PM) • Plan de Estudios Institucional'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200/70 hover:bg-slate-300 text-slate-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Schedule Table Body */}
+            <div className="p-4 sm:p-6 overflow-x-auto overflow-y-auto flex-1">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
+                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
+                  }`}>
+                    <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Tuesday' : 'Martes'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Wednesday' : 'Miércoles'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Thursday' : 'Jueves'}</th>
+                    <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                  {OFFICIAL_SCHEDULE_11_1.map((slot) => (
+                    <tr
+                      key={slot.period}
+                      className={`transition-colors ${
+                        isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
+                      }`}
+                    >
+                      <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400">
+                        <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
+                          {isEn ? `Period ${slot.period}` : `Hora ${slot.period}`}
+                        </div>
+                        <div>{slot.time}</div>
+                      </td>
+                      {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
+                        <td key={idx} className="py-2.5 px-3 align-top">
+                          <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
+                            isDark
+                              ? 'bg-slate-800/80 border-slate-700/60'
+                              : 'bg-white border-slate-200/80 shadow-2xs'
+                          }`}>
+                            <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
+                              {cell.subject}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                              {cell.teacher}
+                            </span>
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className={`p-4 border-t flex items-center justify-between text-xs shrink-0 ${
+              isDark ? 'border-slate-800 bg-slate-950/40 text-slate-400' : 'border-slate-200 bg-slate-50 text-[#757684]'
+            }`}>
+              <span>
+                {isEn
+                  ? 'Official Schedule source: Academic Direction • FET Schedule Generator'
+                  : 'Fuente oficial: Coordinación Académica • Plan de Estudios Institucional'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                }`}
+              >
+                {isEn ? 'Close' : 'Cerrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
