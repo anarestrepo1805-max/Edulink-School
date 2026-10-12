@@ -41,31 +41,21 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanInput = email.trim();
 
-    if (!cleanEmail) {
+    if (!cleanInput) {
       setErrorMessage(
         isEn
-          ? 'Please enter your registered email address.'
-          : 'Por favor ingresa tu correo electrónico registrado.'
-      );
-      return;
-    }
-
-    if (!emailRegex.test(cleanEmail)) {
-      setErrorMessage(
-        isEn
-          ? 'Please enter a valid email format (e.g., user@domain.com).'
-          : 'Por favor ingresa un formato de correo electrónico válido (ej: usuario@dominio.com).'
+          ? 'Please enter your registered identity document or email.'
+          : 'Por favor ingresa tu documento de identidad registrado o correo electrónico.'
       );
       return;
     }
 
     setIsLoading(true);
     try {
-      // Send official Firebase Authentication reset email
-      const result = await sendFirebasePasswordReset(cleanEmail, language);
+      // Send official Firebase Authentication reset email or resolve institutional account
+      const result = await sendFirebasePasswordReset(cleanInput, language);
       setIsLoading(false);
       setIsSubmitted(true);
       setSuccessNotice(result.message);
@@ -151,23 +141,23 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                     isDark ? 'text-slate-300' : 'text-slate-700'
                   }`}
                 >
-                  {isEn ? 'Registered Email Address' : 'Correo Electrónico Registrado'}
+                  {isEn ? 'Identity Document or Registered Email' : 'Documento de Identidad o Correo Registrado'}
                 </label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
-                    mail
+                    badge
                   </span>
                   <input
                     id="input-recovery-email"
-                    type="email"
+                    type="text"
                     autoFocus
-                    autoComplete="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setErrorMessage(null);
                     }}
-                    placeholder={isEn ? 'name@institution.edu' : 'nombre@institucion.edu.co'}
+                    placeholder={isEn ? 'e.g. 1001234567 or user@vallejuelos.edu.co' : 'ej. 1001234567 o usuario@vallejuelos.edu.co'}
                     className={`w-full pl-11 pr-4 py-3 rounded-2xl text-sm border outline-none transition-all ${
                       isDark
                         ? 'bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'

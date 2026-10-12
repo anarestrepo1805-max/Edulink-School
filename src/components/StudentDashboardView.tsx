@@ -436,9 +436,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                 <div className="w-36 h-36 md:w-44 md:h-44 rounded-2xl bg-white/10 backdrop-blur-md p-2 flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300">
                   <div className="w-full h-full rounded-xl bg-white p-3 shadow-md flex items-center justify-center overflow-hidden">
                     <img
-                      src={ASSETS.logoAlt}
+                      src={ASSETS.logo}
                       alt="Edulink School"
                       className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
+                      }}
                     />
                   </div>
                 </div>

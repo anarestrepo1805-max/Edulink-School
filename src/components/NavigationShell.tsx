@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ActiveScreen, UserRole, UserProfile } from '../types';
 import { deleteUserAccount } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
+import { ASSETS } from '../data/mockData';
 
 interface NavigationShellProps {
   currentScreen: ActiveScreen;
@@ -178,12 +179,21 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       }`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* Logo brand & indicator */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-pulse"></span>
-            <span className="font-bold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[22px] text-[#7bd0ff]">school</span>
-              Edulink School
-            </span>
+            <div className="flex items-center gap-2">
+              <img
+                src={ASSETS.logo}
+                alt="Edulink School Logo"
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain filter drop-shadow-[0_2px_8px_rgba(6,182,212,0.4)]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
+                }}
+              />
+              <span className="font-bold text-base sm:text-lg tracking-tight text-white flex items-center">
+                Edulink School
+              </span>
+            </div>
             <span className="hidden sm:inline-block text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-[#c4e7ff] font-semibold">
               I.E. Vallejuelos
             </span>

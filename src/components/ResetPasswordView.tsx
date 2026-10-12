@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { completePasswordReset } from '../services/authService';
+import { ASSETS } from '../data/mockData';
 
 interface ResetPasswordViewProps {
   onSuccess: (email: string) => void;
@@ -159,8 +160,15 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
       }`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-teal-400 p-0.5 shadow-md shadow-cyan-500/20">
-            <div className="w-full h-full bg-[#0a1128] rounded-[10px] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px] text-cyan-400">school</span>
+            <div className="w-full h-full bg-[#0a1128] rounded-[10px] flex items-center justify-center p-1 overflow-hidden">
+              <img
+                src={ASSETS.logo}
+                alt="Edulink School Logo"
+                className="w-full h-full object-contain filter drop-shadow-[0_1px_4px_rgba(6,182,212,0.4)]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
+                }}
+              />
             </div>
           </div>
           <div>

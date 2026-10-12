@@ -172,7 +172,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [regRole, setRegRole] = useState<'student' | 'teacher' | 'family' | 'admin'>('student');
   const [regFullName, setRegFullName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -374,9 +373,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       setRegFullName(student.fullName);
       setRegGradeLevel(student.gradeLevel);
       setRegShift(student.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)');
-      if (!regEmail || regEmail.includes('@edulink.edu.co') || !regEmail.includes('@')) {
-        setRegEmail(student.email);
-      }
       setStudentDocFeedback({
         status: 'found',
         message: isEn
@@ -413,15 +409,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setLoginError(null);
 
-    const cleanEmail = loginEmail.trim().toLowerCase();
+    const cleanIdentifier = loginEmail.trim();
 
-    if (!cleanEmail) {
-      setLoginError(isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.');
-      return;
-    }
-
-    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setLoginError(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido.');
+    if (!cleanIdentifier) {
+      setLoginError(
+        isEn
+          ? 'Please enter your identity document or institutional email.'
+          : 'Por favor ingresa tu documento de identidad o correo institucional.'
+      );
       return;
     }
 
@@ -433,7 +428,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const userProfile = await loginUser(cleanEmail, loginPassword, language);
+      const userProfile = await loginUser(cleanIdentifier, loginPassword, language);
       onLoginSuccess(userProfile);
     } catch (err: any) {
       setLoginError(err.message || (isEn ? 'Error signing in to the platform.' : 'Error al iniciar sesión en la plataforma.'));
@@ -450,11 +445,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     if (!regFullName.trim()) {
       setRegError(isEn ? 'Please enter your full name.' : 'Por favor ingresa tu nombre completo.');
-      return;
-    }
-
-    if (!regEmail.trim()) {
-      setRegError(isEn ? 'Please enter your institutional or personal email.' : 'Por favor ingresa tu correo electrónico institucional o personal.');
       return;
     }
 
@@ -553,7 +543,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       const newUser = await registerNewUser({
         fullName: regFullName.trim(),
-        email: regEmail.trim(),
         password: regPassword,
         role: regRole,
         documentId: regRole === 'family'
@@ -753,6 +742,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 src={ASSETS.logo}
                 alt="Edulink School Logo"
                 className="w-full h-full object-contain filter drop-shadow-[0_8px_20px_rgba(6,182,212,0.4)]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
+                }}
               />
             </div>
           </div>
@@ -920,23 +912,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
                   isDark ? 'text-cyan-300' : 'text-blue-950'
                 }`}>
-                  {isEn ? 'Institutional Email' : 'Correo electrónico'}
+                  {isEn ? 'Identity Document or Institutional Email' : 'Documento de Identidad o Correo Institucional'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[22px] text-cyan-500">
-                    alternate_email
+                    badge
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder=""
+                    placeholder={isEn ? 'e.g. 1001234567 or user@vallejuelos.edu.co' : 'ej. 1001234567 o usuario@vallejuelos.edu.co'}
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
                         : 'bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20'
                     }`}
-                    autoComplete="username email"
+                    autoComplete="username"
                     required
                   />
                 </div>
@@ -1089,7 +1081,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }`}>
         <div className="max-w-[1080px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className={`flex items-center gap-2 font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <img src={ASSETS.logo} alt="" className="w-6 h-6 object-contain filter drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
+            <img
+              src={ASSETS.logo}
+              alt="Edulink School"
+              className="w-6 h-6 object-contain filter drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
+              }}
+            />
             <span>Edulink School © 2026 • Institución Educativa Vallejuelos</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm">
@@ -1713,24 +1712,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5">
-                      {isEn ? 'Email Address *' : 'Correo Electrónico *'}
-                    </label>
-                    <input
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder=""
-                      className={`w-full px-4 py-3 text-base rounded-xl outline-none border ${
-                        isDark
-                          ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
-                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
-                      }`}
-                      required
-                    />
-                  </div>
-
                   {/* Password with rules and validations */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
@@ -1888,7 +1869,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <PasswordRecoveryModal
         isOpen={isRecoveryModalOpen}
         onClose={() => setIsRecoveryModalOpen(false)}
-        initialEmail={loginEmail.includes('@') ? loginEmail : ''}
+        initialEmail={loginEmail.trim()}
         onPasswordResetSuccess={(resetEmail) => {
           setLoginEmail(resetEmail);
           setLoginPassword('');

@@ -1,11 +1,11 @@
 import { Subject, UpcomingAssignment, StudentGradeRecord, NewsFeedItem, ChatContact, ChatMessage, MessageThread } from '../types';
-const logoTransparent = '/src/assets/logo_transparent.png';
+import logoTransparent from '../assets/logo_transparent.png';
 
 export const ASSETS = {
-  logo: logoTransparent,
-  logoOriginal: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCSdAbxIX8CzEGwzjimeUrwJPYsoV9H5ka27VSMnOx0vMDqWCrkhJs-rJaDNNq4qqSh3CR4KGFhwmLDoh2oOv7THJ7aAlMf-jvfxAoo7B9DGuRNajB-n44BhsRTuAi6BdlwziN0F6YN-V-mIN6bpuZmR4v60lEqhRoAT4kp7rCyq4TRsJYGheDRdsBKP_pzg2tGBsgBu4npW8RvAvQDPS86EwrkvILozaRts2b9V6_R37JOZJrfASMTW7NkpVzXD6HOSg',
-  logoAlt: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBT4WXc5O0uRPof6NVgScvalqZHIGnhzA__FefDtjwuXTfuH9yyXNlcOxa5x6dNg0VqlQtp2sHnTSnSddEpFYgfc5otthpyeYo-h2WBJ2mZGZJahl7n2vNuokT2o-B6-n8rqesZLcyQRRWy8unq8yP3kLnYwNq8ztMoZ4JFvIadaO4o2CTWAcrAfPAndQDI5oQp2-FsHQAArOd0pY8BKQlV8pmPTHIFso0gzpxGqxX139DZkkB8V0ITP3DNmV2ht3fqcw',
-  logoSquare: 'https://lh3.googleusercontent.com/aida/AEtjO1W3zwTKsnyZfM-BFYxueai7dlE-Nf_v0pyj9wt2vW-Ks4onYYM4EVyIsWhkv45rMTgzHVh0d0i6dbZ0O1EflAlNvLkpWNkCoGyyfxKX_Qmh2eq1Xyvgcps5nm-6Y39Zvr82C38PBb4VIJi33wJB07ObPkZWGBl5eLj6IjbWvJnd_WKgmoFh05Tgi_SYFR8Srnm4AKlZOMldPt4M5a6_U1WnQLzjgZ8rQf2DUPRCm3YWzx84K2hnUfdkrbdT8B6F4SxRfsC2GSn3qA',
+  logo: logoTransparent || '/logo_transparent.png',
+  logoOriginal: logoTransparent || '/logo_transparent.png',
+  logoAlt: logoTransparent || '/logo_transparent.png',
+  logoSquare: logoTransparent || '/logo_transparent.png',
   studentAvatar: 'https://lh3.googleusercontent.com/aida/AEtjO1UAUp9aO-emEWz86IpIANK_B04r3G5kHHReLdccjYbf1Hsnptbqlw2QZzjU34Q8CbrRjrVZ9F4QoBqkDJTUq_H9mqDRl-HGP-g2n2yw9a3rYGQQH-nErWPuO5FmntI565U80Nt4z0CbC9PdZbpiLrZODZzRHF7InHkJO9gOoEjTZ-7IeSs32BVLLNqBNEFQbj3W_YxDG9Xa2UZuYnSRxpCRjlw6DjEVGc-VC18Y8lhFeS-bG41G8r5RFA',
   parentAvatar: 'https://lh3.googleusercontent.com/aida/AEtjO1V_seUTyWhAjk1Wgyc68lr1KzE3D-KRxqwSsuCcjjkStTh1j-ZM3X8N8Jg9YdImJSv9qZD5av2-LaYe-BqzdujPdfVzIxiMH_RnNqPa8OYgNX_sdmhcyl2GZpaX7kP6Ra5qtF_PJlQa3tsCyvcIb2FR52-pTJ7cyujpM6_uXD_ACGMs6j5ENSW-BQOmuEMT6i9asGL6dWz3iqAquyCw9-GCAhqZY0_a9_JNrByBwt-lvbTcKw70KYTMQu0Wt5mS-5NIHAQvQbrhgA',
   teacherDaniela: 'https://lh3.googleusercontent.com/aida/AEtjO1XqlvtytCnN4FfxmlPZ9qKGjaVFFqby2l87ItG0TriSiiXlGAAHVaX1MZ0hQNdIGz8NTGCsh685YfTND30zXiDmG7HGAMNkhznharxFv29I5qVnj0PTyRC-BmOpbRKb9jl08aFv41f4RuN5CLSLMM5xdAPwjFqlfO62yjQemmE1cwIOxsSwt3MjQTJLDzcA4H6Q8Bk5zLyzFuab-RTE8mw2g0KDatDJ6whZhWFH_8WFYQS8Yv-z0Bpwlg',

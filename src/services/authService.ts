@@ -875,29 +875,57 @@ export async function sendRecoveryEmailWithEmailJS(email: string, code: string):
  * - Returns a generic message to prevent email enumeration attacks.
  */
 export async function sendFirebasePasswordReset(
-  email: string,
+  emailOrDocument: string,
   lang: 'es' | 'en' = 'es'
 ): Promise<{ success: boolean; message: string }> {
-  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanInput = (emailOrDocument || '').trim();
   const isEn = lang === 'en';
 
-  // Basic email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+  if (!cleanInput) {
     throw new Error(
       isEn
-        ? 'Please enter a valid email address.'
-        : 'Por favor ingresa un correo electrónico con un formato válido.'
+        ? 'Please enter your registered identity document or institutional email.'
+        : 'Por favor ingresa tu documento de identidad registrado o correo institucional.'
     );
+  }
+
+  let cleanEmail = cleanInput.toLowerCase();
+  let documentNumber = '';
+
+  // If input does not contain '@', it's an identity document (TI/CC)
+  if (!cleanInput.includes('@')) {
+    documentNumber = cleanInput;
+    const docKey = normalizeKey(cleanInput);
+    try {
+      const regDoc = await getDoc(doc(db, 'registered_documents', docKey));
+      if (regDoc.exists() && regDoc.data().email) {
+        cleanEmail = regDoc.data().email.toLowerCase();
+      } else {
+        const cleanDigits = cleanInput.replace(/[^0-9a-zA-Z]/g, '');
+        cleanEmail = `${cleanDigits}@vallejuelos.edu.co`;
+      }
+    } catch {
+      const cleanDigits = cleanInput.replace(/[^0-9a-zA-Z]/g, '');
+      cleanEmail = `${cleanDigits}@vallejuelos.edu.co`;
+    }
+  } else {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error(
+        isEn
+          ? 'Please enter a valid email address.'
+          : 'Por favor ingresa un correo electrónico con un formato válido.'
+      );
+    }
   }
 
   // Check institutional census and database status
   const localCheck = await isUserRegisteredInDatabase(cleanEmail);
   const existsInCensus =
-    CENSUS_STUDENTS.some((s) => s.email.toLowerCase() === cleanEmail) ||
-    CENSUS_TEACHERS.some((t) => t.email.toLowerCase() === cleanEmail) ||
-    CENSUS_ADMIN_STAFF.some((a) => a.email.toLowerCase() === cleanEmail) ||
-    CENSUS_GUARDIANS.some((g) => g.email.toLowerCase() === cleanEmail);
+    CENSUS_STUDENTS.some((s) => s.documentId === cleanInput || s.email.toLowerCase() === cleanEmail) ||
+    CENSUS_TEACHERS.some((t) => t.cedula === cleanInput || t.code === cleanInput || t.email.toLowerCase() === cleanEmail) ||
+    CENSUS_ADMIN_STAFF.some((a) => a.cedula === cleanInput || a.code === cleanInput || a.email.toLowerCase() === cleanEmail) ||
+    CENSUS_GUARDIANS.some((g) => g.cedula === cleanInput || g.email.toLowerCase() === cleanEmail);
 
   try {
     // Optional ActionCodeSettings pointing back to the app URL
@@ -921,6 +949,7 @@ export async function sendFirebasePasswordReset(
     try {
       await setDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
         email: cleanEmail,
+        documentId: documentNumber || null,
         requestedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         status: 'dispatched_via_firebase',
@@ -939,15 +968,15 @@ export async function sendFirebasePasswordReset(
       if (localCheck.registered || existsInCensus) {
         throw new Error(
           isEn
-            ? `The email ${cleanEmail} is recognized in the institutional records, but an active Firebase Authentication account has not been registered yet. Please go to 'Create Account' with your institutional document to activate your access.`
-            : `El correo ${cleanEmail} está registrado en el censo institucional, pero aún no tiene una cuenta activa en Firebase Authentication. Por favor ve a 'Crear Cuenta' con tu documento oficial para activar tu acceso y contraseña.`
+            ? `The account for ${cleanInput} is recognized in institutional records, but an active Firebase Authentication account has not been registered yet. Please go to 'Create Account' with your institutional document to activate your access.`
+            : `El usuario correspondiente a ${cleanInput} está en los registros institucionales, pero aún no tiene una cuenta activa en Firebase Authentication. Por favor ve a 'Crear Cuenta' con tu documento oficial para activar tu acceso y definir tu contraseña.`
         );
       }
 
       throw new Error(
         isEn
-          ? `The email address ${cleanEmail} is not registered in the institutional census or user platform.`
-          : `El correo electrónico ${cleanEmail} no se encuentra registrado en el censo institucional ni en la plataforma.`
+          ? `The identifier ${cleanInput} is not registered in the institutional census or user platform.`
+          : `El identificador ${cleanInput} no se encuentra registrado en el censo institucional ni en la plataforma.`
       );
     }
 
@@ -1551,7 +1580,7 @@ export async function isUserRegisteredInDatabase(identifier: string): Promise<{
  * Newly registered users start with `hasConfigured: false`, meaning NO information is pre-loaded.
  */
 export async function registerNewUser(params: {
-  email: string;
+  email?: string;
   password: string;
   fullName: string;
   role: UserRole;
@@ -1572,8 +1601,15 @@ export async function registerNewUser(params: {
   roleVerificationCode?: string;
   lang?: 'es' | 'en';
 }): Promise<UserProfile> {
-  const cleanEmail = params.email.trim().toLowerCase();
   const cleanDoc = params.documentId ? params.documentId.trim() : '';
+  const cleanDigits = cleanDoc.replace(/[^0-9a-zA-Z]/g, '');
+
+  // Institutional authentication email:
+  // If an email is provided, use it; otherwise derive the canonical institutional identifier for Firebase Auth:
+  // {documentNumber}@vallejuelos.edu.co. Eliminates fake personal emails (e.g. isabella_martinez_montoya@ejemplo.edu).
+  const cleanEmail = params.email && params.email.trim()
+    ? params.email.trim().toLowerCase()
+    : `${cleanDigits || 'usuario'}@vallejuelos.edu.co`;
 
   // Map Spanish role names to normalized role
   const normalizedRole: 'student' | 'teacher' | 'family' | 'admin' = 
@@ -1805,36 +1841,80 @@ export async function registerNewUser(params: {
  * Logs in a user.
  * STRICT ENFORCEMENT: Validated strictly by registered institutional email and respective password.
  */
-export async function loginUser(emailInput: string, passwordInput?: string, lang: 'es' | 'en' = 'es'): Promise<UserProfile> {
+export async function loginUser(
+  identifierInput: string,
+  passwordInput?: string,
+  lang: 'es' | 'en' = 'es'
+): Promise<UserProfile> {
   const isEn = lang === 'en';
-  const cleanEmail = (emailInput || '').trim().toLowerCase();
-  
-  if (!cleanEmail) {
-    throw new Error(isEn ? 'Please enter your institutional email.' : 'Por favor ingresa tu correo electrónico institucional.');
-  }
+  const cleanIdentifier = (identifierInput || '').trim();
 
-  if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-    throw new Error(isEn ? 'Please enter a valid email address.' : 'Por favor ingresa un correo electrónico válido con su dominio institucional.');
+  if (!cleanIdentifier) {
+    throw new Error(
+      isEn
+        ? 'Please enter your identity document or institutional email.'
+        : 'Por favor ingresa tu documento de identidad o correo electrónico institucional.'
+    );
   }
 
   if (!passwordInput || passwordInput.trim() === '') {
-    throw new Error(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.');
+    throw new Error(
+      isEn
+        ? 'Please enter your password.'
+        : 'Por favor ingresa tu contraseña institucional.'
+    );
   }
 
-  // 1. Authenticate with Firebase Authentication first
+  // Determine target Firebase Auth email:
+  // 1. If it includes '@', use it directly.
+  // 2. If it's a document number (TI/CC), resolve from registered_documents in Firestore
+  //    or construct the canonical institutional format: {documentDigits}@vallejuelos.edu.co
+  let targetAuthEmail = cleanIdentifier.toLowerCase();
+  let cleanDoc = '';
+
+  if (!cleanIdentifier.includes('@')) {
+    cleanDoc = cleanIdentifier;
+    const docKey = normalizeKey(cleanIdentifier);
+    let resolvedEmail: string | null = null;
+
+    try {
+      const regDocSnap = await getDoc(doc(db, 'registered_documents', docKey));
+      if (regDocSnap.exists() && regDocSnap.data().email) {
+        resolvedEmail = regDocSnap.data().email;
+      }
+    } catch (e) {
+      console.debug('Error looking up registered document in Firestore:', e);
+    }
+
+    if (!resolvedEmail) {
+      const cleanDigits = cleanIdentifier.replace(/[^0-9a-zA-Z]/g, '');
+      targetAuthEmail = `${cleanDigits}@vallejuelos.edu.co`;
+    } else {
+      targetAuthEmail = resolvedEmail.toLowerCase();
+    }
+  }
+
+  // 1. Authenticate strictly with Firebase Authentication
   let authUid: string | null = null;
   let authError: any = null;
 
   try {
-    const cred = await signInWithEmailAndPassword(auth, cleanEmail, passwordInput);
+    const cred = await signInWithEmailAndPassword(auth, targetAuthEmail, passwordInput);
     if (cred.user) {
       authUid = cred.user.uid;
-      setStoredUserPassword(cleanEmail, passwordInput);
+      setStoredUserPassword(targetAuthEmail, passwordInput);
+      if (cleanDoc) {
+        setStoredUserPassword(cleanDoc, passwordInput);
+      }
     }
   } catch (err: any) {
     authError = err;
     if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-      throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifica tus datos.');
+      throw new Error(
+        isEn
+          ? 'Incorrect password. Please verify your credentials.'
+          : 'Contraseña incorrecta. Por favor verifica tus credenciales.'
+      );
     }
   }
 
@@ -1853,7 +1933,7 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
     }
 
     try {
-      const emailDoc = await getDoc(doc(db, 'registered_emails', normalizeKey(cleanEmail)));
+      const emailDoc = await getDoc(doc(db, 'registered_emails', normalizeKey(targetAuthEmail)));
       if (emailDoc.exists()) {
         const data = emailDoc.data();
         const profileDoc = await getDoc(doc(db, 'users', data.uid || authUid));
@@ -1870,24 +1950,25 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
   }
 
   // 3. Fallback for demo institutional accounts or accounts created before Auth integration
-  const status = await isUserRegisteredInDatabase(cleanEmail);
+  const status = await isUserRegisteredInDatabase(cleanIdentifier.includes('@') ? cleanIdentifier : (cleanDoc || targetAuthEmail));
   if (!status.registered || !status.profile) {
-    if (authError && authError.code === 'auth/user-not-found') {
-      throw new Error(isEn
-        ? 'The user is not registered on the platform. Please register to continue.'
-        : 'El usuario no está registrado en la plataforma. Por favor regístrate para continuar.');
-    }
-    throw new Error(isEn
-      ? 'The user is not registered on the platform. Please register to continue.'
-      : 'El usuario no está registrado en la plataforma. Por favor regístrate para continuar.');
+    throw new Error(
+      isEn
+        ? 'No active account found for this document or email. Please create your institutional account.'
+        : 'No se encontró una cuenta activa con este documento o correo. Por favor crea tu cuenta institucional.'
+    );
   }
 
+  // Verify password strictly - never allow login without valid password!
   let isPasswordValid = false;
-  const storedPassword = getStoredUserPassword(cleanEmail);
+  const storedPassword = getStoredUserPassword(targetAuthEmail) || (cleanDoc ? getStoredUserPassword(cleanDoc) : null);
   if (storedPassword && storedPassword === passwordInput) {
     isPasswordValid = true;
   }
-  if (DEFAULT_PASSWORDS[cleanEmail] && DEFAULT_PASSWORDS[cleanEmail] === passwordInput) {
+  if (DEFAULT_PASSWORDS[targetAuthEmail] && DEFAULT_PASSWORDS[targetAuthEmail] === passwordInput) {
+    isPasswordValid = true;
+  }
+  if (cleanDoc && DEFAULT_PASSWORDS[cleanDoc] && DEFAULT_PASSWORDS[cleanDoc] === passwordInput) {
     isPasswordValid = true;
   }
 
@@ -1896,7 +1977,7 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
       const res = await fetch('/api/auth/verify-login-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: passwordInput })
+        body: JSON.stringify({ email: targetAuthEmail, password: passwordInput })
       });
       if (res.ok) {
         const data = await res.json();
@@ -1906,7 +1987,11 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
   }
 
   if (!isPasswordValid) {
-    throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifica tus datos.');
+    throw new Error(
+      isEn
+        ? 'Incorrect password. Please verify your credentials.'
+        : 'Contraseña incorrecta. Por favor verifica tus credenciales.'
+    );
   }
 
   localStorage.setItem('edulink_active_session', JSON.stringify(status.profile));
