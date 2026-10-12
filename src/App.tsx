@@ -22,7 +22,11 @@ function MainApp() {
   const [isResetPasswordAction, setIsResetPasswordAction] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('action') === 'reset_password' || params.get('mode') === 'resetPassword';
+      return (
+        params.get('action') === 'reset_password' ||
+        params.get('mode') === 'resetPassword' ||
+        params.has('oobCode')
+      );
     }
     return false;
   });

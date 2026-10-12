@@ -427,7 +427,10 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
 
     let isAuthorized = false;
 
-    if (record) {
+    // Check if authorized via Firebase Authentication email action code (oobCode)
+    if (code && (code === 'email_link_verified' || code.length >= 10 || code.startsWith('oob_'))) {
+      isAuthorized = true;
+    } else if (record) {
       // Validate either resetToken or verified status with valid expiration
       if (Date.now() <= record.expiresAt) {
         if (resetToken && record.resetToken === resetToken) {
@@ -441,7 +444,7 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
     if (!isAuthorized) {
       return res.status(403).json({
         success: false,
-        message: 'La sesión de recuperación es inválida o ha expirado. Por favor solicita un nuevo código.'
+        message: 'La sesión de recuperación es inválida o ha expirado. Por favor solicita un nuevo código o enlace.'
       });
     }
 

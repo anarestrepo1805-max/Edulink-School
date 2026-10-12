@@ -1,5 +1,5 @@
 import { Subject, UpcomingAssignment, StudentGradeRecord, NewsFeedItem, ChatContact, ChatMessage, MessageThread } from '../types';
-import logoTransparent from '../assets/logo_transparent.png';
+const logoTransparent = '/src/assets/logo_transparent.png';
 
 export const ASSETS = {
   logo: logoTransparent,

@@ -21,6 +21,16 @@ import {
 import { auth, db } from '../lib/firebase';
 import { UserProfile, UserRole, Subject, UpcomingAssignment } from '../types';
 import { INITIAL_SUBJECTS, INITIAL_UPCOMING_ASSIGNMENTS } from '../data/mockData';
+import {
+  CENSUS_STUDENTS,
+  CENSUS_TEACHERS,
+  CENSUS_ADMIN_STAFF,
+  CENSUS_GUARDIANS,
+  lookupCensusStudent,
+  lookupCensusGuardian,
+  lookupCensusTeacher,
+  lookupCensusAdmin
+} from '../data/institutionalCensus';
 
 const DEMO_ACCOUNTS: Record<string, UserProfile> = {
   '1092837465': {
@@ -307,7 +317,23 @@ export const ADMIN_ASSIGNMENTS: Record<string, AdminAssignmentRecord> = {
 };
 
 // Institutional Enrolled Students Census: Document IDs and official student names
-export const ENROLLED_STUDENTS_DIRECTORY: Record<string, EnrolledStudentDirectoryRecord> = {
+export const ENROLLED_STUDENTS_DIRECTORY: Record<string, EnrolledStudentDirectoryRecord> = {};
+
+// 1. Populate all 180 official students from CENSUS_STUDENTS
+CENSUS_STUDENTS.forEach((s) => {
+  const gradeFormatted = s.group.includes('°') ? s.group : s.group.replace('-', '°');
+  ENROLLED_STUDENTS_DIRECTORY[s.documentId] = {
+    documentId: s.documentId,
+    fullName: s.fullName,
+    gradeLevel: gradeFormatted,
+    studentCode: s.documentId,
+    shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+    email: s.email
+  };
+});
+
+// 2. Retain historical records for backwards compatibility with existing links
+const HISTORICAL_STUDENTS: Record<string, EnrolledStudentDirectoryRecord> = {
   '1092837465': {
     documentId: '1092837465',
     fullName: 'Miguel Ángel Jiménez',
@@ -413,6 +439,7 @@ export const ENROLLED_STUDENTS_DIRECTORY: Record<string, EnrolledStudentDirector
     email: 'laura.rua@edulink.edu.co'
   }
 };
+Object.assign(ENROLLED_STUDENTS_DIRECTORY, HISTORICAL_STUDENTS);
 
 export const AUTHORIZED_ROLE_CODES: Record<string, AuthorizedRoleRecord> = {
   ...Object.fromEntries(
@@ -426,58 +453,38 @@ export const AUTHORIZED_ROLE_CODES: Record<string, AuthorizedRoleRecord> = {
       k,
       { code: v.code, role: 'admin', description: v.description, department: v.department, active: true }
     ])
+  ),
+  ...Object.fromEntries(
+    CENSUS_TEACHERS.map((t) => [
+      t.code,
+      { code: t.code, role: 'teacher', description: `Docente de ${t.area} (${t.grades}) - ${t.fullName}`, department: t.area, active: true }
+    ])
+  ),
+  ...Object.fromEntries(
+    CENSUS_TEACHERS.map((t) => [
+      t.cedula,
+      { code: t.code, role: 'teacher', description: `Docente de ${t.area} (${t.grades}) - ${t.fullName}`, department: t.area, active: true }
+    ])
+  ),
+  ...Object.fromEntries(
+    CENSUS_ADMIN_STAFF.map((a) => [
+      a.code,
+      { code: a.code, role: 'admin', description: `${a.cargo} - ${a.dependencia} (${a.fullName})`, department: a.dependencia, active: true }
+    ])
+  ),
+  ...Object.fromEntries(
+    CENSUS_ADMIN_STAFF.map((a) => [
+      a.cedula,
+      { code: a.code, role: 'admin', description: `${a.cargo} - ${a.dependencia} (${a.fullName})`, department: a.dependencia, active: true }
+    ])
   )
 };
 
-// Seed the demo accounts into Firestore once so the database holds real registered records
-let isSeeded = false;
-async function seedDemoUsersIfNeeded() {
-  if (isSeeded) return;
+// Seed only pre-authorized institutional verification codes into Firestore if needed (never creates unverified demo users)
+let isCodesSeeded = false;
+async function seedInstitutionalCodesIfNeeded() {
+  if (isCodesSeeded) return;
   try {
-    // 1. Seed demo accounts
-    for (const [identifier, profile] of Object.entries(DEMO_ACCOUNTS)) {
-      const emailKey = normalizeKey(profile.email);
-      const regDocRef = doc(db, 'registered_emails', emailKey);
-      const userDocRef = doc(db, 'users', profile.id);
-
-      // Check if exists
-      const existing = await getDoc(regDocRef);
-      if (!existing.exists()) {
-        await setDoc(regDocRef, {
-          email: profile.email,
-          identifier: identifier,
-          documentId: profile.documentId || '',
-          uid: profile.id,
-          fullName: profile.fullName,
-          role: profile.role,
-          hasConfigured: profile.hasConfigured,
-          registeredAt: profile.createdAt
-        });
-      }
-
-      if (profile.documentId) {
-        const docKey = normalizeKey(profile.documentId);
-        const regDocNumRef = doc(db, 'registered_documents', docKey);
-        const existingDocNum = await getDoc(regDocNumRef);
-        if (!existingDocNum.exists()) {
-          await setDoc(regDocNumRef, {
-            documentId: profile.documentId,
-            email: profile.email,
-            uid: profile.id,
-            fullName: profile.fullName,
-            role: profile.role,
-            registeredAt: profile.createdAt
-          });
-        }
-      }
-
-      const existingUser = await getDoc(userDocRef);
-      if (!existingUser.exists()) {
-        await setDoc(userDocRef, profile);
-      }
-    }
-
-    // 2. Seed pre-authorized institutional verification codes into Firestore
     for (const [codeKey, authRecord] of Object.entries(AUTHORIZED_ROLE_CODES)) {
       const normalizedCode = normalizeKey(codeKey);
       const authDocRef = doc(db, 'authorized_roles', normalizedCode);
@@ -493,38 +500,48 @@ async function seedDemoUsersIfNeeded() {
         });
       }
     }
-
-    isSeeded = true;
+    isCodesSeeded = true;
   } catch (err) {
-    // Non-blocking catch for offline/sandbox mode
-    console.debug('Database seed check:', err);
+    console.debug('Institutional codes check notice:', err);
   }
 }
 
-// Ensure demo accounts are verified in DB on startup
-seedDemoUsersIfNeeded();
+seedInstitutionalCodesIfNeeded();
 
 /**
- * Looks up an enrolled student in the institutional census by document ID or student code.
- * Used when a family member / guardian enters their student's ID so their name is auto-filled.
+ * Looks up an enrolled student in the institutional census by document ID, student code or email.
  */
 export async function lookupEnrolledStudent(documentOrCode: string): Promise<EnrolledStudentDirectoryRecord | null> {
   const clean = documentOrCode.trim();
   if (!clean) return null;
 
-  // 1. Check official enrolled students census
+  // 1. Direct census lookup from institutionalCensus module
+  const censusDirect = lookupCensusStudent(clean);
+  if (censusDirect) {
+    const gradeFormatted = censusDirect.group.includes('°') ? censusDirect.group : censusDirect.group.replace('-', '°');
+    return {
+      documentId: censusDirect.documentId,
+      fullName: censusDirect.fullName,
+      gradeLevel: gradeFormatted,
+      studentCode: censusDirect.documentId,
+      shift: 'Jornada Mañana (6:15 AM - 12:15 PM)',
+      email: censusDirect.email
+    };
+  }
+
+  // 2. Check official enrolled students census dictionary
   if (ENROLLED_STUDENTS_DIRECTORY[clean]) {
     return ENROLLED_STUDENTS_DIRECTORY[clean];
   }
 
-  // 2. Check by student code in census
+  // 3. Check by student code or documentId in census dictionary
   for (const item of Object.values(ENROLLED_STUDENTS_DIRECTORY)) {
-    if (item.studentCode.toLowerCase() === clean.toLowerCase()) {
+    if (item.studentCode.toLowerCase() === clean.toLowerCase() || item.documentId === clean) {
       return item;
     }
   }
 
-  // 3. Check demo student accounts
+  // 4. Check demo student accounts
   if (DEMO_ACCOUNTS[clean] && DEMO_ACCOUNTS[clean].role === 'student') {
     const s = DEMO_ACCOUNTS[clean];
     return {
@@ -537,7 +554,7 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
     };
   }
 
-  // 4. Check Firestore registered_documents
+  // 5. Check Firestore registered_documents
   try {
     const docKey = normalizeKey(clean);
     const docSnap = await getDoc(doc(db, 'registered_documents', docKey));
@@ -558,7 +575,7 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
     console.debug('Firestore student lookup error:', e);
   }
 
-  // 5. Check local registered users in localStorage
+  // 6. Check local registered users in localStorage
   try {
     const stored = localStorage.getItem('edulink_registered_users');
     if (stored) {
@@ -582,7 +599,7 @@ export async function lookupEnrolledStudent(documentOrCode: string): Promise<Enr
 }
 
 /**
- * Validates and retrieves teacher assignment based on their unique linking code.
+ * Validates and retrieves teacher assignment based on their unique linking code or cédula.
  * Ensures the code is UNIQUE AND NON-REPEATABLE (ÚNICO E IRREPETIBLE).
  */
 export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
@@ -593,21 +610,38 @@ export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
 }> {
   const code = codeRaw.trim().toUpperCase();
   if (!code) {
-    return { valid: false, claimed: false, message: 'Ingresa el código de vinculación docente.' };
+    return { valid: false, claimed: false, message: 'Ingresa el código o cédula de vinculación docente.' };
   }
 
-  const assignment = TEACHER_ASSIGNMENTS[code];
+  // 1. Check TEACHER_ASSIGNMENTS (e.g. DOC-VALLE-2026, DOC-TEC-8421, etc.)
+  let assignment = TEACHER_ASSIGNMENTS[code];
+
+  // 2. Check CENSUS_TEACHERS (e.g. 001..015 or CC 70013115)
+  if (!assignment) {
+    const censusT = lookupCensusTeacher(codeRaw.trim());
+    if (censusT) {
+      assignment = {
+        code: censusT.code,
+        subjectArea: censusT.area,
+        assignedGrades: censusT.grades.replace(/-/g, '°'),
+        description: `Docente de ${censusT.area} (${censusT.grades}) - ${censusT.fullName}`
+      };
+    }
+  }
+
   if (!assignment) {
     return {
       valid: false,
       claimed: false,
-      message: 'Código de vinculación docente no encontrado en la base de datos institucional.'
+      message: 'Código de vinculación docente o cédula no encontrado en la base de datos institucional.'
     };
   }
 
-  // Check if already claimed in Firestore
+  const lookupCode = assignment.code;
+
+  // Check if claimed in Firestore used_role_codes
   try {
-    const claimDoc = await getDoc(doc(db, 'used_role_codes', code));
+    const claimDoc = await getDoc(doc(db, 'used_role_codes', lookupCode));
     if (claimDoc.exists()) {
       return {
         valid: true,
@@ -625,7 +659,7 @@ export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
     const claimedStr = localStorage.getItem('edulink_claimed_role_codes');
     if (claimedStr) {
       const claimedList = JSON.parse(claimedStr);
-      if (claimedList.includes(code)) {
+      if (claimedList.includes(lookupCode) || claimedList.includes(code)) {
         return {
           valid: true,
           claimed: true,
@@ -636,21 +670,18 @@ export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
     }
   } catch {}
 
-  // Check if any existing registered user has this code
+  // Check if any existing registered user in Firestore has this code
   try {
-    const storedUsers = localStorage.getItem('edulink_registered_users');
-    if (storedUsers) {
-      const usersObj = JSON.parse(storedUsers);
-      for (const u of Object.values(usersObj) as any[]) {
-        if (u.role === 'teacher' && u.roleVerificationCode === code) {
-          return {
-            valid: true,
-            claimed: true,
-            assignment,
-            message: 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
-          };
-        }
-      }
+    const usersRef = collection(db, 'users');
+    const qTeacher = query(usersRef, where('roleVerificationCode', '==', lookupCode));
+    const snap = await getDocs(qTeacher);
+    if (!snap.empty) {
+      return {
+        valid: true,
+        claimed: true,
+        assignment,
+        message: 'Este código de vinculación docente ya fue utilizado y registrado previamente por otro docente. Cada código es único e irrepetible.'
+      };
     }
   } catch {}
 
@@ -662,7 +693,7 @@ export async function getTeacherAssignmentByCode(codeRaw: string): Promise<{
 }
 
 /**
- * Validates and retrieves administrative cargo/position based on their unique authorization code.
+ * Validates and retrieves administrative cargo/position based on their unique authorization code or cédula.
  * Ensures the code is UNIQUE AND NON-REPEATABLE (ÚNICO E IRREPETIBLE).
  */
 export async function getAdminAssignmentByCode(codeRaw: string): Promise<{
@@ -673,21 +704,38 @@ export async function getAdminAssignmentByCode(codeRaw: string): Promise<{
 }> {
   const code = codeRaw.trim().toUpperCase();
   if (!code) {
-    return { valid: false, claimed: false, message: 'Ingresa el código de verificación directiva.' };
+    return { valid: false, claimed: false, message: 'Ingresa el código o cédula de verificación directiva.' };
   }
 
-  const assignment = ADMIN_ASSIGNMENTS[code];
+  // 1. Check ADMIN_ASSIGNMENTS (e.g. ADM-DIR-2026-VALLE, etc.)
+  let assignment = ADMIN_ASSIGNMENTS[code];
+
+  // 2. Check CENSUS_ADMIN_STAFF (e.g. ADM-001..ADM-008 or CC 92401715)
+  if (!assignment) {
+    const censusA = lookupCensusAdmin(codeRaw.trim());
+    if (censusA) {
+      assignment = {
+        code: censusA.code,
+        position: censusA.cargo,
+        department: censusA.dependencia,
+        description: `${censusA.cargo} - ${censusA.dependencia} (${censusA.fullName})`
+      };
+    }
+  }
+
   if (!assignment) {
     return {
       valid: false,
       claimed: false,
-      message: 'Código de autorización directiva no válido en la base de datos institucional.'
+      message: 'Código de autorización directiva o cédula no válido en la base de datos institucional.'
     };
   }
 
+  const lookupCode = assignment.code;
+
   // Check if already claimed in Firestore
   try {
-    const claimDoc = await getDoc(doc(db, 'used_role_codes', code));
+    const claimDoc = await getDoc(doc(db, 'used_role_codes', lookupCode));
     if (claimDoc.exists()) {
       return {
         valid: true,
@@ -705,7 +753,7 @@ export async function getAdminAssignmentByCode(codeRaw: string): Promise<{
     const claimedStr = localStorage.getItem('edulink_claimed_role_codes');
     if (claimedStr) {
       const claimedList = JSON.parse(claimedStr);
-      if (claimedList.includes(code)) {
+      if (claimedList.includes(lookupCode) || claimedList.includes(code)) {
         return {
           valid: true,
           claimed: true,
@@ -716,21 +764,18 @@ export async function getAdminAssignmentByCode(codeRaw: string): Promise<{
     }
   } catch {}
 
-  // Check if any existing registered user has this code
+  // Check if any existing registered user in Firestore has this code
   try {
-    const storedUsers = localStorage.getItem('edulink_registered_users');
-    if (storedUsers) {
-      const usersObj = JSON.parse(storedUsers);
-      for (const u of Object.values(usersObj) as any[]) {
-        if (u.role === 'admin' && u.roleVerificationCode === code) {
-          return {
-            valid: true,
-            claimed: true,
-            assignment,
-            message: 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
-          };
-        }
-      }
+    const usersRef = collection(db, 'users');
+    const qAdmin = query(usersRef, where('roleVerificationCode', '==', lookupCode));
+    const snap = await getDocs(qAdmin);
+    if (!snap.empty) {
+      return {
+        valid: true,
+        claimed: true,
+        assignment,
+        message: 'Este código de autorización directiva ya fue utilizado y asignado a otro funcionario. Cada cargo tiene un código único e intransferible.'
+      };
     }
   } catch {}
 
@@ -846,6 +891,14 @@ export async function sendFirebasePasswordReset(
     );
   }
 
+  // Check institutional census and database status
+  const localCheck = await isUserRegisteredInDatabase(cleanEmail);
+  const existsInCensus =
+    CENSUS_STUDENTS.some((s) => s.email.toLowerCase() === cleanEmail) ||
+    CENSUS_TEACHERS.some((t) => t.email.toLowerCase() === cleanEmail) ||
+    CENSUS_ADMIN_STAFF.some((a) => a.email.toLowerCase() === cleanEmail) ||
+    CENSUS_GUARDIANS.some((g) => g.email.toLowerCase() === cleanEmail);
+
   try {
     // Optional ActionCodeSettings pointing back to the app URL
     const actionCodeSettings = typeof window !== 'undefined' ? {
@@ -864,21 +917,38 @@ export async function sendFirebasePasswordReset(
       await sendPasswordResetEmail(auth, cleanEmail);
     }
 
+    // Record reset attempt in Firestore password_resets collection
+    try {
+      await setDoc(doc(db, 'password_resets', normalizeKey(cleanEmail)), {
+        email: cleanEmail,
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        status: 'dispatched_via_firebase',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch {}
+
     return {
       success: true,
       message: isEn
-        ? 'If this email address is registered on the platform, you will receive an official Firebase email shortly with instructions to reset your password. Please check your inbox and spam folder.'
-        : 'Si este correo electrónico está registrado en la plataforma, recibirás en breve un mensaje con el enlace oficial de Firebase para restablecer tu contraseña. Por favor revisa tu bandeja de entrada y la carpeta de spam.'
+        ? `We have dispatched an official Firebase password reset link directly to ${cleanEmail}. Please check your inbox and spam folder.`
+        : `Hemos enviado el enlace oficial de restablecimiento de Firebase directamente a ${cleanEmail}. Por favor revisa tu bandeja de entrada y la carpeta de spam.`
     };
   } catch (err: any) {
-    // Anti-enumeration: if user not found, treat as generic success
     if (err?.code === 'auth/user-not-found') {
-      return {
-        success: true,
-        message: isEn
-          ? 'If this email address is registered on the platform, you will receive an official Firebase email shortly with instructions to reset your password. Please check your inbox and spam folder.'
-          : 'Si este correo electrónico está registrado en la plataforma, recibirás en breve un mensaje con el enlace oficial de Firebase para restablecer tu contraseña. Por favor revisa tu bandeja de entrada y la carpeta de spam.'
-      };
+      if (localCheck.registered || existsInCensus) {
+        throw new Error(
+          isEn
+            ? `The email ${cleanEmail} is recognized in the institutional records, but an active Firebase Authentication account has not been registered yet. Please go to 'Create Account' with your institutional document to activate your access.`
+            : `El correo ${cleanEmail} está registrado en el censo institucional, pero aún no tiene una cuenta activa en Firebase Authentication. Por favor ve a 'Crear Cuenta' con tu documento oficial para activar tu acceso y contraseña.`
+        );
+      }
+
+      throw new Error(
+        isEn
+          ? `The email address ${cleanEmail} is not registered in the institutional census or user platform.`
+          : `El correo electrónico ${cleanEmail} no se encuentra registrado en el censo institucional ni en la plataforma.`
+      );
     }
 
     if (err?.code === 'auth/invalid-email') {
@@ -902,9 +972,10 @@ export async function sendFirebasePasswordReset(
     }
 
     throw new Error(
-      isEn
+      err?.message ||
+      (isEn
         ? 'An error occurred while sending the recovery email. Please try again later.'
-        : 'Ocurrió un error al enviar el correo de recuperación. Por favor intenta más tarde.'
+        : 'Ocurrió un error al enviar el correo de recuperación. Por favor intenta más tarde.')
     );
   }
 }
@@ -1231,16 +1302,40 @@ export async function validateRoleAuthorization(params: {
   representedStudentCode?: string;
   lang?: 'es' | 'en';
 }): Promise<{ valid: boolean; message?: string }> {
-  const { role, verificationCode, representedStudentCode, lang = 'es' } = params;
+  const { role, verificationCode, documentId, representedStudentCode, lang = 'es' } = params;
   const isEn = lang === 'en';
 
+  if (role === 'student') {
+    const docToValidate = (documentId || verificationCode || '').trim();
+    if (!docToValidate) {
+      return {
+        valid: false,
+        message: isEn
+          ? 'Student ID document is required for registration.'
+          : 'Se requiere el número de documento de identidad del estudiante para el registro.'
+      };
+    }
+
+    const censusStudent = await lookupEnrolledStudent(docToValidate);
+    if (!censusStudent) {
+      return {
+        valid: false,
+        message: isEn
+          ? 'Document not found in the official institutional enrollment census of I.E. Vallejuelos. Please verify your ID number.'
+          : 'El documento no se encuentra en el censo oficial de matrículas de la I.E. Vallejuelos. Debes ingresar un documento válido.'
+      };
+    }
+
+    return { valid: true };
+  }
+
   if (role === 'teacher') {
-    const code = verificationCode?.trim().toUpperCase();
+    const code = (verificationCode || documentId || '').trim().toUpperCase();
     if (!code) {
       return {
         valid: false,
         message: isEn
-          ? 'Teacher Linking Code is required to register as faculty.'
+          ? 'Teacher Linking Code or ID is required to register as faculty.'
           : 'Se requiere el Código de Vinculación Docente para registrarse como docente.'
       };
     }
@@ -1266,7 +1361,7 @@ export async function validateRoleAuthorization(params: {
   }
 
   if (role === 'admin') {
-    const code = verificationCode?.trim().toUpperCase();
+    const code = (verificationCode || documentId || '').trim().toUpperCase();
     if (!code) {
       return {
         valid: false,
@@ -1320,7 +1415,6 @@ export async function validateRoleAuthorization(params: {
     };
   }
 
-  // Student role: valid by default for student registration
   return { valid: true };
 }
 
@@ -1487,7 +1581,14 @@ export async function registerNewUser(params: {
     params.role === 'docente' || params.role === 'teacher' ? 'teacher' :
     params.role === 'admin' || params.role === 'administrativo' ? 'admin' : 'family';
 
-  // STRICT ROLE AUTHORIZATION CHECK:
+  // 1. Password validation
+  if (!params.password || params.password.length < 8) {
+    throw new Error(params.lang === 'en'
+      ? 'Password must be at least 8 characters long.'
+      : 'La contraseña debe tener un mínimo de 8 caracteres.');
+  }
+
+  // 2. STRICT ROLE AUTHORIZATION CHECK:
   // Validate that user has legitimate institutional authority to register for this role
   const roleAuthCheck = await validateRoleAuthorization({
     role: normalizedRole,
@@ -1501,7 +1602,7 @@ export async function registerNewUser(params: {
     throw new Error(roleAuthCheck.message || 'No estás autorizado para registrarte con este rol institucional.');
   }
   
-  // Verify if already registered by email
+  // 3. Verify if already registered by email in Firestore
   const checkEmail = await isUserRegisteredInDatabase(cleanEmail);
   if (checkEmail.registered) {
     throw new Error(params.lang === 'en'
@@ -1509,7 +1610,7 @@ export async function registerNewUser(params: {
       : 'El usuario ya se encuentra registrado con este correo.');
   }
 
-  // Verify if already registered by identity document number
+  // 4. Verify if already registered by identity document number in Firestore
   if (cleanDoc) {
     const checkDoc = await isUserRegisteredInDatabase(cleanDoc);
     if (checkDoc.registered) {
@@ -1519,70 +1620,104 @@ export async function registerNewUser(params: {
     }
   }
 
-  let uid = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-  // Try Firebase Auth
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, cleanEmail, params.password);
-    if (cred.user) {
-      uid = cred.user.uid;
-    }
-  } catch (authErr: any) {
-    // If Firebase auth fails because of existing account or network, handle gracefully
-    if (authErr.code === 'auth/email-already-in-use') {
-      throw new Error(params.lang === 'en'
-        ? 'This email address is already in use.'
-        : 'Este correo electrónico ya está registrado en la plataforma.');
-    }
-    console.debug('Firebase Auth notice, proceeding with record creation:', authErr.message);
-  }
-
+  // 5. AUTO-ASSIGN & LOCK INSTITUTIONAL VALUES ACCORDING TO OFFICIAL CENSUS RECORDS
+  let finalFullName = params.fullName.trim();
+  let autoGradeLevel = params.gradeLevel?.trim() || '';
+  let autoShift = params.shift?.trim() || 'Jornada Mañana (6:15 AM - 12:15 PM)';
+  let autoStudentCode = params.studentCode?.trim() || cleanDoc;
   let autoSubjectArea = params.subjectArea?.trim() || '';
   let autoAssignedGrades = params.assignedGrades?.trim() || '';
-  let autoAdminPosition = params.adminPosition?.trim() || (normalizedRole === 'admin' ? 'Coordinación' : '');
+  let autoAdminPosition = params.adminPosition?.trim() || '';
   let autoDepartment = params.department?.trim() || '';
   let autoRepresentedStudentName = params.representedStudentName?.trim() || '';
+  let verifiedCode = params.roleVerificationCode?.trim().toUpperCase() || '';
 
-  // Auto-assign institutional teacher assignment according to unique code
-  if (normalizedRole === 'teacher' && params.roleVerificationCode) {
-    const teacherCheck = await getTeacherAssignmentByCode(params.roleVerificationCode);
+  if (normalizedRole === 'student') {
+    const censusRecord = await lookupEnrolledStudent(cleanDoc);
+    if (censusRecord) {
+      finalFullName = censusRecord.fullName;
+      autoGradeLevel = censusRecord.gradeLevel;
+      autoShift = censusRecord.shift || 'Jornada Mañana (6:15 AM - 12:15 PM)';
+      autoStudentCode = censusRecord.studentCode || cleanDoc;
+    }
+  } else if (normalizedRole === 'teacher') {
+    const codeToLookup = verifiedCode || cleanDoc;
+    const teacherCheck = await getTeacherAssignmentByCode(codeToLookup);
     if (teacherCheck.valid && teacherCheck.assignment) {
       autoSubjectArea = teacherCheck.assignment.subjectArea;
       autoAssignedGrades = teacherCheck.assignment.assignedGrades;
+      verifiedCode = teacherCheck.assignment.code;
     }
-  }
-
-  // Auto-assign administrative cargo according to unique code
-  if (normalizedRole === 'admin' && params.roleVerificationCode) {
-    const adminCheck = await getAdminAssignmentByCode(params.roleVerificationCode);
+  } else if (normalizedRole === 'admin') {
+    const codeToLookup = verifiedCode || cleanDoc;
+    const adminCheck = await getAdminAssignmentByCode(codeToLookup);
     if (adminCheck.valid && adminCheck.assignment) {
       autoAdminPosition = adminCheck.assignment.position;
       autoDepartment = adminCheck.assignment.department;
+      verifiedCode = adminCheck.assignment.code;
+    }
+  } else if (normalizedRole === 'family') {
+    if (params.representedStudentCode) {
+      const studentRecord = await lookupEnrolledStudent(params.representedStudentCode);
+      if (studentRecord) {
+        autoRepresentedStudentName = studentRecord.fullName;
+      }
     }
   }
 
-  // Auto-assign represented student name from census
-  if (normalizedRole === 'family' && params.representedStudentCode) {
-    const studentRecord = await lookupEnrolledStudent(params.representedStudentCode);
-    if (studentRecord) {
-      autoRepresentedStudentName = studentRecord.fullName;
+  // 6. CREATE REAL FIREBASE AUTHENTICATION USER ACCOUNT
+  // Rule 1: A count is ONLY considered created when Firebase Authentication confirms it!
+  // No fake UIDs, no silent error catches.
+  let authUserUid: string;
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, cleanEmail, params.password);
+    if (!cred.user || !cred.user.uid) {
+      throw new Error(params.lang === 'en'
+        ? 'Firebase Authentication failed to return a valid user identity.'
+        : 'Firebase Authentication no confirmó la creación de la identidad del usuario.');
     }
+    authUserUid = cred.user.uid;
+  } catch (authErr: any) {
+    if (authErr.code === 'auth/email-already-in-use') {
+      throw new Error(params.lang === 'en'
+        ? 'This email address is already registered in Firebase Authentication. Please sign in or reset your password.'
+        : 'Este correo electrónico ya se encuentra registrado en Firebase Authentication. Por favor inicia sesión o recupera tu contraseña.');
+    } else if (authErr.code === 'auth/operation-not-allowed') {
+      throw new Error(params.lang === 'en'
+        ? 'Email/Password sign-in provider is disabled in Firebase Authentication. Please enable it in Firebase Console > Authentication > Sign-in method.'
+        : 'El proveedor de inicio de sesión por Correo/Contraseña está deshabilitado en Firebase Console. Por favor actívalo en Firebase Console > Authentication > Sign-in method.');
+    } else if (authErr.code === 'auth/weak-password') {
+      throw new Error(params.lang === 'en'
+        ? 'The password is too weak for Firebase Authentication security policies.'
+        : 'La contraseña es demasiado débil para las políticas de seguridad de Firebase Authentication.');
+    } else if (authErr.code === 'auth/invalid-email') {
+      throw new Error(params.lang === 'en'
+        ? 'The institutional email format is invalid.'
+        : 'El formato del correo electrónico institucional no es válido.');
+    } else if (authErr.code === 'auth/network-request-failed') {
+      throw new Error(params.lang === 'en'
+        ? 'Connection error to Firebase Authentication. Please check your internet connection.'
+        : 'Error de conexión con Firebase Authentication. Verifica tu conexión a internet.');
+    }
+    throw new Error(authErr.message || (params.lang === 'en'
+      ? 'Error creating user account in Firebase Authentication.'
+      : 'Error al crear la cuenta de usuario en Firebase Authentication.'));
   }
 
-  // Create initial profile
+  // 7. BUILD USER PROFILE WITH REAL AUTH UID
   const newProfile: UserProfile = {
-    id: uid,
+    id: authUserUid,
     email: cleanEmail,
-    fullName: params.fullName.trim(),
+    fullName: finalFullName,
     role: normalizedRole,
     documentId: cleanDoc,
-    roleVerificationCode: params.roleVerificationCode?.trim().toUpperCase() || '',
+    roleVerificationCode: verifiedCode,
     createdAt: new Date().toISOString(),
-    hasConfigured: false, // starts unconfigured/empty
+    hasConfigured: false,
     institution: params.institution || 'Institución Educativa Vallejuelos',
-    gradeLevel: params.gradeLevel?.trim() || '',
-    studentCode: params.studentCode?.trim() || cleanDoc,
-    shift: params.shift?.trim() || '',
+    gradeLevel: autoGradeLevel,
+    studentCode: autoStudentCode,
+    shift: autoShift,
     subjectArea: autoSubjectArea,
     employeeId: params.employeeId?.trim() || cleanDoc,
     assignedGrades: autoAssignedGrades,
@@ -1597,13 +1732,13 @@ export async function registerNewUser(params: {
     students: []
   };
 
-  // Save to Firestore
+  // 8. SAVE USER PROFILE TO FIRESTORE LINKED TO AUTH UID
   try {
     const emailKey = normalizeKey(cleanEmail);
     await setDoc(doc(db, 'registered_emails', emailKey), {
       email: cleanEmail,
       documentId: cleanDoc,
-      uid: uid,
+      uid: authUserUid,
       fullName: newProfile.fullName,
       role: newProfile.role,
       hasConfigured: false,
@@ -1615,7 +1750,7 @@ export async function registerNewUser(params: {
       await setDoc(doc(db, 'registered_documents', docKey), {
         documentId: cleanDoc,
         email: cleanEmail,
-        uid: uid,
+        uid: authUserUid,
         fullName: newProfile.fullName,
         role: newProfile.role,
         registeredAt: newProfile.createdAt
@@ -1625,7 +1760,7 @@ export async function registerNewUser(params: {
         await setDoc(doc(db, 'registered_documents', normalizeKey(cleanDigits)), {
           documentId: cleanDoc,
           email: cleanEmail,
-          uid: uid,
+          uid: authUserUid,
           fullName: newProfile.fullName,
           role: newProfile.role,
           registeredAt: newProfile.createdAt
@@ -1633,20 +1768,22 @@ export async function registerNewUser(params: {
       }
     }
 
-    await setDoc(doc(db, 'users', uid), newProfile);
-  } catch (fsErr) {
-    console.warn('Firestore write warning:', fsErr);
+    await setDoc(doc(db, 'users', authUserUid), newProfile);
+  } catch (fsErr: any) {
+    console.error('Firestore save error:', fsErr);
+    throw new Error(params.lang === 'en'
+      ? `Account authenticated in Firebase Auth, but failed saving profile to Firestore: ${fsErr.message}`
+      : `Cuenta autenticada en Firebase Auth, pero ocurrió un error guardando el perfil en Firestore: ${fsErr.message}`);
   }
 
-  // Save password in local store and user credentials
+  // 9. Save password in local storage cache for offline / fast fallback
   setStoredUserPassword(cleanEmail, params.password);
 
-  // Also save to localStorage fallback so user is always recognized in this client
   try {
     const localAccountsStr = localStorage.getItem('edulink_registered_users');
     const localAccounts: Record<string, UserProfile> = localAccountsStr ? JSON.parse(localAccountsStr) : {};
     localAccounts[cleanEmail] = newProfile;
-    localAccounts[uid] = newProfile;
+    localAccounts[authUserUid] = newProfile;
     if (cleanDoc) {
       localAccounts[cleanDoc] = newProfile;
       const cleanDigits = cleanDoc.replace(/[^0-9a-zA-Z]/g, '');
@@ -1654,13 +1791,11 @@ export async function registerNewUser(params: {
     }
     localStorage.setItem('edulink_registered_users', JSON.stringify(localAccounts));
     localStorage.setItem('edulink_active_session', JSON.stringify(newProfile));
-  } catch {
-    // Ignore storage issues
-  }
+  } catch {}
 
-  // Mark institutional code as claimed so it cannot be used again (ÚNICO E IRREPETIBLE)
-  if (params.roleVerificationCode && (normalizedRole === 'teacher' || normalizedRole === 'admin')) {
-    await markRoleCodeAsClaimed(params.roleVerificationCode, cleanEmail, normalizedRole);
+  // 10. Mark institutional code as claimed
+  if (verifiedCode && (normalizedRole === 'teacher' || normalizedRole === 'admin')) {
+    await markRoleCodeAsClaimed(verifiedCode, cleanEmail, normalizedRole);
   }
 
   return newProfile;
@@ -1669,7 +1804,6 @@ export async function registerNewUser(params: {
 /**
  * Logs in a user.
  * STRICT ENFORCEMENT: Validated strictly by registered institutional email and respective password.
- * "VERIFICACIÓN DE ACCESO: El inicio de sesión debe ser validado por correo y contraseña. Es decir, el correo con su respectiva contraseña."
  */
 export async function loginUser(emailInput: string, passwordInput?: string, lang: 'es' | 'en' = 'es'): Promise<UserProfile> {
   const isEn = lang === 'en';
@@ -1687,66 +1821,95 @@ export async function loginUser(emailInput: string, passwordInput?: string, lang
     throw new Error(isEn ? 'Please enter your password.' : 'Por favor ingresa tu contraseña institucional.');
   }
 
-  // 1. Verify if user is registered in the database by email
+  // 1. Authenticate with Firebase Authentication first
+  let authUid: string | null = null;
+  let authError: any = null;
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, cleanEmail, passwordInput);
+    if (cred.user) {
+      authUid = cred.user.uid;
+      setStoredUserPassword(cleanEmail, passwordInput);
+    }
+  } catch (err: any) {
+    authError = err;
+    if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifica tus datos.');
+    }
+  }
+
+  // 2. If Firebase Auth returned real UID, fetch and return the Firestore user profile
+  if (authUid) {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', authUid));
+      if (userDoc.exists()) {
+        const profile = userDoc.data() as UserProfile;
+        const completeProfile = { ...profile, id: authUid };
+        localStorage.setItem('edulink_active_session', JSON.stringify(completeProfile));
+        return completeProfile;
+      }
+    } catch (e) {
+      console.warn('Error fetching Firestore user by UID:', e);
+    }
+
+    try {
+      const emailDoc = await getDoc(doc(db, 'registered_emails', normalizeKey(cleanEmail)));
+      if (emailDoc.exists()) {
+        const data = emailDoc.data();
+        const profileDoc = await getDoc(doc(db, 'users', data.uid || authUid));
+        if (profileDoc.exists()) {
+          const profile = profileDoc.data() as UserProfile;
+          const completeProfile = { ...profile, id: authUid };
+          localStorage.setItem('edulink_active_session', JSON.stringify(completeProfile));
+          return completeProfile;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching Firestore user by email doc:', e);
+    }
+  }
+
+  // 3. Fallback for demo institutional accounts or accounts created before Auth integration
   const status = await isUserRegisteredInDatabase(cleanEmail);
   if (!status.registered || !status.profile) {
-    // STRICT REQUIREMENT: If not registered, throw clear error
+    if (authError && authError.code === 'auth/user-not-found') {
+      throw new Error(isEn
+        ? 'The user is not registered on the platform. Please register to continue.'
+        : 'El usuario no está registrado en la plataforma. Por favor regístrate para continuar.');
+    }
     throw new Error(isEn
       ? 'The user is not registered on the platform. Please register to continue.'
-      : 'El usuario no está registrado en la plataforma. Por favor regístrese para continuar.');
+      : 'El usuario no está registrado en la plataforma. Por favor regístrate para continuar.');
   }
 
-  // 2. Validate user password
   let isPasswordValid = false;
-
-  // 2.1 Check via backend PBKDF2 hash verification
-  try {
-    const res = await fetch('/api/auth/verify-login-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, password: passwordInput })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.valid) {
-        isPasswordValid = true;
-      }
-    }
-  } catch {}
-
-  // 2.2 Local and demo accounts fallback
-  if (!isPasswordValid) {
-    const storedPassword = getStoredUserPassword(cleanEmail);
-    if (storedPassword && storedPassword === passwordInput) {
-      isPasswordValid = true;
-    }
+  const storedPassword = getStoredUserPassword(cleanEmail);
+  if (storedPassword && storedPassword === passwordInput) {
+    isPasswordValid = true;
+  }
+  if (DEFAULT_PASSWORDS[cleanEmail] && DEFAULT_PASSWORDS[cleanEmail] === passwordInput) {
+    isPasswordValid = true;
   }
 
-  // Also verify via Firebase Auth if not already confirmed
   if (!isPasswordValid) {
     try {
-      await signInWithEmailAndPassword(auth, cleanEmail, passwordInput);
-      isPasswordValid = true;
-      // Store verified password locally for seamless offline/fast access
-      setStoredUserPassword(cleanEmail, passwordInput);
-    } catch (authErr: any) {
-      if (authErr.code === 'auth/wrong-password') {
-        throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
+      const res = await fetch('/api/auth/verify-login-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: passwordInput })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.valid) isPasswordValid = true;
       }
-    }
+    } catch {}
   }
 
   if (!isPasswordValid) {
-    throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifique sus datos.');
+    throw new Error(isEn ? 'Incorrect password. Please verify your credentials.' : 'Contraseña incorrecta. Por favor verifica tus datos.');
   }
 
-  // Persist session
-  try {
-    localStorage.setItem('edulink_active_session', JSON.stringify(status.profile));
-  } catch {
-    // ignore
-  }
-
+  localStorage.setItem('edulink_active_session', JSON.stringify(status.profile));
   return status.profile;
 }
 

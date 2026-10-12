@@ -243,9 +243,10 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
             </h3>
 
             <p className={`text-sm leading-relaxed mb-5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              {isEn
-                ? 'If this email address is registered on the platform, you will receive an official Firebase email shortly with instructions to reset your password.'
-                : 'Si esta dirección de correo electrónico está registrada en la plataforma, recibirás en breve un mensaje con las instrucciones y el enlace oficial de Firebase para restablecer tu contraseña.'}
+              {successNotice ||
+                (isEn
+                  ? 'We have sent official Firebase instructions to reset your password directly to this email address.'
+                  : 'Hemos enviado las instrucciones y el enlace oficial de Firebase para restablecer tu contraseña directamente a esta dirección de correo.')}
             </p>
 
             {/* Highlighted Email Badge */}
