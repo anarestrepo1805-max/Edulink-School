@@ -6,6 +6,9 @@ import { ResetPasswordView } from './components/ResetPasswordView';
 import { StudentDashboardView } from './components/StudentDashboardView';
 import { StudentAssignmentView } from './components/StudentAssignmentView';
 import { TeacherGradesView } from './components/TeacherGradesView';
+import { TeacherAssignmentsView } from './components/TeacherAssignmentsView';
+import { TeacherAttendanceView } from './components/TeacherAttendanceView';
+import { TeacherMessagingView } from './components/TeacherMessagingView';
 import { FamilyDashboardView } from './components/FamilyDashboardView';
 import { FamilyMessagingView } from './components/FamilyMessagingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
@@ -34,13 +37,13 @@ function MainApp() {
   const handleLoginSuccess = (user: UserProfile) => {
     setCurrentUser(user);
     setUserRole(user.role);
-    if (user.role === 'student') {
+    if (user.role === 'student' || user.role === 'estudiante') {
       setCurrentScreen('student_dashboard');
-    } else if (user.role === 'teacher') {
+    } else if (user.role === 'teacher' || user.role === 'docente') {
       setCurrentScreen('teacher_grades');
-    } else if (user.role === 'family') {
+    } else if (user.role === 'family' || user.role === 'acudiente') {
       setCurrentScreen('family_dashboard');
-    } else if (user.role === 'admin') {
+    } else if (user.role === 'admin' || user.role === 'administrativo') {
       setCurrentScreen('admin_dashboard');
     }
   };
@@ -110,6 +113,33 @@ function MainApp() {
 
       {currentScreen === 'teacher_grades' && (
         <TeacherGradesView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      )}
+
+      {currentScreen === 'teacher_assignments' && (
+        <TeacherAssignmentsView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      )}
+
+      {currentScreen === 'teacher_attendance' && (
+        <TeacherAttendanceView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      )}
+
+      {currentScreen === 'teacher_messaging' && (
+        <TeacherMessagingView
           currentUser={currentUser}
           onNavigate={setCurrentScreen}
           onLogout={handleLogout}

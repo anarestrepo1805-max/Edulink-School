@@ -105,6 +105,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   };
 
   const screens: { id: ActiveScreen; label: string; icon: string; category: string }[] = [
+    // ROL ESTUDIANTE
     {
       id: 'student_dashboard',
       label: currentLang === 'es' ? 'Estudiante • Portal' : 'Student • Portal',
@@ -113,16 +114,38 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     },
     {
       id: 'student_assignment',
-      label: currentLang === 'es' ? 'Estudiante • Taller 1' : 'Student • Workshop 1',
+      label: currentLang === 'es' ? 'Estudiante • Tareas y Entregas' : 'Student • Assignments & Tasks',
       icon: 'assignment',
       category: currentLang === 'es' ? 'Estudiante' : 'Student'
     },
+
+    // ROL DOCENTE
     {
       id: 'teacher_grades',
       label: currentLang === 'es' ? 'Docente • Calificaciones' : 'Teacher • Gradebook',
       icon: 'fact_check',
       category: currentLang === 'es' ? 'Docente' : 'Teacher'
     },
+    {
+      id: 'teacher_assignments',
+      label: currentLang === 'es' ? 'Docente • Gestor de Tareas' : 'Teacher • Assignments Manager',
+      icon: 'assignment_turned_in',
+      category: currentLang === 'es' ? 'Docente' : 'Teacher'
+    },
+    {
+      id: 'teacher_attendance',
+      label: currentLang === 'es' ? 'Docente • Asistencia' : 'Teacher • Class Attendance',
+      icon: 'how_to_reg',
+      category: currentLang === 'es' ? 'Docente' : 'Teacher'
+    },
+    {
+      id: 'teacher_messaging',
+      label: currentLang === 'es' ? 'Docente • Mensajería' : 'Teacher • Messaging',
+      icon: 'chat',
+      category: currentLang === 'es' ? 'Docente' : 'Teacher'
+    },
+
+    // ROL ACUDIENTE / FAMILIA
     {
       id: 'family_dashboard',
       label: currentLang === 'es' ? 'Familiar • Portal' : 'Family • Portal',
@@ -132,9 +155,11 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     {
       id: 'family_messaging',
       label: currentLang === 'es' ? 'Familiar • Mensajería' : 'Family • Messaging',
-      icon: 'chat',
+      icon: 'mark_email_unread',
       category: currentLang === 'es' ? 'Familia' : 'Family'
     },
+
+    // ROL ADMINISTRATIVO
     {
       id: 'admin_dashboard',
       label: currentLang === 'es' ? 'Administrativo • Panel' : 'Staff • Dashboard',
@@ -146,16 +171,21 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   const visibleScreens = screens.filter((screen) => {
     if (!currentUser) return true;
     const role = currentUser.role;
-    if (role === 'student') {
+    if (role === 'student' || role === 'estudiante') {
       return screen.id === 'student_dashboard' || screen.id === 'student_assignment';
     }
-    if (role === 'teacher') {
-      return screen.id === 'teacher_grades';
+    if (role === 'teacher' || role === 'docente') {
+      return (
+        screen.id === 'teacher_grades' ||
+        screen.id === 'teacher_assignments' ||
+        screen.id === 'teacher_attendance' ||
+        screen.id === 'teacher_messaging'
+      );
     }
-    if (role === 'family' || role === 'guardian') {
+    if (role === 'family' || role === 'acudiente' || role === 'guardian') {
       return screen.id === 'family_dashboard' || screen.id === 'family_messaging';
     }
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'administrativo') {
       return screen.id === 'admin_dashboard';
     }
     return true;
@@ -171,17 +201,25 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     if (currentUser) {
       const role = currentUser.role;
       const isStudentScreen = screenId === 'student_dashboard' || screenId === 'student_assignment';
-      const isTeacherScreen = screenId === 'teacher_grades';
+      const isTeacherScreen =
+        screenId === 'teacher_grades' ||
+        screenId === 'teacher_assignments' ||
+        screenId === 'teacher_attendance' ||
+        screenId === 'teacher_messaging';
       const isFamilyScreen = screenId === 'family_dashboard' || screenId === 'family_messaging';
       const isAdminScreen = screenId === 'admin_dashboard';
 
       if (
-        (role === 'student' && !isStudentScreen) ||
-        (role === 'teacher' && !isTeacherScreen) ||
-        ((role === 'family' || role === 'guardian') && !isFamilyScreen) ||
-        (role === 'admin' && !isAdminScreen)
+        ((role === 'student' || role === 'estudiante') && !isStudentScreen) ||
+        ((role === 'teacher' || role === 'docente') && !isTeacherScreen) ||
+        ((role === 'family' || role === 'acudiente' || role === 'guardian') && !isFamilyScreen) ||
+        ((role === 'admin' || role === 'administrativo') && !isAdminScreen)
       ) {
-        setToastMessage(currentLang === 'es' ? 'Acceso restringido: Pantalla exclusiva de otro rol institucional.' : 'Restricted access: Screen exclusive to another institutional role.');
+        setToastMessage(
+          currentLang === 'es'
+            ? 'Acceso restringido: Esta pantalla pertenece a otro rol institucional.'
+            : 'Restricted access: This screen belongs to another institutional role.'
+        );
         setTimeout(() => setToastMessage(null), 3500);
         return;
       }

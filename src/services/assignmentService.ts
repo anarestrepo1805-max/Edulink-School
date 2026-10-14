@@ -335,3 +335,53 @@ export async function publishInstitutionalAssignment(assignment: {
   await setDoc(doc(db, 'assignments', assignmentId), docData);
   return docData;
 }
+
+/**
+ * Fetches all institutional assignments from Firestore.
+ */
+export async function fetchAllInstitutionalAssignments(): Promise<InstitutionalAssignmentDoc[]> {
+  try {
+    const snap = await getDocs(collection(db, 'assignments'));
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<InstitutionalAssignmentDoc, 'id'>) }));
+  } catch (err) {
+    console.warn('Error fetching all institutional assignments:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetches all student submissions for a specific assignment.
+ */
+export async function fetchSubmissionsForAssignment(assignmentId: string): Promise<StudentSubmission[]> {
+  if (!assignmentId) return [];
+  try {
+    const q = query(collection(db, 'submissions'), where('assignmentId', '==', assignmentId));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<StudentSubmission, 'id'>) }));
+  } catch (err) {
+    console.warn('Error fetching submissions for assignment:', err);
+    return [];
+  }
+}
+
+/**
+ * Grades a student submission with score and optional feedback.
+ */
+export async function gradeStudentSubmission(
+  assignmentId: string,
+  studentId: string,
+  score: number,
+  feedback?: string
+): Promise<void> {
+  const submissionId = `${assignmentId}_${studentId}`;
+  await setDoc(
+    doc(db, 'submissions', submissionId),
+    {
+      score,
+      feedback: feedback || '',
+      status: 'graded',
+      gradedAt: new Date().toISOString()
+    },
+    { merge: true }
+  );
+}

@@ -54,11 +54,18 @@ export interface MessageThread {
 
 export type ActiveScreen = 
   | 'login'
+  // Estudiante
   | 'student_dashboard'
   | 'student_assignment'
+  // Docente
   | 'teacher_grades'
+  | 'teacher_assignments'
+  | 'teacher_attendance'
+  | 'teacher_messaging'
+  // Acudiente / Familia
   | 'family_dashboard'
   | 'family_messaging'
+  // Administrativo
   | 'admin_dashboard';
 
 export interface Subject {

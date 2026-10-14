@@ -198,13 +198,13 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               <span>{isEn ? 'Gradebook' : 'Calificaciones'}</span>
             </button>
             <button
-              onClick={() => showToast(isEn ? 'Daily institutional attendance tracking module.' : 'Módulo de control de asistencia diaria.')}
+              onClick={() => onNavigate('teacher_attendance')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
               <span className="material-symbols-outlined text-xl">how_to_reg</span>
-              <span className="text-xs font-bold">{isEn ? 'Attendance' : 'Asistencia'}</span>
+              <span className="text-xs font-bold">{isEn ? 'Class Attendance' : 'Control de Asistencia'}</span>
             </button>
             <button
               onClick={() => setShowScheduleModal(true)}
@@ -216,22 +216,22 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               <span className="text-xs font-bold">{isEn ? 'Institutional Schedule' : 'Horario Institucional'}</span>
             </button>
             <button
-              onClick={() => onNavigate('student_assignment')}
+              onClick={() => onNavigate('teacher_assignments')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
               <span className="material-symbols-outlined text-xl">assignment</span>
-              <span className="text-xs font-bold">{isEn ? 'Tasks & Exams' : 'Tareas y Exámenes'}</span>
+              <span className="text-xs font-bold">{isEn ? 'Assignments & Workshops' : 'Gestor de Tareas y Talleres'}</span>
             </button>
             <button
-              onClick={() => onNavigate('family_messaging')}
+              onClick={() => onNavigate('teacher_messaging')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
-              <span className="material-symbols-outlined text-xl">assessment</span>
-              <span className="text-xs font-bold">{isEn ? 'Messaging' : 'Mensajes'}</span>
+              <span className="material-symbols-outlined text-xl">chat</span>
+              <span className="text-xs font-bold">{isEn ? 'Teacher Messaging' : 'Mensajería y Citaciones'}</span>
             </button>
           </nav>
         </div>
@@ -288,11 +288,11 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => onNavigate('family_messaging')}
+              onClick={() => onNavigate('teacher_messaging')}
               className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-[#444653] hover:bg-[#eff4ff]'
               }`}
-              title={isEn ? 'Messaging' : 'Mensajería'}
+              title={isEn ? 'Teacher Messaging' : 'Mensajería Docente'}
             >
               <span className="material-symbols-outlined text-xl">chat</span>
             </button>
