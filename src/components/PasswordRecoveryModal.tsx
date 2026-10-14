@@ -157,7 +157,7 @@ export const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                       setEmail(e.target.value);
                       setErrorMessage(null);
                     }}
-                    placeholder={isEn ? 'e.g. 1001234567 or user@vallejuelos.edu.co' : 'ej. 1001234567 o usuario@vallejuelos.edu.co'}
+                    placeholder={isEn ? '1001234567 or user@vallejuelos.edu.co' : '1001234567 o usuario@vallejuelos.edu.co'}
                     className={`w-full pl-11 pr-4 py-3 rounded-2xl text-sm border outline-none transition-all ${
                       isDark
                         ? 'bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'

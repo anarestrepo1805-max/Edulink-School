@@ -261,42 +261,21 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
           </nav>
         </div>
 
-        {/* User Card & Logout Bottom */}
-        <div className={`p-4 border-t flex flex-col gap-2 ${
-          isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-        }`}>
-          <div className={`flex items-center gap-3 p-2 rounded-xl ${
-            isDark ? 'bg-slate-800/80' : 'bg-[#eff4ff]'
+        {/* Institutional Status Badge */}
+        <div className={`p-4 border-t ${isDark ? 'border-slate-800' : 'border-[#eff4ff]'}`}>
+          <div className={`rounded-xl p-3 flex items-center justify-between border ${
+            isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
           }`}>
-            <img
-              src={currentUser?.avatarUrl || ASSETS.studentAvatar}
-              alt="Avatar"
-              className={`w-9 h-9 rounded-full object-cover ring-2 ${
-                isDark ? 'ring-cyan-500/30' : 'ring-[#0051d5]/20'
-              }`}
-            />
-            <div className="flex flex-col overflow-hidden">
-              <span className={`text-xs font-bold truncate ${
-                isDark ? 'text-white' : 'text-[#0b1c30]'
-              }`}>
-                {studentName}
+            <div className="flex items-center gap-2">
+              <span className={`material-symbols-outlined text-[20px] ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
+                verified
               </span>
-              <span className={`text-[11px] truncate ${
-                isDark ? 'text-slate-400' : 'text-[#444653]'
-              }`}>
-                {gradeLevel}
+              <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
+                {isEn ? 'Year 2026' : 'Año 2026'}
               </span>
             </div>
+            <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>I.E. Vallejuelos</span>
           </div>
-          <button
-            onClick={onLogout}
-            className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              isDark ? 'text-rose-400 hover:bg-rose-950/40' : 'text-[#ba1a1a] hover:bg-[#fff1f2]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            <span>{isEn ? 'Sign Out' : 'Cerrar Sesión'}</span>
-          </button>
         </div>
       </aside>
 

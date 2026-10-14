@@ -172,6 +172,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [regRole, setRegRole] = useState<'student' | 'teacher' | 'family' | 'admin'>('student');
   const [regFullName, setRegFullName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -505,6 +506,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }
     }
 
+    // Email validation: User must manually enter a valid email address (empty by default, never fake)
+    const cleanEmail = regEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setRegError(isEn
+        ? 'Please enter a valid personal or institutional email address.'
+        : 'Por favor ingresa un correo electrónico válido para tu cuenta.');
+      return;
+    }
+
     // Password validations: minimum 8 characters, uppercase, lowercase, special character
     if (!passHasMinLength) {
       setRegError(isEn ? 'Password must be at least 8 characters long.' : 'La contraseña debe tener un mínimo de 8 caracteres.');
@@ -522,7 +533,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
 
     if (!passHasSpecial) {
-      setRegError(isEn ? 'Password must contain at least one special character (!@#$%&*).' : 'La contraseña debe contener al menos un carácter especial (ej. !@#$%&*).');
+      setRegError(isEn ? 'Password must contain at least one special character (!@#$%&*).' : 'La contraseña debe contener al menos un carácter especial (!@#$%&*).');
       return;
     }
 
@@ -543,6 +554,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       const newUser = await registerNewUser({
         fullName: regFullName.trim(),
+        email: cleanEmail,
         password: regPassword,
         role: regRole,
         documentId: regRole === 'family'
@@ -922,7 +934,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     type="text"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder={isEn ? 'e.g. 1001234567 or user@vallejuelos.edu.co' : 'ej. 1001234567 o usuario@vallejuelos.edu.co'}
+                    placeholder={isEn ? '1001234567 or user@vallejuelos.edu.co' : '1001234567 o usuario@vallejuelos.edu.co'}
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
@@ -1050,6 +1062,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 onClick={() => {
                   setRegError(null);
                   setRegSuccess(null);
+                  setRegEmail('');
+                  setRegFullName('');
+                  setRegPassword('');
+                  setRegConfirmPassword('');
+                  setRegStudentCode('');
+                  setRegTeacherCode('');
+                  setRegGuardianDocId('');
+                  setRegAdminKey('');
+                  setRegAdminDocId('');
+                  setStudentDocFeedback({ status: 'idle', message: '' });
+                  setTeacherFeedback({ status: 'idle', message: '' });
+                  setAdminFeedback({ status: 'idle', message: '' });
+                  setStudentLookupFeedback({ status: 'idle', message: '' });
+                  setAcceptDataPolicy(false);
                   setIsRegisterModalOpen(true);
                 }}
                 className={`w-full font-bold text-base px-5 py-3.5 rounded-xl cursor-pointer transition-all duration-150 shadow-sm flex items-center justify-center gap-2 active:scale-[0.99] border ${
@@ -1707,6 +1733,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           : isDark
                             ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
                             : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  {/* Correo Electrónico Institucional o Personal (Escrito manualmente por el usuario, vacío por defecto) */}
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                      <span>{isEn ? 'Email Address *' : 'Correo Electrónico *'}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {isEn ? 'Enter your personal or institutional email' : 'Ingresa tu correo personal o institucional'}
+                      </span>
+                    </label>
+                    <input
+                      id="input-registration-email"
+                      type="email"
+                      autoComplete="email"
+                      value={regEmail}
+                      onChange={(e) => {
+                        setRegEmail(e.target.value);
+                        setRegError(null);
+                      }}
+                      placeholder=""
+                      className={`w-full px-4 py-3 text-base rounded-xl outline-none border transition-colors ${
+                        isDark
+                          ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-400'
+                          : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-blue-600'
                       }`}
                       required
                     />

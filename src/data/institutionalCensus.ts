@@ -71,7 +71,16 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
     friday: { subject: 'Tecnología', teacher: 'Diego Piedrahita' },
   },
   {
-    time: '8:05 - 9:30',
+    time: '8:05 - 8:35',
+    period: 0,
+    monday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    tuesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    wednesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    thursday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    friday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+  },
+  {
+    time: '8:35 - 9:30',
     period: 3,
     monday: { subject: 'Ed. Física', teacher: 'Juan Manuel Zúñiga' },
     tuesday: { subject: 'Espiritualidad y Valores', teacher: 'Antonio Rueda' },

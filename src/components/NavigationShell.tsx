@@ -143,12 +143,48 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     }
   ];
 
+  const visibleScreens = screens.filter((screen) => {
+    if (!currentUser) return true;
+    const role = currentUser.role;
+    if (role === 'student') {
+      return screen.id === 'student_dashboard' || screen.id === 'student_assignment';
+    }
+    if (role === 'teacher') {
+      return screen.id === 'teacher_grades';
+    }
+    if (role === 'family' || role === 'guardian') {
+      return screen.id === 'family_dashboard' || screen.id === 'family_messaging';
+    }
+    if (role === 'admin') {
+      return screen.id === 'admin_dashboard';
+    }
+    return true;
+  });
+
   const handleScreenClick = (screenId: ActiveScreen) => {
     if (!currentUser && screenId !== 'login') {
       setShowAuthWarning(true);
       setTimeout(() => setShowAuthWarning(false), 4000);
       onSelectScreen('login');
       return;
+    }
+    if (currentUser) {
+      const role = currentUser.role;
+      const isStudentScreen = screenId === 'student_dashboard' || screenId === 'student_assignment';
+      const isTeacherScreen = screenId === 'teacher_grades';
+      const isFamilyScreen = screenId === 'family_dashboard' || screenId === 'family_messaging';
+      const isAdminScreen = screenId === 'admin_dashboard';
+
+      if (
+        (role === 'student' && !isStudentScreen) ||
+        (role === 'teacher' && !isTeacherScreen) ||
+        ((role === 'family' || role === 'guardian') && !isFamilyScreen) ||
+        (role === 'admin' && !isAdminScreen)
+      ) {
+        setToastMessage(currentLang === 'es' ? 'Acceso restringido: Pantalla exclusiva de otro rol institucional.' : 'Restricted access: Screen exclusive to another institutional role.');
+        setTimeout(() => setToastMessage(null), 3500);
+        return;
+      }
     }
     onSelectScreen(screenId);
     setIsExpanded(false);
@@ -201,7 +237,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 
           {/* Quick Screen Switcher Pills */}
           <div className="hidden lg:flex items-center gap-1 overflow-x-auto py-0.5">
-            {screens.map((screen) => {
+            {visibleScreens.map((screen) => {
               const isActive = currentScreen === screen.id;
               const isLocked = !currentUser && screen.id !== 'login';
               return (
@@ -484,7 +520,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
         {/* Mobile Dropdown Navigation */}
         {isExpanded && (
           <div className="lg:hidden mt-2 pt-2 border-t border-white/15 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            {screens.map((screen) => {
+            {visibleScreens.map((screen) => {
               const isActive = currentScreen === screen.id;
               const isLocked = !currentUser && screen.id !== 'login';
               return (
