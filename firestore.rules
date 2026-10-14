@@ -31,6 +31,18 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Institutional assignments published by teachers
+    match /assignments/{assignmentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Student task submissions
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create, update: if true;

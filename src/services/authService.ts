@@ -45,7 +45,7 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     gradeLevel: 'Grado 11°B',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     subjects: INITIAL_SUBJECTS,
-    assignments: INITIAL_UPCOMING_ASSIGNMENTS
+    assignments: []
   },
   'miguel.jimenez@edulink.edu.co': {
     id: 'demo-student-1',
@@ -60,7 +60,7 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     gradeLevel: 'Grado 11°B',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     subjects: INITIAL_SUBJECTS,
-    assignments: INITIAL_UPCOMING_ASSIGNMENTS
+    assignments: []
   },
   '71394821': {
     id: 'demo-teacher-1',

@@ -934,7 +934,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     type="text"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder={isEn ? '1001234567 or user@vallejuelos.edu.co' : '1001234567 o usuario@vallejuelos.edu.co'}
+                    placeholder=""
                     className={`w-full pl-11 pr-4 py-3.5 text-base rounded-xl outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950/60 border border-slate-700/80 text-white focus:bg-slate-900/90 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25'
