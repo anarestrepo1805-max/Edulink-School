@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ActiveScreen, Subject, UpcomingAssignment, UserProfile } from '../types';
-import { ASSETS, INITIAL_SUBJECTS, INITIAL_UPCOMING_ASSIGNMENTS } from '../data/mockData';
-import { OFFICIAL_SCHEDULE_11_1 } from '../data/institutionalCensus';
+import { ASSETS, INITIAL_SUBJECTS } from '../data/mockData';
+import { getOfficialScheduleForGrade } from '../data/institutionalCensus';
+import { fetchPublishedAssignmentsForStudent } from '../services/assignmentService';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
@@ -10,13 +11,15 @@ interface StudentDashboardViewProps {
   onNavigate: (screen: ActiveScreen) => void;
   onLogout: () => void;
   onUpdateUser?: (updated: UserProfile) => void;
+  onOpenAssignment?: (assignmentId?: string) => void;
 }
 
 export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
   currentUser,
   onNavigate,
   onLogout,
-  onUpdateUser
+  onUpdateUser,
+  onOpenAssignment
 }) => {
   const { theme, language } = useThemeLanguage();
   const isDark = theme === 'dark';
@@ -34,12 +37,57 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
     return isConfigured ? INITIAL_SUBJECTS : [];
   });
 
-  const [assignments, setAssignments] = useState<UpcomingAssignment[]>(() => {
-    if (currentUser?.assignments && currentUser.assignments.length > 0) {
-      return currentUser.assignments;
-    }
-    return isConfigured ? INITIAL_UPCOMING_ASSIGNMENTS : [];
-  });
+  // Real published assignments from Firestore (No mock/demo fake assignments)
+  const [assignments, setAssignments] = useState<UpcomingAssignment[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true);
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
+
+
+  // Load only real published assignments from Firestore corresponding to student's grade
+  useEffect(() => {
+    let isMounted = true;
+    const loadRealAssignments = async () => {
+      setIsLoadingAssignments(true);
+      setAssignmentsError(null);
+      try {
+        const studentGrade = currentUser?.gradeLevel || currentUser?.group || '';
+        const studentGroup = currentUser?.group || '';
+        const studentShift = currentUser?.shift || '';
+        const realItems = await fetchPublishedAssignmentsForStudent(
+          studentGrade,
+          studentGroup,
+          studentShift
+        );
+        if (isMounted) {
+          setAssignments(realItems);
+        }
+      } catch (err: unknown) {
+        console.warn('Error loading published assignments from Firestore:', err);
+        if (isMounted) {
+          setAssignmentsError(
+            isEn
+              ? 'Could not connect to database to check assignments.'
+              : 'Error al conectar con la base de datos para consultar las tareas.'
+          );
+          setAssignments([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingAssignments(false);
+        }
+      }
+    };
+
+    loadRealAssignments();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.gradeLevel, currentUser?.group, currentUser?.shift, currentUser?.id, isEn]);
+
+  // Official schedule for this student's grade and group
+  const officialSchedule = useMemo(() => {
+    return getOfficialScheduleForGrade(currentUser?.gradeLevel || currentUser?.group || '11-1');
+  }, [currentUser?.gradeLevel, currentUser?.group]);
 
   const [filterUrgentOnly, setFilterUrgentOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,13 +175,11 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
   const handleLoadSampleData = async () => {
     setIsSaving(true);
     setSubjects(INITIAL_SUBJECTS);
-    setAssignments(INITIAL_UPCOMING_ASSIGNMENTS);
 
     if (currentUser) {
       try {
         const updated = await saveUserConfiguration(currentUser.id, {
           subjects: INITIAL_SUBJECTS,
-          assignments: INITIAL_UPCOMING_ASSIGNMENTS,
           hasConfigured: true
         });
         if (onUpdateUser) {
@@ -516,9 +562,17 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                   <>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
                       <span className="material-symbols-outlined text-[14px]">warning</span>
-                      {isEn ? 'Pending grading' : 'Por calificar/entregar'}
+                      {isEn ? 'Pending tasks' : 'Tareas pendientes'}
                     </span>
-                    <span className="text-xs text-rose-400 font-bold">{isEn ? '2 urgent' : '2 urgentes'}</span>
+                    {assignments.filter((a) => a.urgency === 'urgente').length > 0 ? (
+                      <span className="text-xs text-rose-400 font-bold">
+                        {assignments.filter((a) => a.urgency === 'urgente').length} {isEn ? 'urgent' : 'urgentes'}
+                      </span>
+                    ) : (
+                      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {isEn ? 'Regular term' : 'Plazo regular'}
+                      </span>
+                    )}
                   </>
                 ) : (
                   <>
@@ -745,10 +799,20 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                         </span>
                         <button
                           onClick={() => {
-                            if (sub.id === 'prog' || sub.name.toLowerCase().includes('program') || sub.name.toLowerCase().includes('tecno')) {
+                            const matchingAss = assignments.find(
+                              (a) => a.subject.toLowerCase() === sub.name.toLowerCase()
+                            );
+                            if (matchingAss) {
+                              if (onOpenAssignment) {
+                                onOpenAssignment(matchingAss.id);
+                              }
                               onNavigate('student_assignment');
                             } else {
-                              showToast(isEn ? `Viewing evaluations and topics for ${sub.name}.` : `Mostrando el detalle de evaluaciones de ${sub.name}.`);
+                              showToast(
+                                isEn
+                                  ? `No published tasks for ${sub.name} at this time.`
+                                  : `No hay talleres ni tareas publicados para ${sub.name}.`
+                              );
                             }
                           }}
                           className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
@@ -833,12 +897,12 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                       task_alt
                     </span>
                     <strong className={`text-xs font-bold block mb-1 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                      {isEn ? 'No pending tasks' : 'No hay tareas pendientes'}
+                      {isEn ? 'No published workshops or assignments' : 'No hay talleres ni tareas publicados'}
                     </strong>
                     <p className={`text-[11px] leading-relaxed ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                       {isEn
-                        ? 'When your teachers publish assignments or evaluations, they will appear here with deadlines.'
-                        : 'Una vez tus profesores asignen talleres o evaluaciones aparecerán listadas aquí con sus fechas límite.'}
+                        ? 'No teacher has published assignments or workshops for your grade and group yet.'
+                        : 'Ningún docente ha publicado talleres o tareas para tu grado y grupo por el momento.'}
                     </p>
                   </div>
                 ) : (
@@ -1130,7 +1194,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                  {OFFICIAL_SCHEDULE_11_1.map((slot) => (
+                  {officialSchedule.map((slot) => (
                     <tr
                       key={slot.period}
                       className={`transition-colors ${

@@ -215,28 +215,28 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       }`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* Logo brand & indicator */}
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-pulse"></span>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-pulse shrink-0"></span>
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <img
                 src={ASSETS.logo}
                 alt="Edulink School Logo"
-                className="w-8 h-8 sm:w-9 sm:h-9 object-contain filter drop-shadow-[0_2px_8px_rgba(6,182,212,0.4)]"
+                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 object-contain shrink-0 filter drop-shadow-[0_2px_8px_rgba(6,182,212,0.4)]"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = '/logo_transparent.png';
                 }}
               />
-              <span className="font-bold text-base sm:text-lg tracking-tight text-white flex items-center">
+              <span className="font-bold text-sm sm:text-base md:text-lg tracking-tight text-white truncate">
                 Edulink School
               </span>
             </div>
-            <span className="hidden sm:inline-block text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-[#c4e7ff] font-semibold">
+            <span className="hidden md:inline-block text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-[#c4e7ff] font-semibold shrink-0">
               I.E. Vallejuelos
             </span>
           </div>
 
           {/* Quick Screen Switcher Pills */}
-          <div className="hidden lg:flex items-center gap-1 overflow-x-auto py-0.5">
+          <div className="hidden lg:flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar">
             {visibleScreens.map((screen) => {
               const isActive = currentScreen === screen.id;
               const isLocked = !currentUser && screen.id !== 'login';
@@ -245,7 +245,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                   key={screen.id}
                   onClick={() => handleScreenClick(screen.id)}
                   title={isLocked ? 'Debes iniciar sesión primero' : screen.label}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white ${
                     isActive
                       ? 'bg-white text-[#00288e] shadow-sm scale-105'
                       : isLocked
@@ -263,13 +263,13 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
           </div>
 
           {/* User Session & Profile Menu Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Quick compact theme & language capsule */}
             <div className="flex items-center bg-white/15 border border-white/20 rounded-full p-0.5 shadow-xs">
               <button
                 type="button"
                 onClick={handleToggleTheme}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white/90 hover:text-amber-300 hover:bg-white/20 transition-all cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white/90 hover:text-amber-300 hover:bg-white/20 transition-all cursor-pointer focus-visible:ring-1 focus-visible:ring-white"
                 title={isDarkMode ? (currentLang === 'es' ? 'Cambiar a Modo Claro' : 'Switch to Light Mode') : (currentLang === 'es' ? 'Cambiar a Modo Oscuro' : 'Switch to Dark Mode')}
                 aria-label="Toggle Theme"
               >
@@ -281,7 +281,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               <button
                 type="button"
                 onClick={handleToggleLanguage}
-                className="px-2 h-7 rounded-full flex items-center justify-center text-white/90 hover:text-cyan-200 hover:bg-white/20 text-[11px] font-bold tracking-wider transition-all cursor-pointer"
+                className="px-2 h-7 sm:h-8 rounded-full flex items-center justify-center text-white/90 hover:text-cyan-200 hover:bg-white/20 text-[11px] font-bold tracking-wider transition-all cursor-pointer focus-visible:ring-1 focus-visible:ring-white"
                 title={currentLang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
                 aria-label="Toggle Language"
               >
@@ -295,10 +295,11 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                 <button
                   id="user-profile-menu-button"
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-all cursor-pointer border border-white/20 shadow-xs active:scale-95"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 min-h-[40px] rounded-xl bg-white/15 hover:bg-white/25 text-white transition-all cursor-pointer border border-white/20 shadow-xs active:scale-95 focus-visible:ring-2 focus-visible:ring-white"
                   title={currentLang === 'es' ? 'Opciones de perfil y cuenta' : 'Profile & account options'}
+                  aria-expanded={showProfileMenu}
                 >
-                  <div className="w-8 h-8 rounded-full bg-white/25 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/30 overflow-hidden shrink-0">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/25 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/30 overflow-hidden shrink-0">
                     {currentUser.avatarUrl ? (
                       <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -307,7 +308,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                   </div>
 
                   <div className="text-left hidden sm:flex flex-col leading-tight">
-                    <span className="text-xs font-bold text-white max-w-[150px] truncate">
+                    <span className="text-xs font-bold text-white max-w-[130px] md:max-w-[160px] truncate">
                       {currentUser.fullName}
                     </span>
                     <span className="text-[10px] text-[#7bd0ff] font-semibold">
@@ -324,7 +325,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                 {showProfileMenu && (
                   <div
                     id="user-profile-dropdown"
-                    className={`absolute right-0 mt-2 w-72 rounded-2xl shadow-2xl border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 ${
+                    className={`absolute right-0 mt-2 w-[min(calc(100vw-24px),18rem)] rounded-2xl shadow-2xl border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 ${
                       isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/60' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
                     }`}
                   >
@@ -492,10 +493,13 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
             <div className="flex lg:hidden items-center gap-1">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1 p-1.5 rounded-lg bg-white/15 hover:bg-white/20 text-white text-xs font-semibold"
+                className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 active:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white shrink-0"
                 aria-label={currentLang === 'es' ? 'Abrir navegación móvil' : 'Open mobile menu'}
+                aria-expanded={isExpanded}
               >
-                <span className="material-symbols-outlined text-[20px]">menu</span>
+                <span className="material-symbols-outlined text-[24px]">
+                  {isExpanded ? 'close' : 'menu'}
+                </span>
               </button>
             </div>
           </div>
@@ -503,14 +507,14 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 
         {/* Warning notification banner when an unregistered user clicks locked view */}
         {showAuthWarning && (
-          <div className="mt-2 p-2 rounded-lg bg-[#b91c1c] text-white text-xs font-bold flex items-center justify-between animate-in fade-in">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px]">warning</span>
-              <span>{currentLang === 'es' ? 'Acceso denegado: El usuario no ha iniciado sesión.' : 'Access denied: Please sign in first.'}</span>
+          <div className="mt-2 p-2.5 rounded-xl bg-[#b91c1c] text-white text-xs font-bold flex items-center justify-between gap-2 shadow-md animate-in fade-in">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
+              <span className="truncate">{currentLang === 'es' ? 'Acceso denegado: El usuario no ha iniciado sesión.' : 'Access denied: Please sign in first.'}</span>
             </div>
             <button
               onClick={() => onSelectScreen('login')}
-              className="px-2 py-0.5 rounded bg-white text-[#b91c1c] text-[11px] font-bold"
+              className="px-3 py-1.5 min-h-[36px] rounded-lg bg-white text-[#b91c1c] text-xs font-bold shrink-0 cursor-pointer hover:bg-white/90 transition-colors"
             >
               {currentLang === 'es' ? 'Ir al inicio' : 'Go to login'}
             </button>
@@ -519,7 +523,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 
         {/* Mobile Dropdown Navigation */}
         {isExpanded && (
-          <div className="lg:hidden mt-2 pt-2 border-t border-white/15 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          <div className="lg:hidden mt-2 pt-2 border-t border-white/15 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pb-1 animate-in fade-in slide-in-from-top-1 duration-150">
             {visibleScreens.map((screen) => {
               const isActive = currentScreen === screen.id;
               const isLocked = !currentUser && screen.id !== 'login';
@@ -527,13 +531,13 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                 <button
                   key={screen.id}
                   onClick={() => handleScreenClick(screen.id)}
-                  className={`flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold text-left transition-colors ${
+                  className={`flex items-center gap-2.5 p-3 min-h-[44px] rounded-xl text-xs font-semibold text-left transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white ${
                     isActive
-                      ? 'bg-white text-[#00288e]'
-                      : 'text-white/80 hover:bg-white/15'
+                      ? 'bg-white text-[#00288e] shadow-sm font-bold'
+                      : 'text-white/90 hover:bg-white/20 active:bg-white/25'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px]">
+                  <span className="material-symbols-outlined text-[18px] shrink-0">
                     {isLocked ? 'lock' : screen.icon}
                   </span>
                   <span className="truncate">{screen.label}</span>
@@ -695,7 +699,9 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                       <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-amber-400' : 'text-[#00288e]'}`}>
                         {currentLang === 'es' ? 'Estudiante Representado' : 'Represented Student'}
                       </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#00288e]'}`}>{currentUser.representedStudentName || 'Miguel Ángel Jiménez'}</span>
+                      <span className={`text-sm font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#00288e]'}`}>
+                        {currentUser.representedStudentName || (currentLang === 'es' ? 'Estudiante acudido' : 'Represented student')}
+                      </span>
                     </div>
                   </>
                 )}

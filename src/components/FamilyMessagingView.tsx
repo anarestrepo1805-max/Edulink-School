@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { ActiveScreen, MessageThread } from '../types';
+import { ActiveScreen, MessageThread, UserProfile } from '../types';
 import { ASSETS, INITIAL_MESSAGE_THREADS } from '../data/mockData';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface FamilyMessagingViewProps {
+  currentUser?: UserProfile | null;
   onNavigate: (screen: ActiveScreen) => void;
   onLogout: () => void;
 }
 
 export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
+  currentUser,
   onNavigate
 }) => {
   const { theme, language } = useThemeLanguage();
@@ -203,11 +205,13 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                   {isEn ? 'Viewing details for:' : 'Viendo información de:'}
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-bold">Miguel Ángel Jiménez</span>
+                  <span className="text-xs font-bold">
+                    {currentUser?.representedStudentName || (isEn ? 'Represented Student' : 'Estudiante Representado')}
+                  </span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     isDark ? 'bg-amber-950 text-amber-300' : 'bg-[#dce9ff] text-[#00288e]'
                   }`}>
-                    {isEn ? 'Grade 11°B' : 'Grado 11°B'}
+                    {currentUser?.gradeLevel || (isEn ? 'Grade 11°B' : 'Grado 11°B')}
                   </span>
                 </div>
               </div>
@@ -217,7 +221,9 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="flex flex-col text-right hidden sm:flex">
-                <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>Elena Jiménez</span>
+                <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
+                  {currentUser?.fullName || (isEn ? 'Primary Guardian' : 'Acudiente Principal')}
+                </span>
                 <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                   {isEn ? 'Primary Guardian' : 'Acudiente Principal'}
                 </span>

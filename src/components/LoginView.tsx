@@ -900,7 +900,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {/* Right Column: Glassmorphism Login Card                                   */}
         {/* ========================================================================= */}
         <section className="w-full max-w-[440px] flex flex-col items-center">
-          <div className={`backdrop-blur-xl rounded-3xl p-7 sm:p-9 w-full border shadow-2xl flex flex-col gap-5 relative overflow-hidden transition-all duration-300 ${
+          <div className={`backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-7 md:p-8 w-full border shadow-2xl flex flex-col gap-5 relative overflow-hidden transition-all duration-300 ${
             isDark
               ? 'bg-slate-900/80 border-cyan-500/30 shadow-[0_8px_32px_0_rgba(6,182,212,0.18)] hover:border-cyan-400/50 hover:shadow-[0_12px_40px_0_rgba(6,182,212,0.25)]'
               : 'bg-white/95 border-slate-200 shadow-[0_16px_40px_rgba(0,40,140,0.12)] hover:border-blue-400'

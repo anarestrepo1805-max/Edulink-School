@@ -102,6 +102,7 @@ function MainApp() {
 
       {currentScreen === 'student_assignment' && (
         <StudentAssignmentView
+          currentUser={currentUser}
           onBack={() => setCurrentScreen('student_dashboard')}
           onNavigate={setCurrentScreen}
         />
@@ -127,6 +128,7 @@ function MainApp() {
 
       {currentScreen === 'family_messaging' && (
         <FamilyMessagingView
+          currentUser={currentUser}
           onNavigate={setCurrentScreen}
           onLogout={handleLogout}
         />

@@ -35,8 +35,28 @@
 }
 
 @layer base {
-  body {
+  html, body {
+    overflow-x: hidden;
+    min-width: 320px;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Accessible focus indicators for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid #0051d5;
+    outline-offset: 2px;
+  }
+
+  /* WCAG compliance: Respect user preference for reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -46,6 +66,22 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Custom styled horizontal scrollbar for responsive data tables */
+.table-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.table-scrollbar::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 9999px;
+}
+.table-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+.table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
 }
 
 @keyframes floatLogo {

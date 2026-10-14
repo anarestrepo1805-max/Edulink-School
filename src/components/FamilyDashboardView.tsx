@@ -55,8 +55,8 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
 
   const studentData = {
     miguel: {
-      name: 'Miguel Ángel Jiménez',
-      grade: isEn ? 'Grade 11°2' : 'Grado 11°2',
+      name: currentUser?.representedStudentName || 'Miguel Ángel Jiménez',
+      grade: currentUser?.gradeLevel || (isEn ? 'Grade 11°2' : 'Grado 11°2'),
       avatar: ASSETS.studentAvatar,
       matricula: '2026-1102',
       director: 'Prof. Roberto Gómez',
