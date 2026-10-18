@@ -43,6 +43,17 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Institutional publications, debates and surveys
+    match /institutional_publications/{pubId} {
+      allow read: if true;
+      allow write: if true;
+
+      match /responses/{responseId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create, update: if true;

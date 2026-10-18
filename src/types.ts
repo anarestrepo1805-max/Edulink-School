@@ -57,6 +57,7 @@ export type ActiveScreen =
   // Estudiante
   | 'student_dashboard'
   | 'student_assignment'
+  | 'student_forum'
   // Docente
   | 'teacher_grades'
   | 'teacher_assignments'
@@ -163,3 +164,39 @@ export interface ChatContact {
   unreadCount?: number;
   verified?: boolean;
 }
+
+export interface PublicationSurveyOption {
+  id: string;
+  text: string;
+  votesCount?: number;
+}
+
+export interface InstitutionalPublicationDoc {
+  id: string;
+  title: string;
+  content: string;
+  category: 'general' | 'academico' | 'convivencia' | 'evento';
+  authorName: string;
+  authorRole: 'docente' | 'directivo' | 'coordinador' | 'rector' | 'administrativo';
+  authorEmail?: string;
+  targetGrades: string[]; // e.g. ['all'] or ['11°1', '11°2']
+  createdAt: string;
+  hasSurvey?: boolean;
+  surveyQuestion?: string;
+  surveyOptions?: PublicationSurveyOption[];
+  attachmentName?: string;
+  attachmentUrl?: string;
+  status: 'published' | 'draft';
+}
+
+export interface PublicationSurveyResponse {
+  id: string;
+  publicationId: string;
+  studentId: string;
+  studentName: string;
+  studentGrade: string;
+  optionId: string;
+  optionText: string;
+  answeredAt: string;
+}
+

@@ -3,6 +3,7 @@ import { ActiveScreen, UserRole, UserProfile } from '../types';
 import { deleteUserAccount } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { ASSETS } from '../data/mockData';
+import { StudentProfileModal } from './StudentProfileModal';
 
 interface NavigationShellProps {
   currentScreen: ActiveScreen;
@@ -11,6 +12,7 @@ interface NavigationShellProps {
   onSelectRole: (role: UserRole) => void;
   currentUser: UserProfile | null;
   onLogout: () => void;
+  onUpdateUser?: (updated: UserProfile) => void;
   children: React.ReactNode;
 }
 
@@ -19,10 +21,12 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   onSelectScreen,
   currentUser,
   onLogout,
+  onUpdateUser,
   children
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
+  const [showStudentProfileModal, setShowStudentProfileModal] = useState(false);
 
   // Top-right Profile Dropdown state
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -108,14 +112,20 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     // ROL ESTUDIANTE
     {
       id: 'student_dashboard',
-      label: currentLang === 'es' ? 'Estudiante • Portal' : 'Student • Portal',
+      label: currentLang === 'es' ? 'Portal Estudiantil' : 'Student Portal',
       icon: 'dashboard',
       category: currentLang === 'es' ? 'Estudiante' : 'Student'
     },
     {
       id: 'student_assignment',
-      label: currentLang === 'es' ? 'Estudiante • Tareas y Entregas' : 'Student • Assignments & Tasks',
+      label: currentLang === 'es' ? 'Tareas y Entregas' : 'Assignments & Tasks',
       icon: 'assignment',
+      category: currentLang === 'es' ? 'Estudiante' : 'Student'
+    },
+    {
+      id: 'student_forum',
+      label: currentLang === 'es' ? 'Foro y encuestas' : 'Forums & Surveys',
+      icon: 'forum',
       category: currentLang === 'es' ? 'Estudiante' : 'Student'
     },
 
@@ -172,7 +182,11 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     if (!currentUser) return true;
     const role = currentUser.role;
     if (role === 'student' || role === 'estudiante') {
-      return screen.id === 'student_dashboard' || screen.id === 'student_assignment';
+      return (
+        screen.id === 'student_dashboard' ||
+        screen.id === 'student_assignment' ||
+        screen.id === 'student_forum'
+      );
     }
     if (role === 'teacher' || role === 'docente') {
       return (
@@ -200,7 +214,10 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     }
     if (currentUser) {
       const role = currentUser.role;
-      const isStudentScreen = screenId === 'student_dashboard' || screenId === 'student_assignment';
+      const isStudentScreen =
+        screenId === 'student_dashboard' ||
+        screenId === 'student_assignment' ||
+        screenId === 'student_forum';
       const isTeacherScreen =
         screenId === 'teacher_grades' ||
         screenId === 'teacher_assignments' ||
@@ -420,6 +437,27 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                           </span>
                         </div>
                       </button>
+
+                      {/* Editar perfil y fotografía (Estudiante) */}
+                      {(currentUser.role === 'student' || currentUser.role === 'estudiante') && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowStudentProfileModal(true);
+                          }}
+                          className={`w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors text-left cursor-pointer ${
+                            isDarkMode ? 'text-slate-200 hover:bg-slate-800 hover:text-cyan-300' : 'text-[#222] hover:bg-[#f3f6ff] hover:text-[#00288e]'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[20px] text-cyan-400">add_a_photo</span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{currentLang === 'es' ? 'Editar perfil y foto' : 'Edit profile & photo'}</span>
+                            <span className={`text-[11px] ${isDarkMode ? 'text-slate-400' : 'text-[#666]'}`}>
+                              {currentLang === 'es' ? 'Subir fotografía personal y contacto' : 'Upload photo & contact info'}
+                            </span>
+                          </div>
+                        </button>
+                      )}
 
                       {/* 2. Cambiar de temas (claro/oscuro) */}
                       <button
@@ -768,12 +806,27 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className={`p-4 border-t flex justify-end ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'}`}>
+            <div className={`p-4 border-t flex items-center justify-between ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'}`}>
+              {(currentUser.role === 'student' || currentUser.role === 'estudiante') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowViewProfileModal(false);
+                    setShowStudentProfileModal(true);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    isDarkMode ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-[#00288e] hover:bg-[#1e40af] text-white shadow-xs'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">add_a_photo</span>
+                  <span>{currentLang === 'es' ? 'Editar perfil y foto' : 'Edit profile & photo'}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowViewProfileModal(false)}
-                className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                  isDarkMode ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ml-auto ${
+                  isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                 }`}
               >
                 {currentLang === 'es' ? 'Cerrar' : 'Close'}
@@ -900,6 +953,18 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       <main className="flex-1 w-full">
         {children}
       </main>
+
+      {/* Student Profile & Photo Modal */}
+      {currentUser && (currentUser.role === 'student' || currentUser.role === 'estudiante') && (
+        <StudentProfileModal
+          currentUser={currentUser}
+          isOpen={showStudentProfileModal}
+          onClose={() => setShowStudentProfileModal(false)}
+          onUpdateUser={(updated) => {
+            if (onUpdateUser) onUpdateUser(updated);
+          }}
+        />
+      )}
     </div>
   );
 };

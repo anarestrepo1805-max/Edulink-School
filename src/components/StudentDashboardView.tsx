@@ -5,6 +5,7 @@ import { getOfficialScheduleForGrade } from '../data/institutionalCensus';
 import { fetchPublishedAssignmentsForStudent } from '../services/assignmentService';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
+import { StudentProfileModal } from './StudentProfileModal';
 
 interface StudentDashboardViewProps {
   currentUser?: UserProfile | null;
@@ -96,6 +97,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
 
   // Schedule modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Subject creation modal state
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
@@ -296,13 +298,22 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
               )}
             </button>
             <button
-              onClick={() => showToast(isEn ? 'Technology & Innovation institutional debate forum.' : 'Acceso al foro institucional de debate sobre Tecnología e Innovación.')}
+              onClick={() => onNavigate('student_forum')}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
-              <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
+              <span className="material-symbols-outlined text-[20px]">forum</span>
               <span>{isEn ? 'Forums & Surveys' : 'Foro y encuestas'}</span>
+            </button>
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
+                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">manage_accounts</span>
+              <span>{isEn ? 'My Profile & Settings' : 'Mi Perfil / Configuración'}</span>
             </button>
           </nav>
         </div>
@@ -399,17 +410,25 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                 <span className={`text-xs font-bold leading-tight ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
                   {studentName}
                 </span>
-                <span className={`text-[11px] leading-tight mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                  {gradeLevel} {currentUser?.studentCode ? `• ${currentUser.studentCode}` : ''}
+                <span className={`text-[11px] leading-tight mt-0.5 font-semibold ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
+                  {isEn ? 'Student' : 'Estudiante'} • {gradeLevel}
                 </span>
               </div>
-              <img
-                alt="Student Profile"
-                className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs ${
-                  isDark ? 'ring-cyan-500/40' : 'ring-[#1e40af]/20'
-                }`}
-                src={currentUser?.avatarUrl || ASSETS.studentAvatar}
-              />
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="relative group cursor-pointer focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-full"
+                title={isEn ? 'Edit student profile & photo' : 'Editar perfil y foto del estudiante'}
+              >
+                <img
+                  alt="Student Profile"
+                  className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs group-hover:scale-105 transition-all ${
+                    isDark ? 'ring-cyan-500/40' : 'ring-[#1e40af]/20'
+                  }`}
+                  src={currentUser?.avatarUrl || ASSETS.studentAvatar}
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900" />
+              </button>
             </div>
           </div>
         </header>
@@ -1250,6 +1269,18 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* STUDENT PROFILE & PHOTO MODAL */}
+      {currentUser && (
+        <StudentProfileModal
+          currentUser={currentUser}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdateUser={(updated) => {
+            if (onUpdateUser) onUpdateUser(updated);
+          }}
+        />
       )}
     </div>
   );

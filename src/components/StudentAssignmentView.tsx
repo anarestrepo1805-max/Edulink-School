@@ -338,15 +338,15 @@ export const StudentAssignmentView: React.FC<StudentAssignmentViewProps> = ({
               <span>{isEn ? 'Tasks & Workshops' : 'Tareas y Entregas'}</span>
             </button>
             <button
-              onClick={() => onNavigate('family_messaging')}
+              onClick={() => onNavigate('student_forum')}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
                 isDark
                   ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
-              <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
-              <span>{isEn ? 'Forums & Messages' : 'Foros y mensajería'}</span>
+              <span className="material-symbols-outlined text-[20px]">forum</span>
+              <span>{isEn ? 'Forums & Surveys' : 'Foro y encuestas'}</span>
             </button>
           </nav>
         </div>

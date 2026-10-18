@@ -5,6 +5,7 @@ import { LoginView } from './components/LoginView';
 import { ResetPasswordView } from './components/ResetPasswordView';
 import { StudentDashboardView } from './components/StudentDashboardView';
 import { StudentAssignmentView } from './components/StudentAssignmentView';
+import { StudentForumView } from './components/StudentForumView';
 import { TeacherGradesView } from './components/TeacherGradesView';
 import { TeacherAssignmentsView } from './components/TeacherAssignmentsView';
 import { TeacherAttendanceView } from './components/TeacherAttendanceView';
@@ -93,6 +94,7 @@ function MainApp() {
       onSelectRole={setUserRole}
       currentUser={currentUser}
       onLogout={handleLogout}
+      onUpdateUser={handleUpdateUser}
     >
       {currentScreen === 'student_dashboard' && (
         <StudentDashboardView
@@ -108,6 +110,15 @@ function MainApp() {
           currentUser={currentUser}
           onBack={() => setCurrentScreen('student_dashboard')}
           onNavigate={setCurrentScreen}
+        />
+      )}
+
+      {currentScreen === 'student_forum' && (
+        <StudentForumView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
         />
       )}
 

@@ -297,6 +297,7 @@ export async function publishInstitutionalAssignment(assignment: {
   subject: string;
   subjectColor?: string;
   gradeLevel: string;
+  group?: string;
   shift?: string;
   teacherName: string;
   teacherId?: string;
@@ -317,6 +318,7 @@ export async function publishInstitutionalAssignment(assignment: {
     subject: assignment.subject,
     subjectColor: assignment.subjectColor || 'text-cyan-600',
     gradeLevel: assignment.gradeLevel,
+    group: assignment.group || assignment.gradeLevel,
     shift: assignment.shift || 'Jornada Mañana',
     teacherName: assignment.teacherName,
     teacherId: assignment.teacherId || '',
