@@ -7,7 +7,6 @@ import {
   checkStudentSurveySubmission,
   submitStudentSurveyVote
 } from '../services/studentProfileService';
-import { StudentProfileModal } from './StudentProfileModal';
 
 interface StudentForumViewProps {
   currentUser?: UserProfile | null;
@@ -20,7 +19,7 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
   currentUser,
   onNavigate,
   onLogout,
-  onUpdateUser
+  onUpdateUser: _onUpdateUser
 }) => {
   const { theme, language } = useThemeLanguage();
   const isDark = theme === 'dark';
@@ -36,9 +35,6 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
   const [selectedSurveyOptions, setSelectedSurveyOptions] = useState<Record<string, string>>({});
   const [votedSurveys, setVotedSurveys] = useState<Record<string, boolean>>({});
   const [isSubmittingVote, setIsSubmittingVote] = useState<Record<string, boolean>>({});
-
-  // Profile modal state
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const studentName = currentUser?.fullName || (isEn ? 'Student' : 'Estudiante');
@@ -275,17 +271,6 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
               <span className="material-symbols-outlined text-[20px]">forum</span>
               <span>{isEn ? 'Forums & Surveys' : 'Foro y encuestas'}</span>
             </button>
-
-            {/* MI PERFIL / CONFIGURACIÓN */}
-            <button
-              onClick={() => setShowProfileModal(true)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">manage_accounts</span>
-              <span>{isEn ? 'My Profile & Settings' : 'Mi Perfil / Configuración'}</span>
-            </button>
           </nav>
         </div>
 
@@ -344,21 +329,16 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowProfileModal(true)}
-              className="relative cursor-pointer group"
-              title={isEn ? 'Edit student profile and photo' : 'Editar perfil y foto'}
-            >
+            <div className="relative">
               <img
                 src={currentUser?.avatarUrl || ASSETS.studentAvatar}
                 alt={studentName}
-                className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs group-hover:scale-105 transition-all ${
+                className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs ${
                   isDark ? 'ring-cyan-500/40' : 'ring-[#1e40af]/20'
                 }`}
               />
               <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900" />
-            </button>
+            </div>
           </div>
         </header>
 
@@ -386,18 +366,6 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
                     ? 'Here you will find announcements, academic debate topics, and official surveys published by authorized teachers and directive coordinators.'
                     : 'Espacio para consultar circulares informativas, debates académicos y encuestas de participación habilitadas por los docentes y directivos de la I.E. Vallejuelos.'}
                 </p>
-              </div>
-
-              {/* Quick Profile & Settings shortcut button */}
-              <div className="shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(true)}
-                  className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 active:bg-white/30 text-white text-xs font-bold border border-white/20 backdrop-blur-md flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-                >
-                  <span className="material-symbols-outlined text-[18px]">manage_accounts</span>
-                  <span>{isEn ? 'My Profile & Photo' : 'Mi Perfil y Foto'}</span>
-                </button>
               </div>
             </div>
           </section>

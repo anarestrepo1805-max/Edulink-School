@@ -2,6 +2,7 @@
  * EDULINK SCHOOL - CENSO OFICIAL INSTITUCIONAL
  * Fuente: Registro Escolar Grados 6-1 a 11-2 (I.E. Vallejuelos) y Horario Oficial FET
  */
+import { Subject } from '../types';
 
 export interface CensusStudent {
   group: string;
@@ -439,6 +440,112 @@ export function getOfficialScheduleForGrade(gradeLevel?: string): ScheduleSlot[]
 
   // Default to Grade 11 schedule
   return OFFICIAL_SCHEDULE_11_1;
+}
+
+/**
+ * Automatically retrieves official institutional subjects and assigned teachers for any student
+ * derived directly from the institutional census schedule.
+ * Does NOT require or allow manual subject configuration by students.
+ */
+export function getOfficialSubjectsForStudent(gradeLevel?: string, group?: string): Subject[] {
+  const schedule = getOfficialScheduleForGrade(gradeLevel || group || '11-1');
+  const subjectsMap = new Map<string, {
+    name: string;
+    teacher: string;
+    days: string[];
+    time: string;
+  }>();
+
+  const dayNames: { key: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'; label: string }[] = [
+    { key: 'monday', label: 'Lun' },
+    { key: 'tuesday', label: 'Mar' },
+    { key: 'wednesday', label: 'Mié' },
+    { key: 'thursday', label: 'Jue' },
+    { key: 'friday', label: 'Vie' }
+  ];
+
+  for (const slot of schedule) {
+    if (slot.period === 0) continue; // Skip recreo
+    for (const d of dayNames) {
+      const cell = slot[d.key];
+      if (!cell || !cell.subject || cell.subject.includes('Descanso') || cell.subject.includes('Recreo')) continue;
+      
+      const key = cell.subject.trim();
+      const existing = subjectsMap.get(key);
+      if (!existing) {
+        subjectsMap.set(key, {
+          name: key,
+          teacher: cell.teacher || 'Docente Institucional',
+          days: [d.label],
+          time: slot.time
+        });
+      } else {
+        if (!existing.days.includes(d.label)) {
+          existing.days.push(d.label);
+        }
+      }
+    }
+  }
+
+  const categoryMap: Record<string, string> = {
+    'Matemáticas': 'Ciencias Exactas',
+    'Español': 'Lengua y Humanidades',
+    'Lengua Castellana': 'Lengua y Humanidades',
+    'Inglés': 'Idiomas y Bilingüismo',
+    'Tecnología': 'Tecnología e Informática',
+    'Ciencias Naturales': 'Ciencias Naturales',
+    'Química': 'Ciencias Naturales',
+    'Física': 'Ciencias Naturales',
+    'Filosofía': 'Filosofía y Humanidades',
+    'Filosofía de vida': 'Filosofía y Humanidades',
+    'Sociales': 'Ciencias Sociales',
+    'Artística': 'Educación Artística',
+    'Educación Física': 'Educación Física y Deportes',
+    'Economía y política': 'Ciencias Económicas y Políticas',
+    'Espiritualidad y valores': 'Ética y Valores Humanos'
+  };
+
+  const styleMap: Record<string, { color: string; bgLight: string; icon: string }> = {
+    'Matemáticas': { color: '#2563eb', bgLight: '#eff6ff', icon: 'calculate' },
+    'Español': { color: '#e11d48', bgLight: '#fff1f2', icon: 'auto_stories' },
+    'Lengua Castellana': { color: '#e11d48', bgLight: '#fff1f2', icon: 'auto_stories' },
+    'Inglés': { color: '#0d9488', bgLight: '#f0fdfa', icon: 'language' },
+    'Tecnología': { color: '#4f46e5', bgLight: '#eef2ff', icon: 'terminal' },
+    'Ciencias Naturales': { color: '#16a34a', bgLight: '#f0fdf4', icon: 'biotech' },
+    'Química': { color: '#d97706', bgLight: '#fffbeb', icon: 'science' },
+    'Física': { color: '#0284c7', bgLight: '#f0f9ff', icon: 'bolt' },
+    'Filosofía': { color: '#7c3aed', bgLight: '#f5f3ff', icon: 'psychology' },
+    'Filosofía de vida': { color: '#7c3aed', bgLight: '#f5f3ff', icon: 'psychology' },
+    'Sociales': { color: '#ea580c', bgLight: '#fff7ed', icon: 'public' },
+    'Artística': { color: '#db2777', bgLight: '#fdf2f8', icon: 'palette' },
+    'Educación Física': { color: '#059669', bgLight: '#ecfdf5', icon: 'sports_soccer' },
+    'Economía y política': { color: '#0891b2', bgLight: '#ecfeff', icon: 'account_balance' },
+    'Espiritualidad y valores': { color: '#8b5cf6', bgLight: '#f5f3ff', icon: 'favorite' }
+  };
+
+  const result: Subject[] = [];
+  let index = 1;
+  for (const [name, info] of subjectsMap.entries()) {
+    const styling = styleMap[name] || { color: '#2563eb', bgLight: '#eff6ff', icon: 'menu_book' };
+    const category = categoryMap[name] || 'Carga Académica Oficial';
+    const scheduleStr = `${info.days.join(' - ')} ${info.time}`;
+
+    result.push({
+      id: `subj_${index++}_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+      name,
+      category,
+      teacher: info.teacher,
+      schedule: scheduleStr,
+      grade: 4.2,
+      progress: 75,
+      color: styling.color,
+      bgLight: styling.bgLight,
+      icon: styling.icon,
+      nextClass: `${info.days[0] || 'Lun'} ${info.time.split('-')[0].trim()}`
+    });
+  }
+
+  return result;
 }
 
 /**

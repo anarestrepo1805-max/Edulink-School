@@ -93,6 +93,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       return;
     }
 
+    if (isUploadingPhoto) return; // Prevent duplicate execution
+
     setIsUploadingPhoto(true);
     setFeedbackError(null);
     setFeedbackSuccess(null);
@@ -101,9 +103,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       const result = await uploadStudentProfilePhoto(currentUser.id, selectedFile, currentUser);
       onUpdateUser(result.updatedUser);
       setFeedbackSuccess(
-        isEn
+        result.message ||
+        (isEn
           ? 'Profile photo updated successfully and persisted to database!'
-          : '¡Fotografía de perfil actualizada con éxito en la base de datos institucional!'
+          : '¡Fotografía de perfil guardada con éxito en la base de datos institucional!')
       );
       setSelectedFile(null);
       setPreviewUrl(null);
