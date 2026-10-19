@@ -4,6 +4,7 @@ import { deleteUserAccount } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { ASSETS } from '../data/mockData';
 import { StudentProfileModal } from './StudentProfileModal';
+import { TeacherScheduleModal } from './TeacherScheduleModal';
 
 interface NavigationShellProps {
   currentScreen: ActiveScreen;
@@ -24,16 +25,16 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   onUpdateUser,
   children
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
   const [showStudentProfileModal, setShowStudentProfileModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Top-right Profile Dropdown state
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Modals state
-  const [showViewProfileModal, setShowViewProfileModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
   // Theme & Language context
@@ -290,33 +291,6 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
             </span>
           </div>
 
-          {/* Quick Screen Switcher Pills */}
-          <div className="hidden lg:flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar">
-            {visibleScreens.map((screen) => {
-              const isActive = currentScreen === screen.id;
-              const isLocked = !currentUser && screen.id !== 'login';
-              return (
-                <button
-                  key={screen.id}
-                  onClick={() => handleScreenClick(screen.id)}
-                  title={isLocked ? 'Debes iniciar sesión primero' : screen.label}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white ${
-                    isActive
-                      ? 'bg-white text-[#00288e] shadow-sm scale-105'
-                      : isLocked
-                      ? 'text-white/50 hover:text-white/80 hover:bg-white/10'
-                      : 'text-white/80 hover:text-white hover:bg-white/15'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {isLocked ? 'lock' : screen.icon}
-                  </span>
-                  <span>{screen.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
           {/* User Session & Profile Menu Button */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Quick compact theme & language capsule */}
@@ -419,11 +393,11 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
 
                     {/* Menu Actions List */}
                     <div className="py-1">
-                      {/* 1. Ver Perfil */}
+                      {/* 1. Ver y editar perfil y fotografía (Universal para todos los roles) */}
                       <button
                         onClick={() => {
                           setShowProfileMenu(false);
-                          setShowViewProfileModal(true);
+                          setShowStudentProfileModal(true);
                         }}
                         className={`w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors text-left cursor-pointer ${
                           isDarkMode ? 'text-slate-200 hover:bg-slate-800 hover:text-white' : 'text-[#222] hover:bg-[#f3f6ff] hover:text-[#00288e]'
@@ -431,33 +405,12 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                       >
                         <span className="material-symbols-outlined text-[20px] text-cyan-500">account_circle</span>
                         <div className="flex flex-col">
-                          <span className="font-semibold">{currentLang === 'es' ? 'Ver perfil' : 'View profile'}</span>
+                          <span className="font-semibold">{currentLang === 'es' ? 'Ver y editar perfil' : 'View & edit profile'}</span>
                           <span className={`text-[11px] ${isDarkMode ? 'text-slate-400' : 'text-[#666]'}`}>
-                            {currentLang === 'es' ? 'Datos personales e institucionales' : 'Personal & school details'}
+                            {currentLang === 'es' ? 'Datos personales, contacto y fotografía' : 'Personal info, contact & photo'}
                           </span>
                         </div>
                       </button>
-
-                      {/* Editar perfil y fotografía (Estudiante) */}
-                      {(currentUser.role === 'student' || currentUser.role === 'estudiante') && (
-                        <button
-                          onClick={() => {
-                            setShowProfileMenu(false);
-                            setShowStudentProfileModal(true);
-                          }}
-                          className={`w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors text-left cursor-pointer ${
-                            isDarkMode ? 'text-slate-200 hover:bg-slate-800 hover:text-cyan-300' : 'text-[#222] hover:bg-[#f3f6ff] hover:text-[#00288e]'
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[20px] text-cyan-400">add_a_photo</span>
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{currentLang === 'es' ? 'Editar perfil y foto' : 'Edit profile & photo'}</span>
-                            <span className={`text-[11px] ${isDarkMode ? 'text-slate-400' : 'text-[#666]'}`}>
-                              {currentLang === 'es' ? 'Subir fotografía personal y contacto' : 'Upload photo & contact info'}
-                            </span>
-                          </div>
-                        </button>
-                      )}
 
                       {/* 2. Cambiar de temas (claro/oscuro) */}
                       <button
@@ -563,22 +516,7 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
               >
                 {currentLang === 'es' ? 'Iniciar Sesión / Registro' : 'Sign In / Register'}
               </button>
-            )}
-
-            {/* Mobile menu button */}
-            <div className="flex lg:hidden items-center gap-1">
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 active:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white shrink-0"
-                aria-label={currentLang === 'es' ? 'Abrir navegación móvil' : 'Open mobile menu'}
-                aria-expanded={isExpanded}
-              >
-                <span className="material-symbols-outlined text-[24px]">
-                  {isExpanded ? 'close' : 'menu'}
-                </span>
-              </button>
-            </div>
-          </div>
+            )}          </div>
         </div>
 
         {/* Warning notification banner when an unregistered user clicks locked view */}
@@ -596,32 +534,6 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
             </button>
           </div>
         )}
-
-        {/* Mobile Dropdown Navigation */}
-        {isExpanded && (
-          <div className="lg:hidden mt-2 pt-2 border-t border-white/15 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pb-1 animate-in fade-in slide-in-from-top-1 duration-150">
-            {visibleScreens.map((screen) => {
-              const isActive = currentScreen === screen.id;
-              const isLocked = !currentUser && screen.id !== 'login';
-              return (
-                <button
-                  key={screen.id}
-                  onClick={() => handleScreenClick(screen.id)}
-                  className={`flex items-center gap-2.5 p-3 min-h-[44px] rounded-xl text-xs font-semibold text-left transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white ${
-                    isActive
-                      ? 'bg-white text-[#00288e] shadow-sm font-bold'
-                      : 'text-white/90 hover:bg-white/20 active:bg-white/25'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px] shrink-0">
-                    {isLocked ? 'lock' : screen.icon}
-                  </span>
-                  <span className="truncate">{screen.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </header>
 
       {/* Floating Toast Message */}
@@ -629,210 +541,6 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
         <div className="fixed top-16 right-4 z-50 bg-[#0b1c30] text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in duration-200">
           <span className="material-symbols-outlined text-[18px] text-[#7bd0ff]">check_circle</span>
           <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* ---------------- MODAL 1: VER PERFIL ---------------- */}
-      {showViewProfileModal && currentUser && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border animate-in zoom-in-95 duration-150 ${
-            isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
-          }`}>
-            {/* Modal Header */}
-            <div className={`p-6 text-white flex items-center justify-between ${
-              isDarkMode ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 border-b border-cyan-500/20' : 'bg-gradient-to-r from-[#00288e] to-[#1e40af]'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white text-lg font-bold border-2 border-white/40 overflow-hidden">
-                  {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    currentUser.fullName.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold leading-tight">{currentUser.fullName}</h3>
-                  <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-[#c4e7ff]">
-                    {getRoleLabel(currentUser.role)}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowViewProfileModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
-                title={currentLang === 'es' ? 'Cerrar' : 'Close'}
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            {/* Modal Body Info Details */}
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className={`p-3 rounded-xl border ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
-                }`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                    {currentLang === 'es' ? 'Nombre Completo' : 'Full Name'}
-                  </span>
-                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-[#0b1c30]'}`}>{currentUser.fullName}</span>
-                </div>
-
-                <div className={`p-3 rounded-xl border ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
-                }`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                    {currentLang === 'es' ? 'Documento de Identidad' : 'ID Document'}
-                  </span>
-                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-[#0b1c30]'}`}>{currentUser.documentId}</span>
-                </div>
-
-                <div className={`p-3 rounded-xl border ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
-                }`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                    {currentLang === 'es' ? 'Correo Electrónico' : 'Email Address'}
-                  </span>
-                  <span className={`text-sm font-semibold truncate block ${isDarkMode ? 'text-white' : 'text-[#0b1c30]'}`}>{currentUser.email}</span>
-                </div>
-
-                <div className={`p-3 rounded-xl border ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
-                }`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                    {currentLang === 'es' ? 'Institución Educativa' : 'Educational Institution'}
-                  </span>
-                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-[#0b1c30]'}`}>I.E. Vallejuelos • Medellín</span>
-                </div>
-
-                <div className={`p-3 rounded-xl border sm:col-span-2 ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
-                }`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                    {currentLang === 'es' ? 'Jornada Escolar Oficial' : 'Official School Shift'}
-                  </span>
-                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-cyan-300' : 'text-[#0b1c30]'}`}>
-                    {currentLang === 'es' ? 'Jornada Mañana (6:15 AM a 12:15 PM)' : 'Morning Shift (6:15 AM to 12:15 PM)'}
-                  </span>
-                </div>
-
-                {/* Role specific info */}
-                {currentUser.role === 'student' && (
-                  <>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-blue-950/40 border-blue-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-cyan-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Grado y Grupo Oficial' : 'Official Grade & Group'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-cyan-300' : 'text-[#00288e]'}`}>{currentUser.gradeLevel || 'Grado 11°1'}</span>
-                    </div>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-blue-950/40 border-blue-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-cyan-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Código / Matrícula' : 'Student Code'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-cyan-300' : 'text-[#00288e]'}`}>{currentUser.studentCode || 'EST-2026-042'}</span>
-                    </div>
-                  </>
-                )}
-
-                {currentUser.role === 'teacher' && (
-                  <>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-indigo-950/40 border-indigo-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-indigo-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Área Académica' : 'Academic Area'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-indigo-300' : 'text-[#00288e]'}`}>{currentUser.subjectArea || 'Tecnología e Informática'}</span>
-                    </div>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-indigo-950/40 border-indigo-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-indigo-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Grados Asignados' : 'Assigned Grades'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-indigo-300' : 'text-[#00288e]'}`}>{currentUser.assignedGrades || '6°1, 6°2, 7°1, 7°2'}</span>
-                    </div>
-                  </>
-                )}
-
-                {currentUser.role === 'family' && (
-                  <>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-amber-950/40 border-amber-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-amber-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Parentesco' : 'Relationship'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#00288e]'}`}>{currentUser.relationship || 'Madre de familia'}</span>
-                    </div>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-amber-950/40 border-amber-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-amber-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Estudiante Representado' : 'Represented Student'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-amber-300' : 'text-[#00288e]'}`}>
-                        {currentUser.representedStudentName || (currentLang === 'es' ? 'Estudiante acudido' : 'Represented student')}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {currentUser.role === 'admin' && (
-                  <>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-emerald-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Cargo Oficial' : 'Official Position'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-emerald-300' : 'text-[#00288e]'}`}>{currentUser.adminPosition || currentUser.department || 'Coordinación Académica'}</span>
-                    </div>
-                    <div className={`p-3 rounded-xl border ${
-                      isDarkMode ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-[#eff4ff] border-[#dce9ff]'
-                    }`}>
-                      <span className={`block text-[11px] font-bold uppercase ${isDarkMode ? 'text-emerald-400' : 'text-[#00288e]'}`}>
-                        {currentLang === 'es' ? 'Nivel de Acceso' : 'Access Level'}
-                      </span>
-                      <span className={`text-sm font-bold ${isDarkMode ? 'text-emerald-300' : 'text-[#00288e]'}`}>{currentLang === 'es' ? 'Gestión Institucional' : 'Institutional Leadership'}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className={`p-4 border-t flex items-center justify-between ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'}`}>
-              {(currentUser.role === 'student' || currentUser.role === 'estudiante') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowViewProfileModal(false);
-                    setShowStudentProfileModal(true);
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isDarkMode ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-[#00288e] hover:bg-[#1e40af] text-white shadow-xs'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">add_a_photo</span>
-                  <span>{currentLang === 'es' ? 'Editar perfil y foto' : 'Edit profile & photo'}</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowViewProfileModal(false)}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ml-auto ${
-                  isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                }`}
-              >
-                {currentLang === 'es' ? 'Cerrar' : 'Close'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -954,8 +662,8 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
         {children}
       </main>
 
-      {/* Student Profile & Photo Modal */}
-      {currentUser && (currentUser.role === 'student' || currentUser.role === 'estudiante') && (
+      {/* User Profile & Photo Modal (for all authenticated roles) */}
+      {currentUser && (
         <StudentProfileModal
           currentUser={currentUser}
           isOpen={showStudentProfileModal}

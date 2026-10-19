@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ActiveScreen, StudentGradeRecord, UserProfile } from '../types';
-import { ASSETS } from '../data/mockData';
+import { ASSETS, INITIAL_STUDENT_GRADES } from '../data/mockData';
 import {
   getTeacherAcademicAssignments,
   getCensusStudentsForGroup,
@@ -10,6 +10,8 @@ import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { TeacherSidebar } from './TeacherSidebar';
 import { TeacherScheduleModal } from './TeacherScheduleModal';
+import { exportToCSV, exportToExcel, printFormattedReport } from '../services/exportService';
+import { publishInstitutionalAssignment } from '../services/assignmentService';
 
 interface TeacherGradesViewProps {
   currentUser?: UserProfile | null;
@@ -70,6 +72,19 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isConfiguringDemo, setIsConfiguringDemo] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // New Evaluation modal state
+  const [showNewEvaluationModal, setShowNewEvaluationModal] = useState(false);
+  const [newEvalTitle, setNewEvalTitle] = useState('');
+  const [newEvalPeriod, setNewEvalPeriod] = useState('1° Periodo (2026)');
+  const [newEvalWeight, setNewEvalWeight] = useState('20%');
+  const [newEvalDueDate, setNewEvalDueDate] = useState('2026-04-10');
+  const [newEvalDescription, setNewEvalDescription] = useState('');
+  const [newEvalPublishTask, setNewEvalPublishTask] = useState(true);
+  const [isSavingEval, setIsSavingEval] = useState(false);
 
   // Cargar automáticamente los estudiantes de la base de datos oficial matriculados en el grupo asignado
   useEffect(() => {
@@ -149,6 +164,177 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLastSaved(isEn ? `Today, ${now}` : `Hoy, ${now}`);
     showToast(isEn ? 'Changes saved to institutional cloud system!' : '¡Cambios guardados con éxito en el sistema institucional!');
+  };
+
+  const handleExportExcel = () => {
+    const columns = [
+      { header: '#', key: 'pos' },
+      { header: 'Documento', key: 'id' },
+      { header: 'Matrícula', key: 'matricula' },
+      { header: 'Estudiante', key: 'name' },
+      { header: 'Parcial 1 (30%)', key: 'parcial1' },
+      { header: 'Parcial 2 (30%)', key: 'parcial2' },
+      { header: 'Taller 1 (20%)', key: 'taller1' },
+      { header: 'Ser y Convivencia (20%)', key: 'serConv' },
+      { header: 'Definitiva', key: 'final' },
+      { header: 'Asistencia', key: 'attendance' },
+      { header: 'Estado', key: 'state' }
+    ];
+
+    const rows = grades.map((g, idx) => {
+      const fin = calculateFinal(g);
+      return {
+        pos: idx + 1,
+        id: g.id,
+        matricula: g.matricula,
+        name: g.name,
+        parcial1: g.parcial1.toFixed(1),
+        parcial2: g.parcial2.toFixed(1),
+        taller1: g.taller1.toFixed(1),
+        serConv: g.serConv.toFixed(1),
+        final: fin.toFixed(1),
+        attendance: `${g.attendance}%`,
+        state: fin >= 3.0 ? 'APROBADO' : 'REPROBADO'
+      };
+    });
+
+    exportToExcel(
+      `Planilla_${currentAssignment.groupKey}_${currentAssignment.subjectName}_2026`,
+      currentAssignment.groupKey,
+      rows,
+      columns,
+      {
+        title: `I.E. VALLEJUELOS - PLANILLA OFICIAL DE CALIFICACIONES`,
+        subtitle: `Docente: ${teacherName} | Asignatura: ${currentAssignment.subjectName} | Grupo: ${currentAssignment.group} | Jornada Mañana (6:15 AM - 12:15 PM)`
+      }
+    );
+    setShowExportModal(false);
+    showToast(isEn ? 'Excel spreadsheet downloaded successfully!' : '¡Planilla Excel (.xls) descargada exitosamente!');
+  };
+
+  const handleExportCSV = () => {
+    const columns = [
+      { header: 'Pos', key: 'pos' },
+      { header: 'Documento', key: 'id' },
+      { header: 'Matricula', key: 'matricula' },
+      { header: 'Nombre', key: 'name' },
+      { header: 'P1', key: 'parcial1' },
+      { header: 'P2', key: 'parcial2' },
+      { header: 'T1', key: 'taller1' },
+      { header: 'Ser', key: 'serConv' },
+      { header: 'Definitiva', key: 'final' },
+      { header: 'Asistencia', key: 'attendance' },
+      { header: 'Estado', key: 'state' }
+    ];
+
+    const rows = grades.map((g, idx) => {
+      const fin = calculateFinal(g);
+      return {
+        pos: idx + 1,
+        id: g.id,
+        matricula: g.matricula,
+        name: g.name,
+        parcial1: g.parcial1.toFixed(1),
+        parcial2: g.parcial2.toFixed(1),
+        taller1: g.taller1.toFixed(1),
+        serConv: g.serConv.toFixed(1),
+        final: fin.toFixed(1),
+        attendance: `${g.attendance}%`,
+        state: fin >= 3.0 ? 'APROBADO' : 'REPROBADO'
+      };
+    });
+
+    exportToCSV(`Planilla_${currentAssignment.groupKey}_${currentAssignment.subjectName}`, rows, columns);
+    setShowExportModal(false);
+    showToast(isEn ? 'CSV file downloaded successfully!' : '¡Archivo CSV descargado exitosamente!');
+  };
+
+  const handlePrintReport = () => {
+    let rowsHtml = '';
+    grades.forEach((g, idx) => {
+      const fin = calculateFinal(g);
+      rowsHtml += `<tr>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${idx + 1}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;">${g.matricula}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;font-weight:bold;">${g.name}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${g.parcial1.toFixed(1)}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${g.parcial2.toFixed(1)}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${g.taller1.toFixed(1)}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${g.serConv.toFixed(1)}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:${fin >= 3.0 ? '#059669' : '#dc2626'};">${fin.toFixed(1)}</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;">${g.attendance}%</td>
+        <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:${fin >= 3.0 ? '#059669' : '#dc2626'};">${fin >= 3.0 ? 'APROBADO' : 'REPROBADO'}</td>
+      </tr>`;
+    });
+
+    const tableHtml = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background-color:#00288e;color:#ffffff;">
+            <th style="padding:8px;border:1px solid #cbd5e1;">#</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Matrícula</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Estudiante</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">P1 (30%)</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">P2 (30%)</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">T1 (20%)</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Ser (20%)</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Definitiva</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Asist.</th>
+            <th style="padding:8px;border:1px solid #cbd5e1;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+
+    printFormattedReport(
+      `Planilla de Calificaciones - ${currentAssignment.subjectName} (${currentAssignment.group})`,
+      `I.E. Vallejuelos • Docente: ${teacherName} • Jornada Mañana (6:15 AM a 12:15 PM) • Periodo 1 (2026)`,
+      tableHtml
+    );
+    setShowExportModal(false);
+  };
+
+  const handleCreateEvaluationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEvalTitle.trim()) {
+      showToast(isEn ? 'Evaluation title is required.' : 'El título de la evaluación es requerido.');
+      return;
+    }
+
+    setIsSavingEval(true);
+    try {
+      if (newEvalPublishTask) {
+        await publishInstitutionalAssignment({
+          title: newEvalTitle.trim(),
+          subject: currentAssignment.subjectName,
+          gradeLevel: currentAssignment.groupKey,
+          group: currentAssignment.groupKey,
+          teacherName,
+          teacherId: currentUser?.id || currentUser?.documentId || '',
+          dueDate: newEvalDueDate,
+          dueText: `Fecha límite: ${newEvalDueDate}`,
+          urgency: 'regular',
+          isPublished: true,
+          type: 'Taller / Evaluación',
+          typeIcon: 'assignment',
+          points: newEvalWeight,
+          instructions: newEvalDescription.trim() || 'Desarrollar la evaluación según las instrucciones del docente.'
+        });
+      }
+
+      setShowNewEvaluationModal(false);
+      setNewEvalTitle('');
+      setNewEvalDescription('');
+      showToast(isEn ? 'Evaluation registered and published to students!' : '¡Evaluación registrada y publicada en Tareas y Talleres con éxito!');
+    } catch (err) {
+      console.error('Error saving evaluation:', err);
+      showToast(isEn ? 'Error saving evaluation' : 'Error al guardar la evaluación');
+    } finally {
+      setIsSavingEval(false);
+    }
   };
 
   // Filtered students
@@ -406,7 +592,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
             {/* Right action button group */}
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <button
-                onClick={() => showToast(isEn ? 'Exporting PDF & Excel report for Academic Records.' : 'Generando reporte en PDF y planilla Excel para Secretaría Académica.')}
+                onClick={() => setShowExportModal(true)}
                 className={`h-11 px-4 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold border cursor-pointer ${
                   isDark
                     ? 'bg-slate-800 border-slate-700 text-white hover:bg-slate-700'
@@ -430,7 +616,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               </button>
 
               <button
-                onClick={() => showToast(isEn ? 'New evaluation criterion modal opened.' : 'Nueva evaluación añadida a la planilla.')}
+                onClick={() => setShowNewEvaluationModal(true)}
                 className={`h-11 px-4 rounded-xl text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
                   isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#1e40af] hover:bg-[#00288e]'
                 }`}
@@ -958,6 +1144,312 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           </div>
         </main>
       </div>
+
+      {/* MODAL 1: EXPORTAR PLANILLA */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border animate-in zoom-in-95 duration-150 ${
+            isDark ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
+          }`}>
+            <div className={`p-5 text-white flex items-center justify-between ${
+              isDark ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 border-b border-cyan-500/20' : 'bg-gradient-to-r from-[#00288e] to-[#1e40af]'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-[24px]">download</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold leading-tight">
+                    {isEn ? 'Export Official Gradebook' : 'Exportar Planilla de Calificaciones'}
+                  </h3>
+                  <p className="text-xs text-cyan-200">
+                    {currentAssignment.subjectName} • {currentAssignment.group} • I.E. Vallejuelos
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
+                {isEn
+                  ? 'Select the preferred format to download the complete grade records for this group:'
+                  : 'Selecciona el formato para generar y descargar el registro completo de notas y porcentajes:'}
+              </p>
+
+              {/* Option 1: Excel */}
+              <div
+                onClick={handleExportExcel}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                  isDark
+                    ? 'bg-slate-950/70 border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/10'
+                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-emerald-500 hover:bg-emerald-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">table_chart</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-emerald-400 transition-colors">
+                      {isEn ? 'Excel Spreadsheet (.xls)' : 'Planilla Excel (.xls)'}
+                    </h4>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Full academic table with auto formulas & passing status' : 'Tabla oficial con ponderaciones y estado de aprobación'}
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-emerald-400 text-lg group-hover:translate-x-1 transition-transform">
+                  download
+                </span>
+              </div>
+
+              {/* Option 2: CSV */}
+              <div
+                onClick={handleExportCSV}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                  isDark
+                    ? 'bg-slate-950/70 border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-950/10'
+                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-cyan-500 hover:bg-cyan-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">description</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-cyan-400 transition-colors">
+                      {isEn ? 'CSV Standard File (.csv)' : 'Archivo Plano CSV (.csv)'}
+                    </h4>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'UTF-8 delimited values for database imports & backups' : 'Formato tabular ligero compatible con cualquier software'}
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
+                  download
+                </span>
+              </div>
+
+              {/* Option 3: Print / PDF Report */}
+              <div
+                onClick={handlePrintReport}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                  isDark
+                    ? 'bg-slate-950/70 border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/10'
+                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-blue-500 hover:bg-blue-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">print</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-blue-400 transition-colors">
+                      {isEn ? 'Printable Academic Report / PDF' : 'Imprimir Reporte Oficial / PDF'}
+                    </h4>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Formatted for institutional filing and academic committee' : 'Diseño institucional membretado para actas y archivo'}
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-blue-400 text-lg group-hover:translate-x-1 transition-transform">
+                  open_in_new
+                </span>
+              </div>
+            </div>
+
+            <div className={`p-4 border-t flex justify-end ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-[#f8faff] border-[#eff4ff]'}`}>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                }`}
+              >
+                {isEn ? 'Close' : 'Cerrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: NUEVA EVALUACIÓN */}
+      {showNewEvaluationModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border animate-in zoom-in-95 duration-150 ${
+            isDark ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
+          }`}>
+            <div className={`p-5 text-white flex items-center justify-between ${
+              isDark ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 border-b border-cyan-500/20' : 'bg-gradient-to-r from-[#00288e] to-[#1e40af]'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-[24px]">add_circle</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold leading-tight">
+                    {isEn ? 'New Academic Evaluation' : 'Nueva Evaluación Académica'}
+                  </h3>
+                  <p className="text-xs text-cyan-200">
+                    {currentAssignment.subjectName} • {currentAssignment.group}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewEvaluationModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEvaluationSubmit} className="p-6 space-y-4">
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-[#333]'}`}>
+                  {isEn ? 'Evaluation Title *' : 'Título de la Evaluación o Taller *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newEvalTitle}
+                  onChange={(e) => setNewEvalTitle(e.target.value)}
+                  placeholder="Ej: Taller 2: Razones Trigonométricas y Aplicaciones"
+                  className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                      : 'bg-[#f8faff] border-slate-300 text-[#0b1c30] focus:border-[#00288e]'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-[#333]'}`}>
+                    {isEn ? 'Term / Period' : 'Periodo Académico'}
+                  </label>
+                  <select
+                    value={newEvalPeriod}
+                    onChange={(e) => setNewEvalPeriod(e.target.value)}
+                    className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                        : 'bg-[#f8faff] border-slate-300 text-[#0b1c30] focus:border-[#00288e]'
+                    }`}
+                  >
+                    <option value="1° Periodo (2026)">1° Periodo (2026)</option>
+                    <option value="2° Periodo (2026)">2° Periodo (2026)</option>
+                    <option value="3° Periodo (2026)">3° Periodo (2026)</option>
+                    <option value="4° Periodo (2026)">4° Periodo (2026)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-[#333]'}`}>
+                    {isEn ? 'Weight Percentage' : 'Ponderación'}
+                  </label>
+                  <select
+                    value={newEvalWeight}
+                    onChange={(e) => setNewEvalWeight(e.target.value)}
+                    className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                        : 'bg-[#f8faff] border-slate-300 text-[#0b1c30] focus:border-[#00288e]'
+                    }`}
+                  >
+                    <option value="10%">10% de la nota final</option>
+                    <option value="15%">15% de la nota final</option>
+                    <option value="20%">20% de la nota final</option>
+                    <option value="25%">25% de la nota final</option>
+                    <option value="30%">30% de la nota final</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-[#333]'}`}>
+                  {isEn ? 'Due Date *' : 'Fecha Límite de Entrega *'}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={newEvalDueDate}
+                  onChange={(e) => setNewEvalDueDate(e.target.value)}
+                  className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                      : 'bg-[#f8faff] border-slate-300 text-[#0b1c30] focus:border-[#00288e]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-[#333]'}`}>
+                  {isEn ? 'Instructions & Assessment Criteria' : 'Instrucciones y Criterios de Evaluación'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={newEvalDescription}
+                  onChange={(e) => setNewEvalDescription(e.target.value)}
+                  placeholder="Detalla los puntos, entregables y criterios pedagógicos..."
+                  className={`w-full p-3 rounded-xl text-xs border focus:outline-none transition-all resize-none ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                      : 'bg-[#f8faff] border-slate-300 text-[#0b1c30] focus:border-[#00288e]'
+                  }`}
+                />
+              </div>
+
+              <div className={`p-3.5 rounded-2xl border flex items-center gap-3 ${
+                isDark ? 'bg-slate-950 border-slate-800' : 'bg-[#f8faff] border-[#e2e8f0]'
+              }`}>
+                <input
+                  type="checkbox"
+                  id="auto-publish-task-cb"
+                  checked={newEvalPublishTask}
+                  onChange={(e) => setNewEvalPublishTask(e.target.checked)}
+                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-500 cursor-pointer"
+                />
+                <label htmlFor="auto-publish-task-cb" className="text-xs font-semibold cursor-pointer">
+                  {isEn
+                    ? 'Publish to Tasks & Workshops so students of this group can view and submit'
+                    : 'Publicar automáticamente en Tareas y Talleres para los estudiantes del grupo'}
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewEvaluationModal(false)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isEn ? 'Cancel' : 'Cancelar'}
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingEval}
+                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50 ${
+                    isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">save</span>
+                  <span>{isSavingEval ? (isEn ? 'Saving...' : 'Guardando...') : (isEn ? 'Save Evaluation' : 'Guardar Evaluación')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL HORARIO PROPIO */}
       <TeacherScheduleModal

@@ -11,6 +11,8 @@ import {
   StudentSubmission
 } from '../services/assignmentService';
 import { getTeacherPersonalSchedule, CENSUS_TEACHERS } from '../data/institutionalCensus';
+import { TeacherSidebar } from './TeacherSidebar';
+import { TeacherScheduleModal } from './TeacherScheduleModal';
 
 interface TeacherAssignmentsViewProps {
   currentUser?: UserProfile | null;
@@ -74,48 +76,11 @@ export const TeacherAssignmentsView: React.FC<TeacherAssignmentsViewProps> = ({
       if (data && data.length > 0) {
         setAssignments(data);
       } else {
-        // Fallback demo data if none created yet
-        setAssignments([
-          {
-            id: 'asg-demo-1',
-            title: 'Taller 1: Álgebra Lineal y Matrices en Sistemas Informáticos',
-            subject: 'Matemáticas',
-            gradeLevel: '11-1',
-            group: '11-1',
-            teacherName: teacherName,
-            teacherId: currentUser?.id || '003',
-            dueDate: '2026-03-25',
-            dueText: 'En 3 días • 25 Mar',
-            urgency: 'urgente',
-            isPublished: true,
-            type: 'Archivo PDF',
-            typeIcon: 'description',
-            points: '20%',
-            instructions: 'Resolver los 10 ejercicios del libro guía, capítulo 4. Presentar desarrollo paso a paso y gráficas.',
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: 'asg-demo-2',
-            title: 'Laboratorio de Algoritmos y Estructuras Condicionales',
-            subject: 'Tecnología',
-            gradeLevel: '10-1',
-            group: '10-1',
-            teacherName: teacherName,
-            teacherId: currentUser?.id || '019',
-            dueDate: '2026-03-28',
-            dueText: 'En 6 días • 28 Mar',
-            urgency: 'regular',
-            isPublished: true,
-            type: 'Código Fuente ZIP',
-            typeIcon: 'code',
-            points: '25%',
-            instructions: 'Implementar el algoritmo de ordenamiento y control de inventario con pruebas unitarias.',
-            createdAt: new Date().toISOString()
-          }
-        ]);
+        setAssignments([]);
       }
     } catch (err) {
       console.warn('Error loading assignments:', err);
+      setAssignments([]);
     } finally {
       setLoading(false);
     }

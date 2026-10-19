@@ -41,13 +41,31 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   if (!isOpen) return null;
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'student':
+      case 'estudiante':
+        return isEn ? 'Student' : 'Estudiante';
+      case 'teacher':
+      case 'docente':
+        return isEn ? 'Teacher' : 'Docente';
+      case 'family':
+      case 'acudiente':
+        return isEn ? 'Family / Guardian' : 'Acudiente';
+      case 'admin':
+      case 'directivo':
+        return isEn ? 'Administration' : 'Directivo / Coordinación';
+      default:
+        return isEn ? 'User' : 'Usuario';
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFeedbackError(null);
     setFeedbackSuccess(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit: 5MB
     if (file.size > 5 * 1024 * 1024) {
       setFeedbackError(
         isEn
@@ -57,7 +75,6 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       return;
     }
 
-    // Check file type
     const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     if (!validMimes.includes(file.type.toLowerCase())) {
       setFeedbackError(
@@ -93,7 +110,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       return;
     }
 
-    if (isUploadingPhoto) return; // Prevent duplicate execution
+    if (isUploadingPhoto) return;
 
     setIsUploadingPhoto(true);
     setFeedbackError(null);
@@ -148,7 +165,6 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   };
 
   const currentDisplayAvatar = previewUrl || currentUser.avatarUrl || ASSETS.studentAvatar;
-  const gradeDisplay = currentUser.gradeLevel || '11°1';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -173,7 +189,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-extrabold tracking-tight leading-tight">
-                {isEn ? 'Student Profile & Settings' : 'Mi Perfil • Rol Estudiante'}
+                {isEn ? 'Institutional Profile & Settings' : `Perfil Institucional • ${getRoleLabel(currentUser.role)}`}
               </h2>
               <span className="text-xs text-cyan-200">
                 {isEn ? 'Institution: I.E. Vallejuelos • Medellín' : 'Institución: I.E. Vallejuelos • Medellín'}
@@ -214,7 +230,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">badge</span>
-            <span>{isEn ? 'Consult Profile' : 'Consultar datos institucionales'}</span>
+            <span>{isEn ? 'Institutional Details' : 'Consultar datos institucionales'}</span>
           </button>
 
           <button
@@ -282,8 +298,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <div className="flex flex-col text-center sm:text-left min-w-0">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold self-center sm:self-start bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 mb-1">
                   <span className="material-symbols-outlined text-[14px]">school</span>
-                  {/* Clean student role: NO 'Taller 1' */}
-                  <span>{isEn ? 'STUDENT' : 'ESTUDIANTE'}</span>
+                  <span>{getRoleLabel(currentUser.role).toUpperCase()}</span>
                 </div>
                 <h3 className={`text-xl font-extrabold leading-tight ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
                   {currentUser.fullName}
@@ -342,25 +357,94 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   </span>
                 </div>
 
-                {/* 3. Grado y Grupo */}
-                <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
-                    {isEn ? 'Grade & Group' : 'Grado y Grupo Asignado'}
-                  </span>
-                  <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
-                    {gradeDisplay}
-                  </span>
-                </div>
+                {/* Role Specific details */}
+                {(currentUser.role === 'student' || currentUser.role === 'estudiante') && (
+                  <>
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Grade & Group' : 'Grado y Grupo Asignado'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
+                        {currentUser.gradeLevel || '11°1'}
+                      </span>
+                    </div>
 
-                {/* 4. Matrícula / Código */}
-                <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
-                  <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
-                    {isEn ? 'Student Code / Matricula' : 'Código de Matrícula'}
-                  </span>
-                  <span className={`text-sm font-bold block mt-0.5 font-mono ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
-                    {currentUser.studentCode || currentUser.documentId || '--'}
-                  </span>
-                </div>
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Student Code / Matricula' : 'Código de Matrícula'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 font-mono ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
+                        {currentUser.studentCode || currentUser.documentId || '--'}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {(currentUser.role === 'teacher' || currentUser.role === 'docente') && (
+                  <>
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Academic Department / Area' : 'Área Académica'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
+                        {currentUser.subjectArea || currentUser.area || 'Docencia Secundaria'}
+                      </span>
+                    </div>
+
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Assigned Grades' : 'Grados Asignados'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-cyan-300' : 'text-[#00288e]'}`}>
+                        {currentUser.assignedGrades || '6°1 a 11°2'}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {(currentUser.role === 'family' || currentUser.role === 'acudiente') && (
+                  <>
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-amber-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Relationship' : 'Parentesco'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-amber-300' : 'text-[#00288e]'}`}>
+                        {currentUser.relationship || 'Acudiente Titular'}
+                      </span>
+                    </div>
+
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-amber-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Represented Student' : 'Estudiante Representado'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-amber-300' : 'text-[#00288e]'}`}>
+                        {currentUser.representedStudentName || 'Estudiante asignado'}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {(currentUser.role === 'admin' || currentUser.role === 'directivo') && (
+                  <>
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-emerald-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Official Position' : 'Cargo Oficial'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-emerald-300' : 'text-[#00288e]'}`}>
+                        {currentUser.adminPosition || currentUser.department || 'Coordinación Académica'}
+                      </span>
+                    </div>
+
+                    <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
+                      <span className={`block text-[11px] font-bold uppercase ${isDark ? 'text-emerald-400' : 'text-[#00288e]'}`}>
+                        {isEn ? 'Administrative Department' : 'Dependencia'}
+                      </span>
+                      <span className={`text-sm font-bold block mt-0.5 ${isDark ? 'text-emerald-300' : 'text-[#00288e]'}`}>
+                        {currentUser.department || 'Gestión Directiva'}
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 {/* 5. Jornada */}
                 <div className={`p-3.5 rounded-2xl border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-[#e5eeff]'}`}>
@@ -378,7 +462,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     {isEn ? 'School Institution' : 'Sede e Institución'}
                   </span>
                   <span className={`text-sm font-semibold block mt-0.5 ${isDark ? 'text-slate-200' : 'text-[#0b1c30]'}`}>
-                    {currentUser.institution || 'I.E. Vallejuelos • Sede Principal'}
+                    {currentUser.institution || 'I.E. Vallejuelos • Medellín'}
                   </span>
                 </div>
 
@@ -453,7 +537,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     onChange={handleFileChange}
                     accept="image/jpeg,image/png,image/webp,image/jpg"
                     className="hidden"
-                    id="student-photo-file-input"
+                    id="profile-photo-file-input"
                   />
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -530,7 +614,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   {isEn ? 'Contact Information' : 'Información Personal de Contacto'}
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  {isEn ? 'Editable fields' : 'Campos editables por el estudiante'}
+                  {isEn ? 'Editable contact fields' : 'Campos editables por el usuario'}
                 </span>
               </div>
 
@@ -560,7 +644,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     type="tel"
                     value={emergencyPhone}
                     onChange={(e) => setEmergencyPhone(e.target.value)}
-                    placeholder="Ej: 320 987 6543 (Acudiente)"
+                    placeholder="Ej: 320 987 6543 (Contacto alterno)"
                     className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
                       isDark
                         ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
@@ -585,8 +669,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   </strong>
                   <span>
                     {isEn
-                      ? 'Your student code, grade, assigned group, official identity document, and enrollment shift can only be modified by the school secretariat and directive administration.'
-                      : 'Tu código de matrícula, grado, grupo asignado, documento de identidad oficial y jornada solo pueden ser modificados por la Secretaría Académica de la institución.'}
+                      ? 'Your official name, document ID, role, and shift are verified against institutional census records.'
+                      : 'Tu nombre oficial, documento de identidad, rol institucional y jornada escolar se encuentran validados con el censo oficial de la I.E. Vallejuelos.'}
                   </span>
                 </div>
               </div>

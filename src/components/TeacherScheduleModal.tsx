@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { UserProfile, ScheduleSlot } from '../types';
-import { getTeacherPersonalSchedule } from '../data/institutionalCensus';
+import { getTeacherPersonalSchedule, getOfficialScheduleForGrade } from '../data/institutionalCensus';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 export interface TeacherScheduleModalProps {
@@ -18,11 +18,17 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const teacherName = currentUser?.fullName || (isEn ? 'Teacher' : 'Docente');
+  const isTeacher = currentUser?.role === 'teacher' || currentUser?.role === 'docente';
+  const isStudent = currentUser?.role === 'student' || currentUser?.role === 'estudiante';
+  const userName = currentUser?.fullName || (isTeacher ? (isEn ? 'Teacher' : 'Docente') : (isEn ? 'Student' : 'Estudiante'));
 
-  const personalSchedule = useMemo<ScheduleSlot[]>(() => {
-    return getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId || currentUser?.employeeId);
-  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.employeeId]);
+  const scheduleData = useMemo<ScheduleSlot[]>(() => {
+    if (isTeacher) {
+      return getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId || currentUser?.employeeId);
+    }
+    const grade = currentUser?.gradeLevel || currentUser?.group || '11-1';
+    return getOfficialScheduleForGrade(grade);
+  }, [currentUser, isTeacher]);
 
   if (!isOpen) return null;
 
@@ -55,10 +61,12 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
-                {isEn ? 'Personal Schedule' : 'Horario propio'}
+                {isTeacher
+                  ? (isEn ? 'Personal Teacher Schedule' : 'Horario Personal Docente')
+                  : (isEn ? 'Academic Schedule' : 'Horario Académico')}
               </h3>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                {teacherName} • I.E. Vallejuelos • {isEn ? 'Morning Shift' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
+                {userName} • I.E. Vallejuelos • {isTeacher ? (currentUser?.area || 'Docencia') : `Grado ${currentUser?.gradeLevel || currentUser?.group || '11-1'}`} • {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
               </p>
             </div>
           </div>
@@ -91,7 +99,7 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
               </tr>
             </thead>
             <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-[#eff4ff]'}`}>
-              {personalSchedule.map((slot, idx) => {
+              {scheduleData.map((slot, idx) => {
                 const isBreak = slot.period === 0;
 
                 if (isBreak) {
@@ -140,9 +148,11 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
                               )}
                             </div>
                           ) : (
-                            <span className={`text-[11px] italic ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
-                              —
-                            </span>
+                            <div className={`p-1.5 rounded-lg border border-dashed text-[10px] leading-tight ${
+                              isDark ? 'border-slate-800 text-slate-500 bg-slate-900/40' : 'border-slate-200 text-slate-400 bg-slate-50'
+                            }`}>
+                              <span className="font-medium">{isEn ? 'Free period / Prep time' : 'Espacio libre / Preparación'}</span>
+                            </div>
                           )}
                         </td>
                       );

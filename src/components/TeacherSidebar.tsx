@@ -46,13 +46,6 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       isActive: activeTab === 'attendance'
     },
     {
-      id: 'schedule' as const,
-      label: isEn ? 'Personal Schedule' : 'Horario propio',
-      icon: 'calendar_month',
-      action: onOpenSchedule,
-      isActive: activeTab === 'schedule'
-    },
-    {
       id: 'assignments' as const,
       label: isEn ? 'Tasks & Workshops' : 'Tareas y talleres',
       icon: 'assignment',
@@ -65,6 +58,13 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: 'chat',
       action: () => onNavigate('teacher_messaging'),
       isActive: activeTab === 'messaging'
+    },
+    {
+      id: 'schedule' as const,
+      label: isEn ? 'Schedule' : 'Horario',
+      icon: 'calendar_month',
+      action: onOpenSchedule,
+      isActive: activeTab === 'schedule'
     }
   ];
 
