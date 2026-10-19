@@ -129,28 +129,28 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       category: currentLang === 'es' ? 'Estudiante' : 'Student'
     },
 
-    // ROL DOCENTE
+    // ROL DOCENTE (5 interfaces oficiales)
     {
       id: 'teacher_grades',
-      label: currentLang === 'es' ? 'Docente • Calificaciones' : 'Teacher • Gradebook',
+      label: currentLang === 'es' ? 'Calificaciones' : 'Gradebook',
       icon: 'fact_check',
       category: currentLang === 'es' ? 'Docente' : 'Teacher'
     },
     {
-      id: 'teacher_assignments',
-      label: currentLang === 'es' ? 'Docente • Gestor de Tareas' : 'Teacher • Assignments Manager',
-      icon: 'assignment_turned_in',
-      category: currentLang === 'es' ? 'Docente' : 'Teacher'
-    },
-    {
       id: 'teacher_attendance',
-      label: currentLang === 'es' ? 'Docente • Asistencia' : 'Teacher • Class Attendance',
+      label: currentLang === 'es' ? 'Control de asistencia' : 'Class Attendance',
       icon: 'how_to_reg',
       category: currentLang === 'es' ? 'Docente' : 'Teacher'
     },
     {
+      id: 'teacher_assignments',
+      label: currentLang === 'es' ? 'Tareas y talleres' : 'Tasks & Workshops',
+      icon: 'assignment',
+      category: currentLang === 'es' ? 'Docente' : 'Teacher'
+    },
+    {
       id: 'teacher_messaging',
-      label: currentLang === 'es' ? 'Docente • Mensajería' : 'Teacher • Messaging',
+      label: currentLang === 'es' ? 'Mensajería y citaciones' : 'Messaging & Citations',
       icon: 'chat',
       category: currentLang === 'es' ? 'Docente' : 'Teacher'
     },

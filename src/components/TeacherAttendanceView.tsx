@@ -150,8 +150,9 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
               </div>
             </div>
 
-            {/* Sidebar Links */}
+            {/* 5 Navegaciones Oficiales del Rol Docente */}
             <div className="space-y-1">
+              {/* 1. Calificaciones */}
               <button
                 onClick={() => onNavigate('teacher_grades')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
@@ -159,28 +160,20 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-lg">fact_check</span>
-                <span>{isEn ? 'Gradebook' : 'Calificaciones y Planilla'}</span>
+                <span>{isEn ? 'Gradebook' : 'Calificaciones'}</span>
               </button>
 
+              {/* 2. Control de asistencia (ACTIVO) */}
               <button
-                onClick={() => onNavigate('teacher_assignments')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">assignment_turned_in</span>
-                <span>{isEn ? 'Assignments & Workshops' : 'Tareas y Talleres'}</span>
-              </button>
-
-              <button
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold cursor-default ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-bold cursor-default ${
                   isDark ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
                 }`}
               >
                 <span className="material-symbols-outlined text-lg">how_to_reg</span>
-                <span>{isEn ? 'Class Attendance' : 'Control de Asistencia'}</span>
+                <span>{isEn ? 'Class Attendance' : 'Control de asistencia'}</span>
               </button>
 
+              {/* 3. Horario propio */}
               <button
                 onClick={() => setShowScheduleModal(true)}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
@@ -188,9 +181,21 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-lg">calendar_month</span>
-                <span>{isEn ? 'Personal Schedule' : 'Horario Personal Institucional'}</span>
+                <span>{isEn ? 'Personal Schedule' : 'Horario propio'}</span>
               </button>
 
+              {/* 4. Tareas y talleres */}
+              <button
+                onClick={() => onNavigate('teacher_assignments')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
+                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">assignment</span>
+                <span>{isEn ? 'Tasks & Workshops' : 'Tareas y talleres'}</span>
+              </button>
+
+              {/* 5. Mensajería y citaciones */}
               <button
                 onClick={() => onNavigate('teacher_messaging')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
@@ -198,7 +203,7 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-lg">chat</span>
-                <span>{isEn ? 'Teacher Messaging' : 'Mensajería y Citaciones'}</span>
+                <span>{isEn ? 'Messaging & Citations' : 'Mensajería y citaciones'}</span>
               </button>
             </div>
           </div>

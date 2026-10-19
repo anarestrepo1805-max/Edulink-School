@@ -1232,3 +1232,103 @@ export function lookupCensusAdmin(codeOrCedula: string): CensusAdminStaff | null
   if (!clean) return null;
   return CENSUS_ADMIN_BY_CODE[clean] || CENSUS_ADMIN_BY_CEDULA[clean] || null;
 }
+
+export interface TeacherAcademicAssignment {
+  id: string;
+  subjectName: string;
+  group: string; // e.g. "10°1"
+  groupKey: string; // e.g. "10-1"
+  label: string; // e.g. "Matemáticas — 10°1"
+}
+
+/**
+ * Normaliza claves de grupo como '10°1', '10-1', '10_1' a '10-1'
+ */
+export function normalizeGroupKey(groupStr?: string): string {
+  if (!groupStr) return '10-1';
+  return groupStr.replace(/°/g, '-').replace(/_/g, '-').trim();
+}
+
+/**
+ * Convierte '10-1' a '10°1' para presentación oficial
+ */
+export function formatGroupDisplay(groupKey?: string): string {
+  if (!groupKey) return '10°1';
+  return groupKey.replace('-', '°').trim();
+}
+
+/**
+ * Retorna los estudiantes oficiales del censo matriculados en un grupo específico (6-1 a 11-2).
+ */
+export function getCensusStudentsForGroup(groupKey: string): CensusStudent[] {
+  const norm = normalizeGroupKey(groupKey);
+  const found = CENSUS_STUDENTS.filter(s => normalizeGroupKey(s.group) === norm);
+  if (found.length > 0) return found;
+
+  // Fallback a grupo por defecto si no hay coincidencia exacta
+  return CENSUS_STUDENTS.filter(s => normalizeGroupKey(s.group) === '10-1');
+}
+
+/**
+ * Determina automáticamente las asignaturas y grupos asignados a un docente institucional.
+ * Consulta el censo oficial por nombre, cédula o código.
+ */
+export function getTeacherAcademicAssignments(teacherNameOrDoc?: string): TeacherAcademicAssignment[] {
+  const query = (teacherNameOrDoc || '').trim().toLowerCase();
+  
+  if (query) {
+    const teacher = CENSUS_TEACHERS.find(t =>
+      t.fullName.toLowerCase().includes(query) ||
+      t.cedula === query ||
+      t.code === query ||
+      query.includes(t.fullName.toLowerCase())
+    );
+
+    if (teacher) {
+      const subjectName = teacher.area;
+      const rawGrades = teacher.grades.split(',').map(g => g.trim()).filter(Boolean);
+      
+      const assignments: TeacherAcademicAssignment[] = rawGrades.map((rawGrade, idx) => {
+        const groupKey = normalizeGroupKey(rawGrade);
+        const groupDisplay = formatGroupDisplay(groupKey);
+        return {
+          id: `asg_${teacher.code}_${idx}_${groupKey}`,
+          subjectName,
+          group: groupDisplay,
+          groupKey,
+          label: `${subjectName} — ${groupDisplay}`
+        };
+      });
+
+      if (assignments.length > 0) {
+        return assignments;
+      }
+    }
+  }
+
+  // Asignaciones docentes estándar de la Media Técnica y Bachillerato de la institución
+  return [
+    {
+      id: 'asg_tech_10_1',
+      subjectName: 'Programación de Software',
+      group: '10°1',
+      groupKey: '10-1',
+      label: 'Programación de Software — 10°1'
+    },
+    {
+      id: 'asg_tech_10_2',
+      subjectName: 'Programación de Software',
+      group: '10°2',
+      groupKey: '10-2',
+      label: 'Programación de Software — 10°2'
+    },
+    {
+      id: 'asg_tech_11_1',
+      subjectName: 'Bases de Datos Relacionales',
+      group: '11°1',
+      groupKey: '11-1',
+      label: 'Bases de Datos — 11°1'
+    }
+  ];
+}
+

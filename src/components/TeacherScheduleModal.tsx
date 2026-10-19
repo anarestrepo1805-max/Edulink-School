@@ -55,7 +55,7 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
-                {isEn ? 'Personal Weekly Schedule' : 'Horario Semanal del Docente'}
+                {isEn ? 'Personal Schedule' : 'Horario propio'}
               </h3>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                 {teacherName} • I.E. Vallejuelos • {isEn ? 'Morning Shift' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}

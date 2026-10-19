@@ -1,9 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ActiveScreen, StudentGradeRecord, UserProfile } from '../types';
-import { ASSETS, INITIAL_STUDENT_GRADES } from '../data/mockData';
-import { OFFICIAL_SCHEDULE_11_1 } from '../data/institutionalCensus';
+import { ASSETS } from '../data/mockData';
+import {
+  getTeacherAcademicAssignments,
+  getCensusStudentsForGroup,
+  TeacherAcademicAssignment
+} from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
+import { TeacherSidebar } from './TeacherSidebar';
+import { TeacherScheduleModal } from './TeacherScheduleModal';
 
 interface TeacherGradesViewProps {
   currentUser?: UserProfile | null;
@@ -22,14 +28,40 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const isConfigured = Boolean(currentUser?.hasConfigured);
-  const teacherName = currentUser?.fullName || (isEn ? 'Prof. Daniela Álvarez' : 'Prof. Daniela Álvarez');
+  const teacherName = currentUser?.fullName || (isEn ? 'Teacher' : 'Docente');
 
-  const [grades, setGrades] = useState<StudentGradeRecord[]>(() => {
-    return isConfigured ? INITIAL_STUDENT_GRADES : [];
+  // Consulta automática de asignaturas y grupos asignados al docente desde la base de datos institucional
+  const teacherAssignments = useMemo<TeacherAcademicAssignment[]>(() => {
+    return getTeacherAcademicAssignments(
+      currentUser?.fullName || currentUser?.documentId || currentUser?.email
+    );
+  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email]);
+
+  // Selección automática si tiene una sola o primera combinación
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(() => {
+    return teacherAssignments[0]?.id || '';
   });
-  const [selectedGradeGroup, setSelectedGradeGroup] = useState('10°1');
-  const [selectedSubject, setSelectedSubject] = useState('prog');
+
+  useEffect(() => {
+    if (teacherAssignments.length > 0 && !teacherAssignments.some((a) => a.id === selectedAssignmentId)) {
+      setSelectedAssignmentId(teacherAssignments[0].id);
+    }
+  }, [teacherAssignments, selectedAssignmentId]);
+
+  const currentAssignment = useMemo(() => {
+    return (
+      teacherAssignments.find((a) => a.id === selectedAssignmentId) ||
+      teacherAssignments[0] || {
+        id: 'default',
+        subjectName: 'Matemáticas',
+        group: '10°1',
+        groupKey: '10-1',
+        label: 'Matemáticas — 10°1'
+      }
+    );
+  }, [teacherAssignments, selectedAssignmentId]);
+
+  const [grades, setGrades] = useState<StudentGradeRecord[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState('p1');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'failed'>('all');
@@ -38,6 +70,31 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isConfiguringDemo, setIsConfiguringDemo] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  // Cargar automáticamente los estudiantes de la base de datos oficial matriculados en el grupo asignado
+  useEffect(() => {
+    if (!currentAssignment) return;
+    const censusStudents = getCensusStudentsForGroup(currentAssignment.groupKey);
+    const records: StudentGradeRecord[] = censusStudents.map((cs, idx) => {
+      const p1 = Math.round((3.6 + ((idx * 7) % 15) / 10) * 10) / 10;
+      const p2 = Math.round((3.4 + ((idx * 5) % 17) / 10) * 10) / 10;
+      const t1 = Math.round((3.8 + ((idx * 3) % 13) / 10) * 10) / 10;
+      const sc = Math.round((4.2 + ((idx * 2) % 9) / 10) * 10) / 10;
+      return {
+        id: cs.documentId,
+        matricula: `MAT-${currentAssignment.groupKey}-${cs.documentId.slice(-4)}`,
+        name: cs.fullName,
+        parcial1: Math.min(5.0, p1),
+        parcial2: Math.min(5.0, p2),
+        taller1: Math.min(5.0, t1),
+        serConv: Math.min(5.0, sc),
+        observaciones: '',
+        attendance: 88 + (idx % 12)
+      };
+    });
+    setGrades(records);
+    setUnsavedChanges(0);
+  }, [currentAssignment]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -111,7 +168,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
     });
   }, [grades, searchTerm, statusFilter]);
 
-  const totalStudents = 35;
+  const totalStudents = grades.length;
   const sampleApprovedCount = grades.filter((s) => calculateFinal(s) >= 3.0).length;
   const sampleFailedCount = grades.filter((s) => calculateFinal(s) < 3.0).length;
 
@@ -133,125 +190,13 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
         </div>
       )}
 
-      {/* FIXED SIDEBAR (Portal Docente) */}
-      <aside className={`hidden lg:flex fixed left-0 top-12 bottom-0 w-72 shadow-xs z-40 flex-col justify-between border-r transition-colors ${
-        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
-      }`}>
-        <div className="flex flex-col">
-          <div className={`h-20 px-6 flex items-center gap-3 border-b ${
-            isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-          }`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
-              isDark ? 'bg-cyan-600' : 'bg-[#00288e]'
-            }`}>
-              <span className="material-symbols-outlined text-2xl">school</span>
-            </div>
-            <div className="flex flex-col">
-              <span className={`text-xl font-extrabold leading-tight tracking-tight ${
-                isDark ? 'text-white' : 'text-[#00288e]'
-              }`}>
-                Edulink
-              </span>
-              <span className={`text-[11px] font-bold uppercase tracking-wider ${
-                isDark ? 'text-slate-400' : 'text-[#444653]'
-              }`}>
-                {isEn ? 'Teacher Portal' : 'Portal Docente'}
-              </span>
-            </div>
-          </div>
-
-          <div className="px-4 py-2">
-            <div className={`rounded-xl px-3 py-2 flex items-center gap-2 border ${
-              isDark ? 'bg-slate-800 border-slate-700 text-cyan-300' : 'bg-[#eff4ff] border-[#dce9ff] text-[#00288e]'
-            }`}>
-              <span className="material-symbols-outlined text-lg">verified_user</span>
-              <span className="text-xs font-extrabold">{isEn ? 'Connected Gradebook' : 'Docencia Conectada'}</span>
-            </div>
-          </div>
-
-          <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-            <button
-              onClick={() => onNavigate('teacher_grades')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">dashboard</span>
-              <span className="text-xs font-bold">{isEn ? 'Home' : 'Inicio'}</span>
-            </button>
-            <button
-              onClick={() => showToast(isEn ? 'Assigned Groups: 6°1, 6°2, 10°1, 10°2, 11°1, 11°2.' : 'Grupos asignados: 6°1, 6°2, 10°1, 10°2, 11°1, 11°2.')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">groups</span>
-              <span className="text-xs font-bold">{isEn ? 'My Groups' : 'Mis Grupos'}</span>
-            </button>
-            <button
-              onClick={() => onNavigate('teacher_grades')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-xs shadow-sm transition-colors text-left cursor-pointer ${
-                isDark ? 'bg-cyan-600 text-white' : 'bg-[#1e40af] text-white'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">fact_check</span>
-              <span>{isEn ? 'Gradebook' : 'Calificaciones'}</span>
-            </button>
-            <button
-              onClick={() => onNavigate('teacher_attendance')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">how_to_reg</span>
-              <span className="text-xs font-bold">{isEn ? 'Class Attendance' : 'Control de Asistencia'}</span>
-            </button>
-            <button
-              onClick={() => setShowScheduleModal(true)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">calendar_month</span>
-              <span className="text-xs font-bold">{isEn ? 'Institutional Schedule' : 'Horario Institucional'}</span>
-            </button>
-            <button
-              onClick={() => onNavigate('teacher_assignments')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">assignment</span>
-              <span className="text-xs font-bold">{isEn ? 'Assignments & Workshops' : 'Gestor de Tareas y Talleres'}</span>
-            </button>
-            <button
-              onClick={() => onNavigate('teacher_messaging')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left cursor-pointer ${
-                isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">chat</span>
-              <span className="text-xs font-bold">{isEn ? 'Teacher Messaging' : 'Mensajería y Citaciones'}</span>
-            </button>
-          </nav>
-        </div>
-
-        <div className={`p-4 border-t ${isDark ? 'border-slate-800' : 'border-[#eff4ff]'}`}>
-          <div className={`rounded-xl p-3 flex items-center gap-3 border ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
-          }`}>
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <div className="flex flex-col">
-              <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                {isEn ? 'Synchronized' : 'Sincronizado'}
-              </span>
-              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                {isEn ? 'Central Cloud OK' : 'Servidor Central OK'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </aside>
+      {/* Menú lateral docente exclusivo con las 5 interfaces oficiales */}
+      <TeacherSidebar
+        activeTab="grades"
+        onNavigate={onNavigate}
+        onOpenSchedule={() => setShowScheduleModal(true)}
+        currentUser={currentUser}
+      />
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
@@ -378,70 +323,47 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           <div className={`rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
           }`}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1">
-              {/* Grade selector */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+              {/* Asignatura y Grupo Asignado (Selección Automática o Lista Unificada) */}
               <div className={`relative flex items-center rounded-xl px-3 py-2 border ${
                 isDark ? 'bg-slate-800 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
               }`}>
                 <span className={`material-symbols-outlined mr-2 text-xl ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
-                  groups
+                  menu_book
                 </span>
                 <div className="flex flex-col flex-1 min-w-0">
                   <span className={`text-[10px] font-bold leading-none uppercase ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                    {isEn ? 'Grade & Group' : 'Grado & Grupo'}
+                    {isEn ? 'Assigned Subject & Group' : 'Asignatura y Grupo Asignado'}
                   </span>
-                  <select
-                    value={selectedGradeGroup}
-                    onChange={(e) => setSelectedGradeGroup(e.target.value)}
-                    className={`bg-transparent text-xs focus:outline-none cursor-pointer pr-4 appearance-none font-bold ${
-                      isDark ? 'text-white' : 'text-[#0b1c30]'
-                    }`}
-                  >
-                    <option value="6°1">6°1 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="6°2">6°2 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="7°1">7°1 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="7°2">7°2 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="8°1">8°1 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="8°2">8°2 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="9°1">9°1 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="9°2">9°2 — {isEn ? 'Basic Secondary' : 'Básica Secundaria'}</option>
-                    <option value="10°1">10°1 — {isEn ? 'Technical High' : 'Media Técnica'}</option>
-                    <option value="10°2">10°2 — {isEn ? 'Technical High' : 'Media Técnica'}</option>
-                    <option value="11°1">11°1 — {isEn ? 'Technical High' : 'Media Técnica'}</option>
-                    <option value="11°2">11°2 — {isEn ? 'Technical High' : 'Media Técnica'}</option>
-                  </select>
+                  {teacherAssignments.length <= 1 ? (
+                    <div className={`text-xs font-extrabold truncate py-0.5 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
+                      {currentAssignment.label}
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedAssignmentId}
+                      onChange={(e) => setSelectedAssignmentId(e.target.value)}
+                      className={`bg-transparent text-xs focus:outline-none cursor-pointer pr-4 appearance-none font-bold ${
+                        isDark ? 'text-white' : 'text-[#0b1c30]'
+                      }`}
+                    >
+                      {teacherAssignments.map((asg) => (
+                        <option
+                          key={asg.id}
+                          value={asg.id}
+                          className={isDark ? 'bg-slate-900 text-white' : 'bg-white text-[#0b1c30]'}
+                        >
+                          {asg.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-                <span className={`material-symbols-outlined text-base pointer-events-none absolute right-3 ${isDark ? 'text-slate-500' : 'text-[#757684]'}`}>
-                  expand_more
-                </span>
-              </div>
-
-              {/* Subject selector */}
-              <div className={`relative flex items-center rounded-xl px-3 py-2 border ${
-                isDark ? 'bg-slate-800 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
-              }`}>
-                <span className={`material-symbols-outlined mr-2 text-xl ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
-                  code
-                </span>
-                <div className="flex flex-col flex-1 min-w-0">
-                  <span className={`text-[10px] font-bold leading-none uppercase ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                    {isEn ? 'Subject' : 'Asignatura'}
+                {teacherAssignments.length > 1 && (
+                  <span className={`material-symbols-outlined text-base pointer-events-none absolute right-3 ${isDark ? 'text-slate-500' : 'text-[#757684]'}`}>
+                    expand_more
                   </span>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    className={`bg-transparent text-xs focus:outline-none cursor-pointer pr-4 appearance-none font-bold ${
-                      isDark ? 'text-white' : 'text-[#0b1c30]'
-                    }`}
-                  >
-                    <option value="prog">{isEn ? 'Software Programming' : 'Programación de Software'}</option>
-                    <option value="bd">{isEn ? 'Relational Databases' : 'Bases de Datos Relacionales'}</option>
-                    <option value="web">{isEn ? 'Frontend Web Development' : 'Desarrollo Web Frontend'}</option>
-                  </select>
-                </div>
-                <span className={`material-symbols-outlined text-base pointer-events-none absolute right-3 ${isDark ? 'text-slate-500' : 'text-[#757684]'}`}>
-                  expand_more
-                </span>
+                )}
               </div>
 
               {/* Period selector */}
@@ -1037,119 +959,13 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
         </main>
       </div>
 
-      {/* INSTITUTIONAL SCHEDULE MODAL */}
-      {showScheduleModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
-        >
-          <div className={`relative w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl border flex flex-col overflow-hidden transition-all ${
-            isDark ? 'bg-slate-900 border-slate-700/80 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
-            {/* Modal Header */}
-            <div className={`p-4 sm:p-6 border-b flex items-center justify-between shrink-0 ${
-              isDark ? 'border-slate-800 bg-slate-950/50' : 'border-slate-200 bg-slate-50/80'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                  isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-[#00288e]'
-                }`}>
-                  <span className="material-symbols-outlined text-[24px]">calendar_month</span>
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold leading-tight">
-                    {isEn ? 'Official Institutional Schedule - Academic Term' : 'Horario Escolar Oficial - Jornada Institucional'}
-                  </h3>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                    {isEn ? 'School Day: Morning Shift (6:15 AM - 12:15 PM) • FET Official Master Plan' : 'Jornada Mañana (6:15 AM - 12:15 PM) • Plan de Estudios Institucional'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowScheduleModal(false)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
-                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200/70 hover:bg-slate-300 text-slate-700'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            {/* Schedule Table Body */}
-            <div className="p-4 sm:p-6 overflow-x-auto overflow-y-auto flex-1">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
-                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
-                  }`}>
-                    <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Tuesday' : 'Martes'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Wednesday' : 'Miércoles'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Thursday' : 'Jueves'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                  {OFFICIAL_SCHEDULE_11_1.map((slot) => (
-                    <tr
-                      key={slot.period}
-                      className={`transition-colors ${
-                        isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
-                      }`}
-                    >
-                      <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400">
-                        <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
-                          {isEn ? `Period ${slot.period}` : `Hora ${slot.period}`}
-                        </div>
-                        <div>{slot.time}</div>
-                      </td>
-                      {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
-                        <td key={idx} className="py-2.5 px-3 align-top">
-                          <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
-                            isDark
-                              ? 'bg-slate-800/80 border-slate-700/60'
-                              : 'bg-white border-slate-200/80 shadow-2xs'
-                          }`}>
-                            <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
-                              {cell.subject}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                              {cell.teacher}
-                            </span>
-                          </div>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Footer */}
-            <div className={`p-4 border-t flex items-center justify-between text-xs shrink-0 ${
-              isDark ? 'border-slate-800 bg-slate-950/40 text-slate-400' : 'border-slate-200 bg-slate-50 text-[#757684]'
-            }`}>
-              <span>
-                {isEn
-                  ? 'Official Schedule source: Academic Direction • FET Schedule Generator'
-                  : 'Fuente oficial: Coordinación Académica • Plan de Estudios Institucional'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowScheduleModal(false)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                }`}
-              >
-                {isEn ? 'Close' : 'Cerrar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL HORARIO PROPIO */}
+      <TeacherScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 };
+
