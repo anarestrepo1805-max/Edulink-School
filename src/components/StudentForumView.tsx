@@ -656,18 +656,6 @@ export const StudentForumView: React.FC<StudentForumViewProps> = ({
           )}
         </main>
       </div>
-
-      {/* STUDENT PROFILE & PHOTO EDIT MODAL */}
-      {currentUser && (
-        <StudentProfileModal
-          currentUser={currentUser}
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          onUpdateUser={(updated) => {
-            if (onUpdateUser) onUpdateUser(updated);
-          }}
-        />
-      )}
     </div>
   );
 };

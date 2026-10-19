@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ActiveScreen, Subject, UpcomingAssignment, UserProfile } from '../types';
-import { ASSETS, INITIAL_SUBJECTS } from '../data/mockData';
-import { getOfficialScheduleForGrade } from '../data/institutionalCensus';
+import { ASSETS } from '../data/mockData';
+import { getOfficialScheduleForGrade, getOfficialSubjectsForStudent } from '../data/institutionalCensus';
 import { fetchPublishedAssignmentsForStudent } from '../services/assignmentService';
-import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { StudentProfileModal } from './StudentProfileModal';
 
@@ -26,17 +25,26 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const isConfigured = Boolean(currentUser?.hasConfigured);
   const studentName = currentUser?.fullName || (isEn ? 'Student' : 'Estudiante');
   const gradeLevel = currentUser?.gradeLevel ? (currentUser.gradeLevel.startsWith('Grado') ? currentUser.gradeLevel : `${isEn ? 'Grade' : 'Grado'} ${currentUser.gradeLevel}`) : (isEn ? 'Grade 11°2' : 'Grado 11°2');
   const shift = currentUser?.shift || (isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)');
 
-  const [subjects, setSubjects] = useState<Subject[]>(() => {
-    if (currentUser?.subjects && currentUser.subjects.length > 0) {
-      return currentUser.subjects;
+  // Official subjects derived directly from institutional census based on student's grade & group
+  // Students do NOT manually configure or add subjects
+  const subjects = useMemo<Subject[]>(() => {
+    try {
+      const studentGrade = currentUser?.gradeLevel || currentUser?.group || '11°1';
+      const studentGroup = currentUser?.group || '';
+      const list = getOfficialSubjectsForStudent(studentGrade, studentGroup);
+      if (list && list.length > 0) {
+        return list;
+      }
+      return [];
+    } catch (err) {
+      console.error('Error al consultar asignaturas de la base de datos institucional:', err);
+      return [];
     }
-    return isConfigured ? INITIAL_SUBJECTS : [];
-  });
+  }, [currentUser?.gradeLevel, currentUser?.group]);
 
   // Real published assignments from Firestore (No mock/demo fake assignments)
   const [assignments, setAssignments] = useState<UpcomingAssignment[]>([]);
@@ -95,17 +103,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Schedule modal state
+  // Schedule and profile modal states
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-
-  // Subject creation modal state
-  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
-  const [newSubName, setNewSubName] = useState('');
-  const [newSubTeacher, setNewSubTeacher] = useState('');
-  const [newSubSchedule, setNewSubSchedule] = useState('');
-  const [newSubRoom, setNewSubRoom] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -127,73 +127,6 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
         sub.teacher.toLowerCase().includes(searchQuery.toLowerCase())
       : true
   );
-
-  const handleAddSubjectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubName.trim()) return;
-
-    setIsSaving(true);
-    const newSubjectItem: Subject = {
-      id: `sub_${Date.now()}`,
-      name: newSubName.trim(),
-      category: isEn ? 'Enrolled Subject' : 'Asignatura Matriculada',
-      teacher: newSubTeacher.trim() || (isEn ? 'Assigned Teacher' : 'Docente Asignado'),
-      schedule: newSubSchedule.trim() || (isEn ? 'Mon & Wed 07:00 AM' : 'Lunes y Miércoles 07:00 AM'),
-      room: newSubRoom.trim() || (isEn ? 'Room 201' : 'Aula 201'),
-      grade: 4.5,
-      progress: 25,
-      color: '#0051d5',
-      bgLight: isDark ? 'rgba(0,81,213,0.2)' : '#eff4ff',
-      icon: 'menu_book',
-      nextClass: isEn ? 'Next session according to schedule' : 'Próxima sesión según horario'
-    };
-
-    const updatedSubjects = [...subjects, newSubjectItem];
-    setSubjects(updatedSubjects);
-
-    if (currentUser) {
-      try {
-        const updated = await saveUserConfiguration(currentUser.id, {
-          subjects: updatedSubjects,
-          hasConfigured: true
-        });
-        if (onUpdateUser) {
-          onUpdateUser(updated);
-        }
-        showToast(isEn ? 'Subject registered successfully.' : 'Asignatura guardada correctamente.');
-      } catch (err) {
-        console.warn('Error saving configuration:', err);
-      }
-    }
-
-    setShowAddSubjectModal(false);
-    setNewSubName('');
-    setNewSubTeacher('');
-    setNewSubSchedule('');
-    setNewSubRoom('');
-    setIsSaving(false);
-  };
-
-  const handleLoadSampleData = async () => {
-    setIsSaving(true);
-    setSubjects(INITIAL_SUBJECTS);
-
-    if (currentUser) {
-      try {
-        const updated = await saveUserConfiguration(currentUser.id, {
-          subjects: INITIAL_SUBJECTS,
-          hasConfigured: true
-        });
-        if (onUpdateUser) {
-          onUpdateUser(updated);
-        }
-        showToast(isEn ? 'Sample 11th grade subjects loaded.' : 'Materias de Grado 11° cargadas.');
-      } catch (err) {
-        console.warn('Error saving demo subjects:', err);
-      }
-    }
-    setIsSaving(false);
-  };
 
   return (
     <div className={`min-h-screen flex transition-colors duration-200 ${
@@ -248,11 +181,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
             </button>
             <button
               onClick={() => {
-                if (!isConfigured && subjects.length === 0) {
-                  setShowAddSubjectModal(true);
-                } else {
-                  showToast(isEn ? `Showing ${subjects.length} enrolled subjects.` : `Mostrando ${subjects.length} asignaturas matriculadas.`);
-                }
+                showToast(isEn ? `Showing ${subjects.length} official institutional subjects.` : `Mostrando ${subjects.length} asignaturas oficiales asignadas.`);
               }}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
@@ -263,11 +192,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
             </button>
             <button
               onClick={() => {
-                if (!isConfigured && subjects.length === 0) {
-                  showToast(isEn ? 'No grades recorded yet. Please configure your subjects.' : 'Tu cuenta no tiene calificaciones registradas aún. Configura tus asignaturas.');
-                } else {
-                  showToast(isEn ? 'Current GPA: 4.2 / 5.0. No failed subjects.' : 'Promedio acumulado actual: 4.2 / 5.0. No tienes materias reprobadas.');
-                }
+                showToast(isEn ? 'Current GPA: 4.2 / 5.0. No failed subjects.' : 'Promedio acumulado actual: 4.2 / 5.0. No tienes materias reprobadas.');
               }}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
@@ -454,7 +379,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                   {isEn ? `Hello, ${studentName}! 👋` : `¡Hola, ${studentName}! 👋`}
                 </h1>
                 <p className="text-sm sm:text-base text-cyan-100 font-normal leading-relaxed">
-                  {isConfigured || subjects.length > 0
+                  {subjects.length > 0
                     ? (isEn
                         ? `You have ${assignments.length} scheduled assignments across your enrolled subjects.`
                         : `Tienes ${assignments.length} actividades programadas en tus asignaturas activas.`)
@@ -540,10 +465,10 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
                       isDark ? 'bg-slate-800 text-slate-400' : 'bg-[#f1f5f9] text-[#64748b]'
                     }`}>
-                      {isEn ? 'No grades yet' : 'Sin notas aún'}
+                      {isEn ? 'Official registry' : 'Registro oficial'}
                     </span>
                     <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Add subjects' : 'Configura materias'}
+                      {isEn ? 'Institutional enrollment' : 'Carga institucional activa'}
                     </span>
                   </>
                 )}
@@ -658,15 +583,9 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowAddSubjectModal(true)}
-                    className={`px-3 py-1.5 rounded-xl text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer ${
-                      isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
-                    <span>{isEn ? 'Add Subject' : 'Agregar Materia'}</span>
-                  </button>
+                  <span className="text-xs px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30">
+                    {subjects.length} {isEn ? 'subjects' : 'materias oficiales'}
+                  </span>
                 </div>
               </div>
 
@@ -681,36 +600,13 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                     <span className="material-symbols-outlined text-[36px]">inventory_2</span>
                   </div>
                   <h3 className={`text-xl font-extrabold mb-2 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                    {isEn ? 'No subjects configured yet' : 'No hay asignaturas configuradas todavía'}
+                    {isEn ? 'No subjects registered in institutional census' : 'No se encontraron asignaturas registradas'}
                   </h3>
-                  <p className={`text-sm max-w-md mb-6 leading-relaxed ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
+                  <p className={`text-sm max-w-md mb-2 leading-relaxed ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                     {isEn
-                      ? 'Upon registering, your profile is clean. You can add your subjects manually or load the suggested 11th grade subjects to explore the system.'
-                      : 'Al registrarte en la plataforma tu perfil se encuentra completamente limpio. Puedes agregar tus materias escolares de forma manual o cargar la estructura sugerida.'}
+                      ? 'No official subjects have been assigned to your grade and group in the institutional census. Please contact academic coordination.'
+                      : 'No se encontraron materias asignadas para tu grado y grupo en el censo institucional. Por favor comunícate con la coordinación académica de la I.E. Vallejuelos.'}
                   </p>
-                  <div className="flex flex-wrap items-center justify-center gap-3">
-                    <button
-                      onClick={() => setShowAddSubjectModal(true)}
-                      className={`px-4 py-2.5 rounded-xl text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
-                        isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                      <span>{isEn ? 'Configure My First Subject' : 'Configurar mi primera Asignatura'}</span>
-                    </button>
-                    <button
-                      onClick={handleLoadSampleData}
-                      disabled={isSaving}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
-                        isDark
-                          ? 'bg-slate-800 hover:bg-slate-700 text-cyan-300'
-                          : 'bg-[#eff4ff] hover:bg-[#dce9ff] text-[#00288e]'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">auto_stories</span>
-                      <span>{isEn ? 'Load 11th Grade Subjects' : 'Cargar asignaturas de Grado 11°'}</span>
-                    </button>
-                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -782,7 +678,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
                               schedule
                             </span>
                             <span>
-                              {sub.schedule} • {sub.room}
+                              {sub.schedule}
                             </span>
                           </div>
                         </div>
@@ -1021,135 +917,7 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
         </main>
       </div>
 
-      {/* MODAL: ADD SUBJECT FORM */}
-      {showAddSubjectModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl border animate-in fade-in zoom-in-95 duration-200 ${
-            isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-[#e2e8f0] text-[#0b1c30]'
-          }`}>
-            <div className={`flex items-center justify-between mb-4 pb-2 border-b ${
-              isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-            }`}>
-              <div className="flex items-center gap-2">
-                <span className={`material-symbols-outlined text-[24px] ${isDark ? 'text-cyan-400' : 'text-[#00288e]'}`}>
-                  school
-                </span>
-                <h3 className="font-extrabold text-lg">
-                  {isEn ? 'Configure New Subject' : 'Configurar Nueva Asignatura'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowAddSubjectModal(false)}
-                className={`p-1 rounded-lg cursor-pointer ${isDark ? 'text-slate-400 hover:text-white' : 'text-[#757684] hover:text-[#0b1c30]'}`}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
 
-            <form onSubmit={handleAddSubjectSubmit} className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold">
-                  {isEn ? 'Subject Name *' : 'Nombre de la Asignatura *'}
-                </label>
-                <input
-                  type="text"
-                  value={newSubName}
-                  onChange={(e) => setNewSubName(e.target.value)}
-                  placeholder={isEn ? 'e.g. Mathematics, Biology, History' : 'ej. Matemáticas, Biología, Historia'}
-                  required
-                  className={`w-full h-10.5 px-3.5 text-sm rounded-xl outline-none border transition-all ${
-                    isDark
-                      ? 'bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:border-cyan-400'
-                      : 'bg-white border-[#cbd5e1] text-[#0b1c30] placeholder:text-[#757684]/60 focus:bg-[#eff4ff] focus:border-[#0051d5]'
-                  }`}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold">
-                  {isEn ? 'Teacher' : 'Docente Titular'}
-                </label>
-                <input
-                  type="text"
-                  value={newSubTeacher}
-                  onChange={(e) => setNewSubTeacher(e.target.value)}
-                  placeholder={isEn ? 'e.g. Prof. Roberto Gómez' : 'ej. Lic. Roberto Gómez'}
-                  className={`w-full h-10.5 px-3.5 text-sm rounded-xl outline-none border transition-all ${
-                    isDark
-                      ? 'bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:border-cyan-400'
-                      : 'bg-white border-[#cbd5e1] text-[#0b1c30] placeholder:text-[#757684]/60 focus:bg-[#eff4ff] focus:border-[#0051d5]'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold">
-                    {isEn ? 'Schedule' : 'Horario'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newSubSchedule}
-                    onChange={(e) => setNewSubSchedule(e.target.value)}
-                    placeholder={isEn ? 'e.g. Tue & Thu 08:00 AM' : 'ej. Mar y Jue 08:00 AM'}
-                    className={`w-full h-10.5 px-3.5 text-sm rounded-xl outline-none border transition-all ${
-                      isDark
-                        ? 'bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:border-cyan-400'
-                        : 'bg-white border-[#cbd5e1] text-[#0b1c30] placeholder:text-[#757684]/60 focus:bg-[#eff4ff] focus:border-[#0051d5]'
-                    }`}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold">
-                    {isEn ? 'Classroom' : 'Aula / Salón'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newSubRoom}
-                    onChange={(e) => setNewSubRoom(e.target.value)}
-                    placeholder={isEn ? 'e.g. Room 302' : 'ej. Aula 302'}
-                    className={`w-full h-10.5 px-3.5 text-sm rounded-xl outline-none border transition-all ${
-                      isDark
-                        ? 'bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:border-cyan-400'
-                        : 'bg-white border-[#cbd5e1] text-[#0b1c30] placeholder:text-[#757684]/60 focus:bg-[#eff4ff] focus:border-[#0051d5]'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div className={`mt-4 pt-3 border-t flex items-center justify-end gap-2 ${
-                isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-              }`}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddSubjectModal(false)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
-                    isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff]'
-                  }`}
-                >
-                  {isEn ? 'Cancel' : 'Cancelar'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className={`px-5 py-2 rounded-xl text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
-                  }`}
-                >
-                  {isSaving ? (
-                    <span>{isEn ? 'Saving to Firestore...' : 'Guardando en Firestore...'}</span>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[18px]">save</span>
-                      <span>{isEn ? 'Save Subject' : 'Guardar Asignatura'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Official Schedule Modal */}
       {showScheduleModal && (

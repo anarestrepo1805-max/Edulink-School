@@ -54,6 +54,29 @@ service cloud.firestore {
       }
     }
 
+    // Official academic gradebooks
+    match /gradebooks/{gradebookId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Daily attendance records
+    match /attendance/{attendanceId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Institutional messaging conversations
+    match /conversations/{conversationId} {
+      allow read: if true;
+      allow write: if true;
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create, update: if true;

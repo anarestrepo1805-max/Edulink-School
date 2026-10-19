@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'teacher' | 'family' | 'admin' | 'estudiante' | 'docente' | 'acudiente' | 'administrativo';
+export type UserRole = 'student' | 'teacher' | 'family' | 'admin' | 'estudiante' | 'docente' | 'acudiente' | 'administrativo' | 'guardian';
 
 export interface UserProfile {
   id: string;
@@ -75,13 +75,23 @@ export interface Subject {
   category: string;
   teacher: string;
   schedule: string;
-  room: string;
+  room?: string;
   grade: number;
   progress: number;
   color: string;
   bgLight: string;
   icon: string;
   nextClass: string;
+}
+
+export interface ScheduleSlot {
+  time: string;
+  period: number;
+  monday: { subject: string; teacher: string };
+  tuesday: { subject: string; teacher: string };
+  wednesday: { subject: string; teacher: string };
+  thursday: { subject: string; teacher: string };
+  friday: { subject: string; teacher: string };
 }
 
 export interface UpcomingAssignment {

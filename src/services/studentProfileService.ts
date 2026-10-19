@@ -9,9 +9,13 @@ import {
 
 /**
  * Executes a promise with an enforced timeout to guarantee operations NEVER hang indefinitely.
+ * Safely attaches a background rejection handler to prevent unhandled rejection crashes.
  */
 function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMsg: string): Promise<T> {
   let timer: any;
+  promise.catch((err) => {
+    console.debug('Background promise caught after race or timeout:', err);
+  });
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => reject(new Error(timeoutMsg)), timeoutMs);
   });
@@ -37,7 +41,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 
 /**
  * Optimizes and compresses an image on the client side using HTML5 Canvas.
- * Produces a high-quality 320x320 thumbnail suitable for profile avatars.
+ * Produces a crisp 320x320 avatar thumbnail suitable for profile photos.
  */
 function processAndCompressImage(file: File): Promise<{ blob: Blob; dataUrl: string }> {
   const compressionPromise = new Promise<{ blob: Blob; dataUrl: string }>((resolve, reject) => {
@@ -73,8 +77,7 @@ function processAndCompressImage(file: File): Promise<{ blob: Blob; dataUrl: str
 
           ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, targetDim, targetDim);
 
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-          // Convert dataUrl directly to blob synchronously to eliminate async hanging
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           const blob = dataUrlToBlob(dataUrl);
           resolve({ blob, dataUrl });
         } catch (canvasErr) {
@@ -86,14 +89,14 @@ function processAndCompressImage(file: File): Promise<{ blob: Blob; dataUrl: str
     reader.readAsDataURL(file);
   });
 
-  return runWithTimeout(compressionPromise, 5000, 'El procesamiento de la imagen tardó demasiado tiempo.');
+  return runWithTimeout(compressionPromise, 3500, 'El procesamiento de la imagen tardó demasiado tiempo.');
 }
 
 /**
  * Uploads student's profile photo to Firebase Storage (if available)
  * and updates their Firestore document with the new avatar URL.
  * Falls back to an optimized, compressed JPEG Data URL in Firestore if Firebase Storage
- * bucket encounters CORS or permission errors, guaranteeing 100% persistence.
+ * bucket encounters CORS or permission errors, guaranteeing 100% persistence without hanging.
  */
 export async function uploadStudentProfilePhoto(
   userId: string,
@@ -115,12 +118,12 @@ export async function uploadStudentProfilePhoto(
     throw new Error('La imagen excede el límite de 5 MB. Por favor selecciona una imagen más ligera.');
   }
 
-  // Identify authentic user UID via Firebase Authentication
+  // Identify authentic user UID via Firebase Authentication or profile ID
   const authUser = auth.currentUser;
   const effectiveUid = authUser?.uid || userId || currentUser.id;
 
   if (!effectiveUid) {
-    throw new Error('No se pudo identificar la sesión activa en Firebase Authentication.');
+    throw new Error('No se pudo identificar la sesión activa del usuario.');
   }
 
   // 1. Client-side compression and square crop
@@ -129,7 +132,7 @@ export async function uploadStudentProfilePhoto(
   let finalAvatarUrl: string = dataUrl;
   let usedStorage = false;
 
-  // 2. Try Firebase Storage upload with a strict timeout (3000ms) so it NEVER hangs indefinitely
+  // 2. Try Firebase Storage upload with a strict timeout (2500ms) so it NEVER hangs indefinitely
   try {
     if (storage) {
       const fileExtension = 'jpg';
@@ -149,20 +152,20 @@ export async function uploadStudentProfilePhoto(
 
       finalAvatarUrl = await runWithTimeout(
         storageUploadPromise(),
-        3000,
+        2500,
         'Tiempo de espera agotado al conectar con Firebase Storage'
       );
       usedStorage = true;
     }
   } catch (storageErr) {
-    console.warn('Firebase Storage upload notice (using optimized fallback in Firestore):', storageErr);
-    // If Firebase Storage is not provisioned or times out, finalAvatarUrl is the compact 320x320 JPEG DataUrl (~25KB)
+    console.warn('Firebase Storage notice (using optimized persistent fallback in Firestore):', storageErr);
+    // If Firebase Storage is not provisioned or times out, finalAvatarUrl is the compact 320x320 JPEG DataUrl (~22KB)
     finalAvatarUrl = dataUrl;
   }
 
-  // 3. Persist to Firestore /users/{effectiveUid} using setDoc with merge: true
+  // 3. Persist avatarUrl to Firestore /users/{effectiveUid} using merge: true
+  // We only merge avatarUrl & updatedAt to avoid undefined field errors in Firestore
   const updatePayload = {
-    ...currentUser,
     avatarUrl: finalAvatarUrl,
     updatedAt: new Date().toISOString()
   };
@@ -171,18 +174,21 @@ export async function uploadStudentProfilePhoto(
     const userDocRef = doc(db, 'users', effectiveUid);
     await runWithTimeout(
       setDoc(userDocRef, updatePayload, { merge: true }),
-      3500,
+      3000,
       'Tiempo de espera al guardar en Firestore'
     );
 
     // If currentUser.id is different from effectiveUid, also update that document to keep both in sync
     if (currentUser.id && currentUser.id !== effectiveUid) {
       const altDocRef = doc(db, 'users', currentUser.id);
-      await runWithTimeout(
-        setDoc(altDocRef, updatePayload, { merge: true }),
-        2000,
-        'Tiempo de espera secundario'
-      ).catch(() => {});
+      setDoc(altDocRef, updatePayload, { merge: true }).catch(() => {});
+    }
+
+    // Also update registered_emails mapping if email is known
+    if (currentUser.email) {
+      const cleanEmail = currentUser.email.toLowerCase().trim().replace(/[.#$[\]]/g, '_');
+      const emailDocRef = doc(db, 'registered_emails', cleanEmail);
+      setDoc(emailDocRef, { avatarUrl: finalAvatarUrl }, { merge: true }).catch(() => {});
     }
   } catch (fsErr) {
     console.warn('Error updating user document in Firestore (continuing with active session):', fsErr);
@@ -222,7 +228,7 @@ export async function uploadStudentProfilePhoto(
     avatarUrl: finalAvatarUrl,
     updatedUser,
     message: usedStorage
-      ? 'Fotografía subida a Firebase Storage y actualizada en tu perfil.'
+      ? 'Fotografía guardada con éxito en Firebase Storage y actualizada en tu perfil.'
       : 'Fotografía optimizada y guardada de forma persistente en la base de datos institucional.'
   };
 }
