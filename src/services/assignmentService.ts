@@ -44,6 +44,11 @@ export interface InstitutionalAssignmentDoc {
   points?: string;
   instructions?: string;
   borderAccent?: string;
+  pdfUrl?: string;
+  pdfName?: string;
+  pdfSize?: string;
+  isEvaluation?: boolean;
+  percentage?: string;
   createdAt: string;
 }
 
@@ -310,6 +315,11 @@ export async function publishInstitutionalAssignment(assignment: {
   points?: string;
   instructions?: string;
   borderAccent?: string;
+  pdfUrl?: string;
+  pdfName?: string;
+  pdfSize?: string;
+  isEvaluation?: boolean;
+  percentage?: string;
 }): Promise<InstitutionalAssignmentDoc> {
   const assignmentId = assignment.id || `assign_${Date.now()}`;
   const docData: InstitutionalAssignmentDoc = {
@@ -331,6 +341,11 @@ export async function publishInstitutionalAssignment(assignment: {
     points: assignment.points || '100 pts',
     instructions: assignment.instructions || '',
     borderAccent: assignment.borderAccent || 'border-l-4 border-cyan-500',
+    pdfUrl: assignment.pdfUrl,
+    pdfName: assignment.pdfName,
+    pdfSize: assignment.pdfSize,
+    isEvaluation: assignment.isEvaluation || false,
+    percentage: assignment.percentage || '20%',
     createdAt: new Date().toISOString()
   };
 

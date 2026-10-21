@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { ActiveScreen, UserProfile } from '../types';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { CENSUS_STUDENTS, getTeacherPersonalSchedule } from '../data/institutionalCensus';
+import { TeacherSidebar } from './TeacherSidebar';
+import { TeacherScheduleModal } from './TeacherScheduleModal';
 
 interface TeacherAttendanceViewProps {
   currentUser?: UserProfile | null;
@@ -136,77 +138,12 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Navigation Column */}
         <aside className="lg:col-span-3 space-y-4">
-          <div className={`rounded-2xl p-5 border ${isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'} shadow-sm`}>
-            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-800/20">
-              <div className="w-12 h-12 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center font-bold text-lg">
-                {teacherName.charAt(0)}
-              </div>
-              <div>
-                <h3 className="font-bold text-sm leading-tight">{teacherName}</h3>
-                <p className="text-xs text-cyan-500 font-medium">{teacherArea}</p>
-                <span className="inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-                  {isEn ? 'Teacher Role' : 'Rol Docente'}
-                </span>
-              </div>
-            </div>
-
-            {/* 5 Navegaciones Oficiales del Rol Docente */}
-            <div className="space-y-1">
-              {/* 1. Calificaciones */}
-              <button
-                onClick={() => onNavigate('teacher_grades')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">fact_check</span>
-                <span>{isEn ? 'Gradebook' : 'Calificaciones'}</span>
-              </button>
-
-              {/* 2. Control de asistencia (ACTIVO) */}
-              <button
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-bold cursor-default ${
-                  isDark ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">how_to_reg</span>
-                <span>{isEn ? 'Class Attendance' : 'Control de asistencia'}</span>
-              </button>
-
-              {/* 3. Horario propio */}
-              <button
-                onClick={() => setShowScheduleModal(true)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">calendar_month</span>
-                <span>{isEn ? 'Personal Schedule' : 'Horario propio'}</span>
-              </button>
-
-              {/* 4. Tareas y talleres */}
-              <button
-                onClick={() => onNavigate('teacher_assignments')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">assignment</span>
-                <span>{isEn ? 'Tasks & Workshops' : 'Tareas y talleres'}</span>
-              </button>
-
-              {/* 5. Mensajería y citaciones */}
-              <button
-                onClick={() => onNavigate('teacher_messaging')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-colors cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">chat</span>
-                <span>{isEn ? 'Messaging & Citations' : 'Mensajería y citaciones'}</span>
-              </button>
-            </div>
-          </div>
+          <TeacherSidebar
+            currentUser={currentUser}
+            activeScreen="teacher_attendance"
+            onNavigate={onNavigate}
+            onOpenSchedule={() => setShowScheduleModal(true)}
+          />
 
           {/* Attendance Stats Widget */}
           <div className={`rounded-2xl p-4 border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'} space-y-3`}>
@@ -437,56 +374,11 @@ export const TeacherAttendanceView: React.FC<TeacherAttendanceViewProps> = ({
       </div>
 
       {/* Teacher Schedule Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 ${
-            isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
-          }`}>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
-                  {isEn ? 'Official Institutional Timetable' : 'Horario Oficial FET • I.E. Vallejuelos'}
-                </span>
-                <h2 className="text-lg font-black">{isEn ? 'Personal Weekly Schedule' : 'Horario Personal del Docente'}</h2>
-                <p className="text-xs text-slate-400">{teacherName} • {teacherArea}</p>
-              </div>
-              <button
-                onClick={() => setShowScheduleModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className={`border-b ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Period' : 'Hora'}</th>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Monday' : 'Lunes'}</th>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Tuesday' : 'Martes'}</th>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Wednesday' : 'Miércoles'}</th>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Thursday' : 'Jueves'}</th>
-                    <th className="py-2.5 px-3 font-bold">{isEn ? 'Friday' : 'Viernes'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/40">
-                  {personalSchedule.map((slot, idx) => (
-                    <tr key={idx} className={slot.period === 0 ? 'bg-amber-500/5' : ''}>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-400">{slot.time}</td>
-                      <td className="py-2.5 px-3">{slot.monday.subject}</td>
-                      <td className="py-2.5 px-3">{slot.tuesday.subject}</td>
-                      <td className="py-2.5 px-3">{slot.wednesday.subject}</td>
-                      <td className="py-2.5 px-3">{slot.thursday.subject}</td>
-                      <td className="py-2.5 px-3">{slot.friday.subject}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

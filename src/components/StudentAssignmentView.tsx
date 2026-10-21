@@ -825,6 +825,45 @@ export const StudentAssignmentView: React.FC<StudentAssignmentViewProps> = ({
                             : 'Estimado estudiante, consulta las directrices establecidas por el docente, desarrolla tu solución de forma individual y adjunta los archivos finales en el panel derecho antes del plazo límite de entrega.')}
                       </p>
 
+                      {activeAssignment.pdfUrl && (
+                        <div
+                          className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border ${
+                            isDark
+                              ? 'bg-slate-950/70 border-cyan-500/30 text-white'
+                              : 'bg-white border-blue-200 text-slate-900 shadow-xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/30">
+                              <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">
+                                {isEn ? 'Official Attachment' : 'Documento / Guía Adjunta'}
+                              </span>
+                              <span className="text-sm font-extrabold truncate block">
+                                {activeAssignment.pdfName || 'Guia_de_Actividad.pdf'}
+                              </span>
+                              {activeAssignment.pdfSize && (
+                                <span className="text-xs text-slate-400 font-medium">
+                                  {activeAssignment.pdfSize} • Formato PDF institucional
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <a
+                            href={activeAssignment.pdfUrl}
+                            download={activeAssignment.pdfName || 'Guia_de_Actividad.pdf'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 shrink-0"
+                          >
+                            <span className="material-symbols-outlined text-base">download</span>
+                            <span>{isEn ? 'Download PDF' : 'Descargar PDF'}</span>
+                          </a>
+                        </div>
+                      )}
+
                       <div
                         className={`p-5 rounded-2xl flex flex-col gap-3 border ${
                           isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
