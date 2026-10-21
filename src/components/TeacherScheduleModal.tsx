@@ -61,9 +61,7 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
-                {isTeacher
-                  ? (isEn ? 'Personal Teacher Schedule' : 'Horario Personal Docente')
-                  : (isEn ? 'Academic Schedule' : 'Horario Académico')}
+                {isEn ? 'Personal Schedule' : 'Horario propio'}
               </h3>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                 {userName} • I.E. Vallejuelos • {isTeacher ? (currentUser?.area || 'Docencia') : `Grado ${currentUser?.gradeLevel || currentUser?.group || '11-1'}`} • {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
@@ -126,11 +124,11 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
                     </td>
                     {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const).map((day) => {
                       const cell = slot[day];
-                      const hasClass = cell && cell.subject && !cell.subject.includes('Descanso');
+                      const isFree = !cell || !cell.subject || cell.subject === 'Libre' || cell.subject.includes('Libre') || cell.subject.includes('Preparación');
 
                       return (
                         <td key={day} className="py-2.5 px-3 align-top">
-                          {hasClass ? (
+                          {!isFree ? (
                             <div
                               className={`p-2 rounded-xl border ${
                                 isDark
@@ -141,17 +139,17 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
                               <div className="font-extrabold text-[11px] leading-tight text-cyan-500 dark:text-cyan-400">
                                 {cell.subject}
                               </div>
-                              {cell.teacher && (
+                              {cell.teacher && cell.teacher !== 'Sin asignación' && cell.teacher !== '—' && (
                                 <div className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                                   {cell.teacher}
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <div className={`p-1.5 rounded-lg border border-dashed text-[10px] leading-tight ${
+                            <div className={`p-2 rounded-xl border border-dashed text-center text-xs font-semibold ${
                               isDark ? 'border-slate-800 text-slate-500 bg-slate-900/40' : 'border-slate-200 text-slate-400 bg-slate-50'
                             }`}>
-                              <span className="font-medium">{isEn ? 'Free period / Prep time' : 'Espacio libre / Preparación'}</span>
+                              <span>Libre</span>
                             </div>
                           )}
                         </td>

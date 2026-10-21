@@ -607,11 +607,11 @@ export function getTeacherPersonalSchedule(teacherNameOrDoc?: string): ScheduleS
     const row: ScheduleSlot = {
       time: slot.time,
       period: slot.period,
-      monday: { subject: 'Tiempo de Preparación / Atención', teacher: '—' },
-      tuesday: { subject: 'Tiempo de Preparación / Atención', teacher: '—' },
-      wednesday: { subject: 'Tiempo de Preparación / Atención', teacher: '—' },
-      thursday: { subject: 'Tiempo de Preparación / Atención', teacher: '—' },
-      friday: { subject: 'Tiempo de Preparación / Atención', teacher: '—' },
+      monday: { subject: 'Libre', teacher: 'Sin asignación' },
+      tuesday: { subject: 'Libre', teacher: 'Sin asignación' },
+      wednesday: { subject: 'Libre', teacher: 'Sin asignación' },
+      thursday: { subject: 'Libre', teacher: 'Sin asignación' },
+      friday: { subject: 'Libre', teacher: 'Sin asignación' },
     };
 
     days.forEach(day => {
@@ -1273,15 +1273,38 @@ export function getCensusStudentsForGroup(groupKey: string): CensusStudent[] {
  * Determina automáticamente las asignaturas y grupos asignados a un docente institucional.
  * Consulta el censo oficial por nombre, cédula o código.
  */
-export function getTeacherAcademicAssignments(teacherNameOrDoc?: string): TeacherAcademicAssignment[] {
+export function getTeacherAcademicAssignments(
+  teacherNameOrDoc?: string,
+  userSubjectArea?: string,
+  userAssignedGrades?: string
+): TeacherAcademicAssignment[] {
   const query = (teacherNameOrDoc || '').trim().toLowerCase();
   
+  if (userSubjectArea && userSubjectArea.trim()) {
+    const subject = userSubjectArea.trim();
+    const gradesStr = userAssignedGrades || '10°1, 10°2';
+    const rawGrades = gradesStr.split(',').map(g => g.trim()).filter(Boolean);
+    return rawGrades.map((rawGrade, idx) => {
+      const groupKey = normalizeGroupKey(rawGrade);
+      const groupDisplay = formatGroupDisplay(groupKey);
+      return {
+        id: `asg_custom_${idx}_${groupKey}`,
+        subjectName: subject,
+        group: groupDisplay,
+        groupKey,
+        label: `${subject} — ${groupDisplay}`
+      };
+    });
+  }
+
   if (query) {
     const teacher = CENSUS_TEACHERS.find(t =>
       t.fullName.toLowerCase().includes(query) ||
       t.cedula === query ||
       t.code === query ||
-      query.includes(t.fullName.toLowerCase())
+      query.includes(t.fullName.toLowerCase()) ||
+      t.email.toLowerCase() === query ||
+      t.area.toLowerCase() === query
     );
 
     if (teacher) {
@@ -1310,25 +1333,19 @@ export function getTeacherAcademicAssignments(teacherNameOrDoc?: string): Teache
   return [
     {
       id: 'asg_tech_10_1',
-      subjectName: 'Programación de Software',
+      subjectName: 'Tecnología e Informática',
       group: '10°1',
       groupKey: '10-1',
-      label: 'Programación de Software — 10°1'
-    },
-    {
-      id: 'asg_tech_10_2',
-      subjectName: 'Programación de Software',
-      group: '10°2',
-      groupKey: '10-2',
-      label: 'Programación de Software — 10°2'
+      label: 'Tecnología e Informática — 10°1'
     },
     {
       id: 'asg_tech_11_1',
-      subjectName: 'Bases de Datos Relacionales',
+      subjectName: 'Tecnología e Informática',
       group: '11°1',
       groupKey: '11-1',
-      label: 'Bases de Datos — 11°1'
+      label: 'Tecnología e Informática — 11°1'
     }
   ];
 }
+
 

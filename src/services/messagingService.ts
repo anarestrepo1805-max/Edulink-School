@@ -1,23 +1,28 @@
 import {
   collection,
   doc,
+  setDoc,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
   query,
   where,
-  orderBy
+  orderBy,
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import {
+  CENSUS_GUARDIANS,
   CENSUS_TEACHERS,
   CENSUS_ADMIN_STAFF,
-  CENSUS_GUARDIANS
+  CENSUS_STUDENTS,
+  getTeacherAcademicAssignments,
+  normalizeGroupKey
 } from '../data/institutionalCensus';
 
-export interface InstitutionalMessage {
+export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
@@ -25,319 +30,509 @@ export interface InstitutionalMessage {
   senderRole: string;
   recipientId: string;
   recipientName: string;
+  recipientRole: string;
   text: string;
-  createdAt: string;
+  createdAt: number;
   citationDate?: string;
   citationTime?: string;
+  citationReason?: string;
+  citationStudentName?: string;
+  citationNotes?: string;
 }
 
+export interface ConversationParticipant {
+  id: string;
+  fullName: string;
+  role: string;
+  email?: string;
+  detail?: string;
+}
+
+export interface Conversation {
+  id: string;
+  participantIds: string[];
+  participants: Record<string, ConversationParticipant>;
+  lastMessage: string;
+  lastMessageTime: number;
+  lastSenderId: string;
+  unreadCount?: Record<string, number>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AuthorizedContact {
+  id: string;
+  fullName: string;
+  role: 'teacher' | 'family' | 'admin';
+  roleLabel: string;
+  email?: string;
+  detail?: string;
+}
+
+// Aliases for compatibility
+export type InstitutionalMessage = ChatMessage;
 export interface InstitutionalConversation {
   id: string;
   participantIds: string[];
-  participantInfo: Record<
-    string,
-    {
-      name: string;
-      role: string;
-      email?: string;
-      photo?: string;
-      group?: string;
-    }
-  >;
-  subject: string;
-  category: 'acudientes' | 'directivos' | 'profesores' | 'citaciones' | 'orientacion';
-  lastMessageText: string;
-  lastMessageSenderId: string;
-  lastMessageSenderName: string;
-  lastMessageAt: string;
-  unreadBy: string[];
-  citationInfo?: {
-    studentName?: string;
-    guardianName?: string;
-    citationDate?: string;
-    citationTime?: string;
-    reason?: string;
-    notes?: string;
-  };
+  participantInfo?: Record<string, { name: string; role: string; email?: string }>;
+  subject?: string;
+  category?: string;
+  lastMessageText?: string;
+  lastMessageSenderId?: string;
+  lastMessageSenderName?: string;
+  lastMessageAt?: string;
+  unreadBy?: string[];
 }
-
 export interface RecipientOption {
   id: string;
   name: string;
   role: string;
-  category: 'acudientes' | 'directivos' | 'profesores' | 'orientacion';
+  category: string;
   detail: string;
   email?: string;
 }
 
 /**
- * Fetches real conversations for an authenticated user from Firestore.
+ * Builds a deterministic conversation ID for two users so both always access the exact same chat thread.
+ */
+export function getDeterministicConversationId(userId1: string, userId2: string): string {
+  const clean1 = (userId1 || 'user_a').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const clean2 = (userId2 || 'user_b').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const sorted = [clean1, clean2].sort();
+  return `conv_${sorted[0]}__${sorted[1]}`;
+}
+
+/**
+ * Normalizes role to Spanish display label.
+ */
+export function formatRoleLabel(role?: string): string {
+  const norm = (role || '').toLowerCase();
+  if (norm.includes('teach') || norm.includes('docent')) return 'Docente';
+  if (norm.includes('fam') || norm.includes('acud') || norm.includes('guard')) return 'Acudiente';
+  if (norm.includes('adm') || norm.includes('coord') || norm.includes('rector')) return 'Directivo / Administrativo';
+  return 'Usuario Institucional';
+}
+
+/**
+ * Subscribes in real-time to conversations involving the specified user in Firestore.
  * If no conversations exist in the database, returns an empty array [].
  * Does NOT generate mock, demo, or fake conversations.
  */
-export async function fetchUserConversations(
-  user: UserProfile
-): Promise<InstitutionalConversation[]> {
-  if (!user) return [];
+export function subscribeUserConversations(
+  userId: string,
+  onUpdate: (conversations: Conversation[]) => void
+): Unsubscribe {
+  if (!userId) {
+    onUpdate([]);
+    return () => {};
+  }
 
-  const userKeys = [
-    user.id,
-    user.documentId,
-    user.email?.toLowerCase().trim()
-  ].filter(Boolean);
+  const convCol = collection(db, 'conversations');
+  const q = query(convCol, where('participantIds', 'array-contains', userId));
 
-  try {
-    const convRef = collection(db, 'conversations');
-    const snapshot = await getDocs(convRef);
-
-    if (snapshot.empty) {
-      return [];
-    }
-
-    const conversations: InstitutionalConversation[] = [];
-
-    snapshot.forEach((docSnap) => {
-      const data = { id: docSnap.id, ...docSnap.data() } as InstitutionalConversation;
-      const participants = data.participantIds || [];
-
-      // Check if current user is one of the participants
-      const isParticipant = participants.some((pId) =>
-        userKeys.includes(pId) || userKeys.includes(pId.toLowerCase())
-      );
-
-      if (isParticipant) {
-        conversations.push(data);
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      if (snapshot.empty) {
+        onUpdate([]);
+        return;
       }
-    });
 
-    // Sort descending by lastMessageAt
-    conversations.sort((a, b) => {
-      const timeA = new Date(a.lastMessageAt || 0).getTime();
-      const timeB = new Date(b.lastMessageAt || 0).getTime();
-      return timeB - timeA;
-    });
+      const convList: Conversation[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data() as any;
+        convList.push({
+          id: d.id,
+          participantIds: data.participantIds || [],
+          participants: data.participants || {},
+          lastMessage: data.lastMessage || data.lastMessageText || 'Mensaje',
+          lastMessageTime: data.lastMessageTime || (data.lastMessageAt ? new Date(data.lastMessageAt).getTime() : Date.now()),
+          lastSenderId: data.lastSenderId || data.lastMessageSenderId || '',
+          unreadCount: data.unreadCount || {},
+          createdAt: data.createdAt ? (typeof data.createdAt === 'number' ? data.createdAt : new Date(data.createdAt).getTime()) : Date.now(),
+          updatedAt: data.updatedAt ? (typeof data.updatedAt === 'number' ? data.updatedAt : new Date(data.updatedAt).getTime()) : Date.now()
+        });
+      });
 
-    return conversations;
-  } catch (err) {
-    console.warn('Error fetching user conversations from Firestore:', err);
-    return [];
-  }
-}
-
-/**
- * Fetches messages belonging to a specific conversation from Firestore.
- * If no messages exist, returns [].
- */
-export async function fetchConversationMessages(
-  conversationId: string
-): Promise<InstitutionalMessage[]> {
-  if (!conversationId) return [];
-
-  try {
-    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-    const snapshot = await getDocs(messagesRef);
-
-    if (snapshot.empty) {
-      return [];
+      // Sort in memory by lastMessageTime descending
+      convList.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+      onUpdate(convList);
+    },
+    (error) => {
+      console.warn('Real-time conversation subscription notice (fallback empty):', error);
+      onUpdate([]);
     }
-
-    const messages: InstitutionalMessage[] = [];
-    snapshot.forEach((docSnap) => {
-      messages.push({ id: docSnap.id, ...docSnap.data() } as InstitutionalMessage);
-    });
-
-    messages.sort((a, b) => {
-      const timeA = new Date(a.createdAt || 0).getTime();
-      const timeB = new Date(b.createdAt || 0).getTime();
-      return timeA - timeB;
-    });
-
-    return messages;
-  } catch (err) {
-    console.warn('Error fetching conversation messages from Firestore:', err);
-    return [];
-  }
+  );
 }
 
 /**
- * Sends a new message inside an existing conversation.
- * Persists to Firestore and updates the conversation's lastMessage metadata.
+ * Subscribes in real-time to messages of a specific conversation from Firestore.
  */
-export async function sendInstitutionalMessage(params: {
-  conversationId: string;
+export function subscribeConversationMessages(
+  conversationId: string,
+  onUpdate: (messages: ChatMessage[]) => void
+): Unsubscribe {
+  if (!conversationId) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  const msgCol = collection(db, 'conversations', conversationId, 'messages');
+  const q = query(msgCol, orderBy('createdAt', 'asc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      if (snapshot.empty) {
+        onUpdate([]);
+        return;
+      }
+
+      const messages: ChatMessage[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data() as any;
+        const createdAtVal = typeof data.createdAt === 'number' 
+          ? data.createdAt 
+          : (data.createdAt ? new Date(data.createdAt).getTime() : Date.now());
+
+        messages.push({
+          id: d.id,
+          conversationId: data.conversationId || conversationId,
+          senderId: data.senderId || '',
+          senderName: data.senderName || 'Remitente',
+          senderRole: data.senderRole || '',
+          recipientId: data.recipientId || '',
+          recipientName: data.recipientName || '',
+          recipientRole: data.recipientRole || '',
+          text: data.text || '',
+          createdAt: createdAtVal,
+          citationDate: data.citationDate,
+          citationTime: data.citationTime,
+          citationReason: data.citationReason,
+          citationStudentName: data.citationStudentName,
+          citationNotes: data.citationNotes
+        });
+      });
+
+      onUpdate(messages);
+    },
+    (error) => {
+      console.warn('Real-time messages subscription notice:', error);
+      onUpdate([]);
+    }
+  );
+}
+
+/**
+ * Sends a real message in Firestore, creating or updating the conversation.
+ * All messages are persisted in Firestore and stay available on refresh.
+ */
+export async function sendChatMessage(params: {
   sender: UserProfile;
-  recipientId: string;
-  recipientName: string;
+  recipient: AuthorizedContact | { id: string; fullName: string; role: string; email?: string; detail?: string };
   text: string;
-  citationDate?: string;
-  citationTime?: string;
-}): Promise<InstitutionalMessage> {
-  const {
-    conversationId,
-    sender,
-    recipientId,
-    recipientName,
-    text,
-    citationDate,
-    citationTime
-  } = params;
-
-  const nowIso = new Date().toISOString();
-  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
-  const messageDoc: InstitutionalMessage = {
-    id: messageId,
-    conversationId,
-    senderId: sender.documentId || sender.id,
-    senderName: sender.fullName,
-    senderRole: sender.role,
-    recipientId,
-    recipientName,
-    text: text.trim(),
-    createdAt: nowIso,
-    ...(citationDate ? { citationDate } : {}),
-    ...(citationTime ? { citationTime } : {})
-  };
-
-  try {
-    // 1. Write message doc
-    const msgRef = doc(db, 'conversations', conversationId, 'messages', messageId);
-    await setDoc(msgRef, messageDoc);
-
-    // 2. Update conversation metadata
-    const convRef = doc(db, 'conversations', conversationId);
-    await updateDoc(convRef, {
-      lastMessageText: text.trim(),
-      lastMessageSenderId: sender.documentId || sender.id,
-      lastMessageSenderName: sender.fullName,
-      lastMessageAt: nowIso,
-      unreadBy: [recipientId]
-    });
-
-    return messageDoc;
-  } catch (err) {
-    console.error('Error sending institutional message to Firestore:', err);
-    throw err;
-  }
-}
-
-/**
- * Creates a brand new conversation channel and posts the initial message.
- */
-export async function createInstitutionalConversation(params: {
-  sender: UserProfile;
-  recipient: {
-    id: string;
-    name: string;
-    role: string;
-    email?: string;
-    group?: string;
-  };
-  subject: string;
-  category: 'acudientes' | 'directivos' | 'profesores' | 'citaciones' | 'orientacion';
-  initialText: string;
-  citationInfo?: {
+  citation?: {
+    date: string;
+    time: string;
+    reason: string;
     studentName?: string;
-    guardianName?: string;
-    citationDate?: string;
-    citationTime?: string;
-    reason?: string;
     notes?: string;
   };
-}): Promise<{ conversation: InstitutionalConversation; firstMessage: InstitutionalMessage }> {
-  const { sender, recipient, subject, category, initialText, citationInfo } = params;
-
+}): Promise<ChatMessage> {
+  const { sender, recipient, text, citation } = params;
   const senderId = sender.documentId || sender.id;
-  const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-  const nowIso = new Date().toISOString();
+  const recipientId = recipient.id;
+  const conversationId = getDeterministicConversationId(senderId, recipientId);
 
-  const conversationDoc: InstitutionalConversation = {
-    id: conversationId,
-    participantIds: [senderId, recipient.id],
-    participantInfo: {
-      [senderId]: {
-        name: sender.fullName,
-        role: sender.role,
-        email: sender.email,
-        photo: sender.avatarUrl
-      },
-      [recipient.id]: {
-        name: recipient.name,
-        role: recipient.role,
-        email: recipient.email,
-        group: recipient.group
-      }
-    },
-    subject: subject.trim(),
-    category,
-    lastMessageText: initialText.trim(),
-    lastMessageSenderId: senderId,
-    lastMessageSenderName: sender.fullName,
-    lastMessageAt: nowIso,
-    unreadBy: [recipient.id],
-    ...(citationInfo ? { citationInfo } : {})
-  };
+  const senderRoleLabel = formatRoleLabel(sender.role);
+  const recipientRoleLabel = formatRoleLabel(recipient.role);
 
-  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-  const messageDoc: InstitutionalMessage = {
+  const now = Date.now();
+  const messageId = `msg_${now}_${Math.random().toString(36).substring(2, 7)}`;
+
+  const messageDoc: ChatMessage = {
     id: messageId,
     conversationId,
     senderId,
-    senderName: sender.fullName,
-    senderRole: sender.role,
-    recipientId: recipient.id,
-    recipientName: recipient.name,
-    text: initialText.trim(),
-    createdAt: nowIso,
-    ...(citationInfo?.citationDate ? { citationDate: citationInfo.citationDate } : {}),
-    ...(citationInfo?.citationTime ? { citationTime: citationInfo.citationTime } : {})
+    senderName: sender.fullName || 'Docente Institucional',
+    senderRole: senderRoleLabel,
+    recipientId,
+    recipientName: recipient.fullName,
+    recipientRole: recipientRoleLabel,
+    text: text.trim(),
+    createdAt: now,
+    ...(citation && {
+      citationDate: citation.date,
+      citationTime: citation.time,
+      citationReason: citation.reason,
+      citationStudentName: citation.studentName,
+      citationNotes: citation.notes
+    })
   };
 
-  try {
-    // 1. Write conversation doc
-    const convRef = doc(db, 'conversations', conversationId);
-    await setDoc(convRef, conversationDoc);
+  // 1. Ensure conversation document exists / is updated
+  const convRef = doc(db, 'conversations', conversationId);
+  const participantIds = Array.from(new Set([
+    sender.id,
+    senderId,
+    recipient.id
+  ])).filter(Boolean);
 
-    // 2. Write first message
-    const msgRef = doc(db, 'conversations', conversationId, 'messages', messageId);
-    await setDoc(msgRef, messageDoc);
+  const conversationPayload: Partial<Conversation> = {
+    id: conversationId,
+    participantIds,
+    participants: {
+      [senderId]: {
+        id: senderId,
+        fullName: sender.fullName,
+        role: senderRoleLabel,
+        email: sender.email
+      },
+      [recipient.id]: {
+        id: recipient.id,
+        fullName: recipient.fullName,
+        role: recipientRoleLabel,
+        email: recipient.email,
+        detail: recipient.detail
+      }
+    },
+    lastMessage: text.trim() || (citation ? `Citación oficial: ${citation.reason}` : 'Mensaje'),
+    lastMessageTime: now,
+    lastSenderId: senderId,
+    updatedAt: now
+  };
 
-    return { conversation: conversationDoc, firstMessage: messageDoc };
-  } catch (err) {
-    console.error('Error creating institutional conversation in Firestore:', err);
-    throw err;
-  }
+  // Upsert conversation doc
+  await setDoc(convRef, conversationPayload, { merge: true });
+
+  // 2. Save message subcollection document
+  const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+  await setDoc(messageRef, messageDoc);
+
+  return messageDoc;
 }
 
 /**
- * Marks conversation as read by the current user.
+ * Retrieves the authorized contacts eligible to chat with the current user.
+ * Strictly limited to authorized Docentes, Acudientes, and Directivos / Administrativos.
  */
-export async function markConversationAsRead(
-  conversationId: string,
-  userId: string
-): Promise<void> {
+export async function getAuthorizedContactsForUser(currentUser?: UserProfile | null): Promise<AuthorizedContact[]> {
+  if (!currentUser) return [];
+
+  const currentRole = (currentUser.role || '').toLowerCase();
+  const currentUserId = currentUser.id;
+  const currentDoc = currentUser.documentId || '';
+  const currentName = (currentUser.fullName || '').toLowerCase();
+
+  const contactsMap = new Map<string, AuthorizedContact>();
+
+  // 1. Fetch real registered users from Firestore 'users' collection
+  try {
+    const usersCol = collection(db, 'users');
+    const snap = await getDocs(usersCol);
+    snap.forEach((d) => {
+      const u = d.data() as UserProfile;
+      const role = (u.role || '').toLowerCase();
+      // Exclude self and students from teacher-family-admin chat
+      if (u.id === currentUserId || d.id === currentUserId) return;
+      if (role === 'student' || role === 'estudiante') return;
+
+      if (role === 'teacher' || role === 'docente' || role === 'family' || role === 'acudiente' || role === 'admin' || role === 'administrativo') {
+        const contactId = u.documentId || u.id;
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: u.fullName || 'Usuario',
+          role: role.includes('teach') || role.includes('docent') ? 'teacher' : (role.includes('fam') || role.includes('acud') ? 'family' : 'admin'),
+          roleLabel: formatRoleLabel(role),
+          email: u.email,
+          detail: u.subjectArea || (u.role === 'family' ? 'Acudiente registrado' : 'Directivo institucional')
+        });
+      }
+    });
+  } catch (error) {
+    console.warn('Could not query users collection, using census data:', error);
+  }
+
+  // 2. Add institutional census contacts according to role permissions
+  // If currentUser is Teacher:
+  // Can chat with Acudientes (especially of their assigned groups), Admin staff, and other Teachers
+  if (currentRole.includes('teach') || currentRole.includes('docent')) {
+    // Determine teacher's assigned groups
+    const assignments = getTeacherAcademicAssignments(currentUser.fullName || currentUser.documentId);
+    const assignedGroupKeys = new Set(assignments.map(a => a.groupKey));
+
+    // Acudientes of students in assigned groups (or all official acudientes)
+    CENSUS_GUARDIANS.forEach((g) => {
+      const student = CENSUS_STUDENTS.find(s => s.documentId === g.studentDocumentId);
+      const studentGroupKey = student ? normalizeGroupKey(student.group) : '';
+      const isAssigned = assignedGroupKeys.has(studentGroupKey);
+
+      const contactId = g.cedula;
+      if (!contactsMap.has(contactId)) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: g.fullName,
+          role: 'family',
+          roleLabel: 'Acudiente',
+          email: g.email,
+          detail: student ? `${g.relationship} de ${student.fullName} (${student.group})` : 'Acudiente oficial'
+        });
+      }
+    });
+
+    // Admin staff
+    CENSUS_ADMIN_STAFF.forEach((adm) => {
+      const contactId = adm.cedula || adm.code;
+      if (!contactsMap.has(contactId) && adm.fullName.toLowerCase() !== currentName) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: adm.fullName,
+          role: 'admin',
+          roleLabel: adm.cargo || 'Directivo',
+          email: adm.email,
+          detail: `Directivo • ${adm.cargo}`
+        });
+      }
+    });
+
+    // Other Teachers
+    CENSUS_TEACHERS.forEach((t) => {
+      const contactId = t.cedula || t.code;
+      if (!contactsMap.has(contactId) && t.fullName.toLowerCase() !== currentName && t.cedula !== currentDoc) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: t.fullName,
+          role: 'teacher',
+          roleLabel: 'Docente',
+          email: t.email,
+          detail: `Área: ${t.area} • Grados: ${t.grades}`
+        });
+      }
+    });
+  } 
+  // If currentUser is Family (Acudiente):
+  // Can chat with Teachers and Admin staff
+  else if (currentRole.includes('fam') || currentRole.includes('acud') || currentRole.includes('guard')) {
+    // Teachers
+    CENSUS_TEACHERS.forEach((t) => {
+      const contactId = t.cedula || t.code;
+      if (!contactsMap.has(contactId)) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: t.fullName,
+          role: 'teacher',
+          roleLabel: 'Docente',
+          email: t.email,
+          detail: `Docente de ${t.area}`
+        });
+      }
+    });
+
+    // Admin staff
+    CENSUS_ADMIN_STAFF.forEach((adm) => {
+      const contactId = adm.cedula || adm.code;
+      if (!contactsMap.has(contactId)) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: adm.fullName,
+          role: 'admin',
+          roleLabel: adm.cargo || 'Directivo',
+          email: adm.email,
+          detail: `Directivo • ${adm.cargo}`
+        });
+      }
+    });
+  }
+  // If currentUser is Admin:
+  else {
+    // Teachers
+    CENSUS_TEACHERS.forEach((t) => {
+      const contactId = t.cedula || t.code;
+      if (!contactsMap.has(contactId)) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: t.fullName,
+          role: 'teacher',
+          roleLabel: 'Docente',
+          email: t.email,
+          detail: `Docente de ${t.area}`
+        });
+      }
+    });
+    // Acudientes
+    CENSUS_GUARDIANS.slice(0, 30).forEach((g) => {
+      const contactId = g.cedula;
+      if (!contactsMap.has(contactId)) {
+        contactsMap.set(contactId, {
+          id: contactId,
+          fullName: g.fullName,
+          role: 'family',
+          roleLabel: 'Acudiente',
+          email: g.email,
+          detail: 'Acudiente oficial'
+        });
+      }
+    });
+  }
+
+  return Array.from(contactsMap.values()).sort((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
+// Backwards-compatible utility helpers
+export async function fetchUserConversations(user: UserProfile): Promise<InstitutionalConversation[]> {
+  if (!user) return [];
+  const convCol = collection(db, 'conversations');
+  const snap = await getDocs(query(convCol, where('participantIds', 'array-contains', user.id)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as InstitutionalConversation));
+}
+
+export async function fetchConversationMessages(conversationId: string): Promise<InstitutionalMessage[]> {
+  if (!conversationId) return [];
+  const msgCol = collection(db, 'conversations', conversationId, 'messages');
+  const snap = await getDocs(query(msgCol, orderBy('createdAt', 'asc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as InstitutionalMessage));
+}
+
+export async function sendInstitutionalMessage(params: any): Promise<InstitutionalMessage> {
+  return sendChatMessage({
+    sender: params.sender,
+    recipient: { id: params.recipientId, fullName: params.recipientName, role: 'family' },
+    text: params.text,
+    citation: params.citationDate ? { date: params.citationDate, time: params.citationTime || '07:30', reason: 'Citación' } : undefined
+  });
+}
+
+export async function createInstitutionalConversation(params: any): Promise<any> {
+  const msg = await sendChatMessage({
+    sender: params.sender,
+    recipient: params.recipient,
+    text: params.initialText,
+    citation: params.citationInfo ? {
+      date: params.citationInfo.citationDate,
+      time: params.citationInfo.citationTime,
+      reason: params.citationInfo.reason,
+      studentName: params.citationInfo.studentName,
+      notes: params.citationInfo.notes
+    } : undefined
+  });
+  return { conversation: { id: msg.conversationId }, firstMessage: msg };
+}
+
+export async function markConversationAsRead(conversationId: string, userId: string): Promise<void> {
   if (!conversationId || !userId) return;
   try {
     const convRef = doc(db, 'conversations', conversationId);
     const snap = await getDoc(convRef);
     if (snap.exists()) {
-      const data = snap.data() as InstitutionalConversation;
-      const unread = (data.unreadBy || []).filter((id) => id !== userId);
+      const data = snap.data();
+      const unread = (data.unreadBy || []).filter((id: string) => id !== userId);
       await updateDoc(convRef, { unreadBy: unread });
     }
-  } catch (err) {
-    console.warn('Error marking conversation as read:', err);
-  }
+  } catch {}
 }
 
-/**
- * Returns the list of real, authorized institutional contacts that the user can message,
- * based on their role and institutional census records.
- */
 export function getAuthorizedRecipients(userRole: string): RecipientOption[] {
   const options: RecipientOption[] = [];
-
-  // Administrators and leadership are accessible to teachers and families
   CENSUS_ADMIN_STAFF.forEach((admin) => {
     options.push({
       id: admin.cedula || admin.code,
@@ -348,9 +543,7 @@ export function getAuthorizedRecipients(userRole: string): RecipientOption[] {
       email: admin.email
     });
   });
-
   if (userRole === 'teacher' || userRole === 'admin') {
-    // Teachers and Admins can contact guardians (acudientes)
     CENSUS_GUARDIANS.forEach((g) => {
       options.push({
         id: g.cedula,
@@ -361,8 +554,6 @@ export function getAuthorizedRecipients(userRole: string): RecipientOption[] {
         email: g.email
       });
     });
-
-    // Teachers can also message other teachers
     CENSUS_TEACHERS.forEach((t) => {
       options.push({
         id: t.cedula || t.code,
@@ -374,7 +565,6 @@ export function getAuthorizedRecipients(userRole: string): RecipientOption[] {
       });
     });
   } else if (userRole === 'family') {
-    // Families can message teachers
     CENSUS_TEACHERS.forEach((t) => {
       options.push({
         id: t.cedula || t.code,
@@ -386,6 +576,5 @@ export function getAuthorizedRecipients(userRole: string): RecipientOption[] {
       });
     });
   }
-
   return options;
 }

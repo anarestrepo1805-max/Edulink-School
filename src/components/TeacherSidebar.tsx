@@ -11,7 +11,8 @@ export type TeacherActiveTab =
   | 'messaging';
 
 interface TeacherSidebarProps {
-  activeTab: TeacherActiveTab;
+  activeTab?: TeacherActiveTab;
+  activeScreen?: ActiveScreen | string;
   onNavigate: (screen: ActiveScreen) => void;
   onOpenSchedule: () => void;
   currentUser?: UserProfile | null;
@@ -19,6 +20,7 @@ interface TeacherSidebarProps {
 
 export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   activeTab,
+  activeScreen,
   onNavigate,
   onOpenSchedule,
   currentUser
@@ -27,8 +29,15 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
+  const resolvedTab: TeacherActiveTab = activeTab || (
+    activeScreen === 'teacher_grades' ? 'grades' :
+    activeScreen === 'teacher_attendance' ? 'attendance' :
+    activeScreen === 'teacher_assignments' ? 'assignments' :
+    activeScreen === 'teacher_messaging' ? 'messaging' : 'grades'
+  );
+
   const teacherName = currentUser?.fullName || (isEn ? 'Teacher' : 'Docente');
-  const teacherArea = currentUser?.area || (isEn ? 'High School Faculty' : 'Docencia Secundaria');
+  const teacherArea = currentUser?.subjectArea || currentUser?.area || (isEn ? 'High School Faculty' : 'Docencia Secundaria');
 
   const navItems = [
     {
@@ -36,35 +45,35 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       label: isEn ? 'Gradebook' : 'Calificaciones',
       icon: 'fact_check',
       action: () => onNavigate('teacher_grades'),
-      isActive: activeTab === 'grades'
+      isActive: resolvedTab === 'grades'
     },
     {
       id: 'attendance' as const,
       label: isEn ? 'Class Attendance' : 'Control de asistencia',
       icon: 'how_to_reg',
       action: () => onNavigate('teacher_attendance'),
-      isActive: activeTab === 'attendance'
+      isActive: resolvedTab === 'attendance'
+    },
+    {
+      id: 'schedule' as const,
+      label: isEn ? 'Personal Schedule' : 'Horario propio',
+      icon: 'calendar_month',
+      action: onOpenSchedule,
+      isActive: resolvedTab === 'schedule'
     },
     {
       id: 'assignments' as const,
       label: isEn ? 'Tasks & Workshops' : 'Tareas y talleres',
       icon: 'assignment',
       action: () => onNavigate('teacher_assignments'),
-      isActive: activeTab === 'assignments'
+      isActive: resolvedTab === 'assignments'
     },
     {
       id: 'messaging' as const,
       label: isEn ? 'Messaging & Citations' : 'Mensajería y citaciones',
       icon: 'chat',
       action: () => onNavigate('teacher_messaging'),
-      isActive: activeTab === 'messaging'
-    },
-    {
-      id: 'schedule' as const,
-      label: isEn ? 'Schedule' : 'Horario',
-      icon: 'calendar_month',
-      action: onOpenSchedule,
-      isActive: activeTab === 'schedule'
+      isActive: resolvedTab === 'messaging'
     }
   ];
 

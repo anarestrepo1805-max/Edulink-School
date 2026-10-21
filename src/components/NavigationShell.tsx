@@ -243,7 +243,6 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       }
     }
     onSelectScreen(screenId);
-    setIsExpanded(false);
   };
 
   const getRoleLabel = (role?: UserRole) => {
