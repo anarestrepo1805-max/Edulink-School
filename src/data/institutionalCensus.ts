@@ -103,7 +103,7 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
     period: 5,
     monday: { subject: 'Química', teacher: 'Mauricio Salazar' },
     tuesday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    wednesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    wednesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     friday: { subject: 'Inglés', teacher: 'Felipe Torres' },
   },
@@ -115,6 +115,65 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
     wednesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     thursday: { subject: 'Química', teacher: 'Mauricio Salazar' },
     friday: { subject: 'Español', teacher: 'Jorge Castaño' },
+  },
+];
+
+export const OFFICIAL_SCHEDULE_11_2: ScheduleSlot[] = [
+  {
+    time: '6:15 - 7:10', period: 1,
+    monday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    tuesday: { subject: 'Español', teacher: 'Jorge Castaño' },
+    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    thursday: { subject: 'Español', teacher: 'Jorge Castaño' },
+    friday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+  },
+  {
+    time: '7:10 - 8:05', period: 2,
+    monday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+    tuesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    wednesday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+    thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    friday: { subject: 'Español', teacher: 'Jorge Castaño' },
+  },
+  {
+    time: '8:05 - 9:00', period: 3,
+    monday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    wednesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+  },
+  {
+    time: '9:00 - 9:30', period: 0,
+    monday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    tuesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    wednesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    thursday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    friday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+  },
+  {
+    time: '9:30 - 10:25', period: 4,
+    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    tuesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    friday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+  },
+  {
+    time: '10:25 - 11:20', period: 5,
+    monday: { subject: 'Español', teacher: 'Jorge Castaño' },
+    tuesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    thursday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
+  },
+  {
+    time: '11:20 - 12:15', period: 6,
+    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    wednesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    friday: { subject: 'Química', teacher: 'Mauricio Salazar' },
   },
 ];
 
@@ -138,9 +197,9 @@ export const OFFICIAL_SCHEDULE_10_1: ScheduleSlot[] = [
   {
     time: '8:05 - 9:00', period: 3,
     monday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    tuesday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    tuesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    thursday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    thursday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     friday: { subject: 'Tecnología', teacher: 'Sandra López' },
   },
   {
@@ -173,6 +232,65 @@ export const OFFICIAL_SCHEDULE_10_1: ScheduleSlot[] = [
     tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
+  },
+];
+
+export const OFFICIAL_SCHEDULE_10_2: ScheduleSlot[] = [
+  {
+    time: '6:15 - 7:10', period: 1,
+    monday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    tuesday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
+    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    thursday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
+    friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+  },
+  {
+    time: '7:10 - 8:05', period: 2,
+    monday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+    tuesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    wednesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    thursday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    friday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
+  },
+  {
+    time: '8:05 - 9:00', period: 3,
+    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    tuesday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    wednesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+    thursday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+  },
+  {
+    time: '9:00 - 9:30', period: 0,
+    monday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    tuesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    wednesday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    thursday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+    friday: { subject: 'Descanso / Recreo Institucional', teacher: 'Comunidad Educativa' },
+  },
+  {
+    time: '9:30 - 10:25', period: 4,
+    monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+  },
+  {
+    time: '10:25 - 11:20', period: 5,
+    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    wednesday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    friday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+  },
+  {
+    time: '11:20 - 12:15', period: 6,
+    monday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    tuesday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    wednesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    thursday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
     friday: { subject: 'Física', teacher: 'Claudia Montoya' },
   },
 ];
@@ -242,7 +360,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
     tuesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     wednesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
-    thursday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    thursday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
     friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
   },
   {
@@ -255,7 +373,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
   },
   {
     time: '8:05 - 9:00', period: 3,
-    monday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    monday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     tuesday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
     wednesday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     thursday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
@@ -272,7 +390,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
   {
     time: '9:30 - 10:25', period: 4,
     monday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
-    tuesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    tuesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
     wednesday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
     thursday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
     friday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
@@ -281,7 +399,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     time: '10:25 - 11:20', period: 5,
     monday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     tuesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     friday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
   },
@@ -289,9 +407,9 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     time: '11:20 - 12:15', period: 6,
     monday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
     tuesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
     thursday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
-    friday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
 ];
 
@@ -299,9 +417,9 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
   {
     time: '6:15 - 7:10', period: 1,
     monday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
-    tuesday: { subject: 'Filosofía de vida', teacher: 'Carlos Ramírez' },
+    tuesday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     wednesday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
-    thursday: { subject: 'Filosofía de vida', teacher: 'Carlos Ramírez' },
+    thursday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     friday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
   },
   {
@@ -316,9 +434,9 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
     time: '8:05 - 9:00', period: 3,
     monday: { subject: 'Español', teacher: 'Jorge Castaño' },
     tuesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Carlos Ramírez' },
+    wednesday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    friday: { subject: 'Filosofía de vida', teacher: 'Carlos Ramírez' },
+    friday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
   },
   {
     time: '9:00 - 9:30', period: 0,
@@ -341,7 +459,7 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
     monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     tuesday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
     wednesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    thursday: { subject: 'Filosofía de vida', teacher: 'Carlos Ramírez' },
+    thursday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
   {
