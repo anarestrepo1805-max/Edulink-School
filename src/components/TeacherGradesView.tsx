@@ -4,9 +4,12 @@ import { ASSETS, INITIAL_STUDENT_GRADES } from '../data/mockData';
 import {
   getTeacherAcademicAssignments,
   getCensusStudentsForGroup,
+  getTeacherPersonalSchedule,
   TeacherAcademicAssignment
 } from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { TeacherSidebar } from './TeacherSidebar';
 import { TeacherScheduleModal } from './TeacherScheduleModal';
@@ -90,7 +93,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   useEffect(() => {
     if (!currentAssignment) return;
     const censusStudents = getCensusStudentsForGroup(currentAssignment.groupKey);
-    const records: StudentGradeRecord[] = censusStudents.map((cs, idx) => {
+    const defaultRecords: StudentGradeRecord[] = censusStudents.map((cs, idx) => {
       const p1 = Math.round((3.6 + ((idx * 7) % 15) / 10) * 10) / 10;
       const p2 = Math.round((3.4 + ((idx * 5) % 17) / 10) * 10) / 10;
       const t1 = Math.round((3.8 + ((idx * 3) % 13) / 10) * 10) / 10;
@@ -107,7 +110,19 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
         attendance: 88 + (idx % 12)
       };
     });
-    setGrades(records);
+
+    // Cargar calificaciones guardadas de Firestore si existen
+    const docId = `gradebook_${currentAssignment.groupKey}_${encodeURIComponent(currentAssignment.subjectName)}`;
+    getDoc(doc(db, 'gradebooks', docId)).then((snap) => {
+      if (snap.exists() && snap.data()?.records) {
+        setGrades(snap.data().records);
+      } else {
+        setGrades(defaultRecords);
+      }
+    }).catch(() => {
+      setGrades(defaultRecords);
+    });
+
     setUnsavedChanges(0);
   }, [currentAssignment]);
 
@@ -145,8 +160,8 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
     value: string
   ) => {
     const num = Math.min(5.0, Math.max(1.0, parseFloat(value) || 1.0));
-    setGrades((prev) =>
-      prev.map((student) => {
+    setGrades((prev) => {
+      const next = prev.map((student) => {
         if (student.id === studentId) {
           return {
             ...student,
@@ -154,16 +169,76 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           };
         }
         return student;
-      })
-    );
-    setUnsavedChanges((prev) => prev + 1);
-  };
+      });
 
-  const handleSaveChanges = () => {
-    setUnsavedChanges(0);
+      // Guardar de forma persistente en Firestore en tiempo real
+      if (currentAssignment) {
+        const docId = `gradebook_${currentAssignment.groupKey}_${encodeURIComponent(currentAssignment.subjectName)}`;
+        setDoc(doc(db, 'gradebooks', docId), {
+          groupKey: currentAssignment.groupKey,
+          subjectName: currentAssignment.subjectName,
+          records: next,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => console.debug('Firestore grade save notice:', err));
+      }
+
+      return next;
+    });
+
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLastSaved(isEn ? `Today, ${now}` : `Hoy, ${now}`);
-    showToast(isEn ? 'Changes saved to institutional cloud system!' : '¡Cambios guardados con éxito en el sistema institucional!');
+  };
+
+  const handleExportTeacherSchedule = () => {
+    const slots = getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId);
+    const columns = [
+      { header: 'Periodo', key: 'period' },
+      { header: 'Horario', key: 'time' },
+      { header: 'Lunes', key: 'monday' },
+      { header: 'Martes', key: 'tuesday' },
+      { header: 'Miércoles', key: 'wednesday' },
+      { header: 'Jueves', key: 'thursday' },
+      { header: 'Viernes', key: 'friday' }
+    ];
+    const rows = slots.map(s => ({
+      period: s.period === 0 ? 'Descanso' : `P${s.period}`,
+      time: s.time,
+      monday: s.monday.subject,
+      tuesday: s.tuesday.subject,
+      wednesday: s.wednesday.subject,
+      thursday: s.thursday.subject,
+      friday: s.friday.subject
+    }));
+    exportToExcel(`Horario_Docente_${teacherName.replace(/\s+/g, '_')}_2026`, 'Horario', rows, columns, {
+      title: 'I.E. VALLEJUELOS - HORARIO PERSONAL DOCENTE',
+      subtitle: `Docente: ${teacherName} | Jornada: 6:15 AM a 12:15 PM | Descanso: 9:00 AM a 9:30 AM`
+    });
+    setShowExportModal(false);
+    showToast(isEn ? 'Personal schedule exported successfully!' : '¡Horario personal de clases exportado con éxito!');
+  };
+
+  const handleExportRoster = () => {
+    const censusStudents = getCensusStudentsForGroup(currentAssignment.groupKey);
+    const columns = [
+      { header: '#', key: 'pos' },
+      { header: 'Documento', key: 'documentId' },
+      { header: 'Nombre Completo', key: 'fullName' },
+      { header: 'Grupo Asignado', key: 'group' },
+      { header: 'Correo Institucional', key: 'email' }
+    ];
+    const rows = censusStudents.map((s, idx) => ({
+      pos: idx + 1,
+      documentId: s.documentId,
+      fullName: s.fullName,
+      group: currentAssignment.group,
+      email: s.email
+    }));
+    exportToExcel(`Listado_Estudiantes_${currentAssignment.groupKey}_2026`, currentAssignment.groupKey, rows, columns, {
+      title: `LISTADO OFICIAL DE ESTUDIANTES - GRUPO ${currentAssignment.group}`,
+      subtitle: `Docente Responsable: ${teacherName} | Asignatura: ${currentAssignment.subjectName}`
+    });
+    setShowExportModal(false);
+    showToast(isEn ? 'Student roster exported successfully!' : '¡Listado de estudiantes exportado con éxito!');
   };
 
   const handleExportExcel = () => {
@@ -604,15 +679,6 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                   download
                 </span>
                 <span>{isEn ? 'Export' : 'Exportar'}</span>
-              </button>
-
-              <button
-                onClick={handleSaveChanges}
-                className="h-11 px-5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 shadow-xs hover:shadow-md transition-all flex items-center gap-2 text-xs font-extrabold cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-lg">save</span>
-                <span>{isEn ? 'Save Changes' : 'Guardar Cambios'}</span>
               </button>
 
               <button
@@ -1176,90 +1242,144 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto">
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
                 {isEn
-                  ? 'Select the preferred format to download the complete grade records for this group:'
-                  : 'Selecciona el formato para generar y descargar el registro completo de notas y porcentajes:'}
+                  ? 'Select an authorized document to export for your assigned academic load:'
+                  : 'Selecciona el documento oficial autorizado para exportar según tu carga académica:'}
               </p>
 
-              {/* Option 1: Excel */}
+              {/* Option 1: Excel Planilla de Calificaciones */}
               <div
                 onClick={handleExportExcel}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
                   isDark
                     ? 'bg-slate-950/70 border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-950/10'
                     : 'bg-[#f8faff] border-[#e2e8f0] hover:border-emerald-500 hover:bg-emerald-50/50'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[24px]">table_chart</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">table_chart</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold leading-tight group-hover:text-emerald-400 transition-colors">
-                      {isEn ? 'Excel Spreadsheet (.xls)' : 'Planilla Excel (.xls)'}
+                    <h4 className="text-xs font-bold leading-tight group-hover:text-emerald-400 transition-colors">
+                      {isEn ? `Gradebook Spreadsheet (.xls) — ${currentAssignment.group}` : `Planilla de Calificaciones (.xls) — Grupo ${currentAssignment.group}`}
                     </h4>
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Full academic table with auto formulas & passing status' : 'Tabla oficial con ponderaciones y estado de aprobación'}
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Official grades with weights and approval status' : 'Registro de notas con ponderaciones y estado de aprobación'}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-emerald-400 text-lg group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-emerald-400 text-base group-hover:translate-x-1 transition-transform">
                   download
                 </span>
               </div>
 
-              {/* Option 2: CSV */}
+              {/* Option 2: CSV Planilla */}
               <div
                 onClick={handleExportCSV}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
                   isDark
                     ? 'bg-slate-950/70 border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-950/10'
                     : 'bg-[#f8faff] border-[#e2e8f0] hover:border-cyan-500 hover:bg-cyan-50/50'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[24px]">description</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">description</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold leading-tight group-hover:text-cyan-400 transition-colors">
-                      {isEn ? 'CSV Standard File (.csv)' : 'Archivo Plano CSV (.csv)'}
+                    <h4 className="text-xs font-bold leading-tight group-hover:text-cyan-400 transition-colors">
+                      {isEn ? `CSV Data File (.csv) — ${currentAssignment.group}` : `Planilla en Archivo CSV (.csv) — Grupo ${currentAssignment.group}`}
                     </h4>
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'UTF-8 delimited values for database imports & backups' : 'Formato tabular ligero compatible con cualquier software'}
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Lightweight delimited table for data backup' : 'Formato compatible para importación y respaldo de notas'}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-cyan-400 text-base group-hover:translate-x-1 transition-transform">
                   download
                 </span>
               </div>
 
-              {/* Option 3: Print / PDF Report */}
+              {/* Option 3: Listado de Estudiantes del Grupo Asignado */}
+              <div
+                onClick={handleExportRoster}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                  isDark
+                    ? 'bg-slate-950/70 border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-950/10'
+                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-indigo-500 hover:bg-indigo-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">badge</span>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold leading-tight group-hover:text-indigo-400 transition-colors">
+                      {isEn ? `Student Roster (.xls) — Group ${currentAssignment.group}` : `Listado Oficial de Estudiantes (.xls) — Grupo ${currentAssignment.group}`}
+                    </h4>
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Official census student directory with document and email' : 'Censo oficial de matriculados con documento y correo'}
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-indigo-400 text-base group-hover:translate-x-1 transition-transform">
+                  download
+                </span>
+              </div>
+
+              {/* Option 4: Horario Personal de Clases */}
+              <div
+                onClick={handleExportTeacherSchedule}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                  isDark
+                    ? 'bg-slate-950/70 border-slate-800 hover:border-amber-500/50 hover:bg-amber-950/10'
+                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-amber-500 hover:bg-amber-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">calendar_month</span>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold leading-tight group-hover:text-amber-400 transition-colors">
+                      {isEn ? 'Personal Teaching Schedule (.xls)' : 'Horario Personal de Clases (.xls)'}
+                    </h4>
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                      {isEn ? 'Morning shift: 6:15 AM - 12:15 PM with official break' : 'Jornada 6:15 AM a 12:15 PM con descanso de 9:00 a 9:30 AM'}
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-amber-400 text-base group-hover:translate-x-1 transition-transform">
+                  download
+                </span>
+              </div>
+
+              {/* Option 5: Print / PDF Report */}
               <div
                 onClick={handlePrintReport}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
                   isDark
                     ? 'bg-slate-950/70 border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/10'
                     : 'bg-[#f8faff] border-[#e2e8f0] hover:border-blue-500 hover:bg-blue-50/50'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[24px]">print</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">print</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold leading-tight group-hover:text-blue-400 transition-colors">
+                    <h4 className="text-xs font-bold leading-tight group-hover:text-blue-400 transition-colors">
                       {isEn ? 'Printable Academic Report / PDF' : 'Imprimir Reporte Oficial / PDF'}
                     </h4>
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
                       {isEn ? 'Formatted for institutional filing and academic committee' : 'Diseño institucional membretado para actas y archivo'}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-blue-400 text-lg group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-blue-400 text-base group-hover:translate-x-1 transition-transform">
                   open_in_new
                 </span>
               </div>
