@@ -75,6 +75,17 @@ export interface AuthorizedContact {
   avatar?: string;
 }
 
+export interface ChatNotification {
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  senderAvatar?: string;
+  text: string;
+  time: number;
+  unreadCount: number;
+}
+
 // Aliases for compatibility
 export type InstitutionalMessage = ChatMessage;
 export interface InstitutionalConversation {
@@ -178,6 +189,52 @@ export function subscribeUserConversations(
       onUpdate([]);
     }
   );
+}
+
+/**
+ * Subscribes in real-time to unread chat notifications for the user across all conversations.
+ * Invokes callback with an array of notifications and total unread count.
+ */
+export function subscribeChatNotifications(
+  userId: string,
+  onUpdate: (notifications: ChatNotification[], totalUnread: number) => void
+): Unsubscribe {
+  if (!userId) {
+    onUpdate([], 0);
+    return () => {};
+  }
+
+  return subscribeUserConversations(userId, (conversations) => {
+    const notifs: ChatNotification[] = [];
+    let totalUnread = 0;
+
+    conversations.forEach((conv) => {
+      const count = conv.unreadCount?.[userId] || 0;
+      const isUnread = count > 0 || (conv.unreadBy || []).includes(userId);
+
+      // Only notify if unread and the current user was not the last sender
+      if (isUnread && conv.lastSenderId !== userId) {
+        const unreadCount = count > 0 ? count : 1;
+        totalUnread += unreadCount;
+
+        const other = Object.values(conv.participants || {}).find((p) => p.id !== userId);
+        const sender = conv.participants?.[conv.lastSenderId] || other;
+
+        notifs.push({
+          conversationId: conv.id,
+          senderId: conv.lastSenderId || other?.id || '',
+          senderName: sender?.fullName || 'Remitente Institucional',
+          senderRole: sender?.role || 'Docente / Acudiente',
+          senderAvatar: sender?.avatar,
+          text: conv.lastMessage || 'Nuevo mensaje institucional',
+          time: conv.lastMessageTime || conv.updatedAt || Date.now(),
+          unreadCount
+        });
+      }
+    });
+
+    onUpdate(notifs, totalUnread);
+  });
 }
 
 /**
