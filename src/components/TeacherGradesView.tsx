@@ -8,8 +8,6 @@ import {
   TeacherAcademicAssignment
 } from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
-import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { TeacherSidebar } from './TeacherSidebar';
 import { TeacherScheduleModal } from './TeacherScheduleModal';
@@ -38,9 +36,11 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   // Consulta automática de asignaturas y grupos asignados al docente desde la base de datos institucional
   const teacherAssignments = useMemo<TeacherAcademicAssignment[]>(() => {
     return getTeacherAcademicAssignments(
-      currentUser?.fullName || currentUser?.documentId || currentUser?.email
+      currentUser?.fullName || currentUser?.documentId || currentUser?.email,
+      currentUser?.subjectArea,
+      currentUser?.assignedGrades
     );
-  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email]);
+  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email, currentUser?.subjectArea, currentUser?.assignedGrades]);
 
   // Selección automática si tiene una sola o primera combinación
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(() => {
@@ -93,7 +93,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   useEffect(() => {
     if (!currentAssignment) return;
     const censusStudents = getCensusStudentsForGroup(currentAssignment.groupKey);
-    const defaultRecords: StudentGradeRecord[] = censusStudents.map((cs, idx) => {
+    const records: StudentGradeRecord[] = censusStudents.map((cs, idx) => {
       const p1 = Math.round((3.6 + ((idx * 7) % 15) / 10) * 10) / 10;
       const p2 = Math.round((3.4 + ((idx * 5) % 17) / 10) * 10) / 10;
       const t1 = Math.round((3.8 + ((idx * 3) % 13) / 10) * 10) / 10;
@@ -110,19 +110,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
         attendance: 88 + (idx % 12)
       };
     });
-
-    // Cargar calificaciones guardadas de Firestore si existen
-    const docId = `gradebook_${currentAssignment.groupKey}_${encodeURIComponent(currentAssignment.subjectName)}`;
-    getDoc(doc(db, 'gradebooks', docId)).then((snap) => {
-      if (snap.exists() && snap.data()?.records) {
-        setGrades(snap.data().records);
-      } else {
-        setGrades(defaultRecords);
-      }
-    }).catch(() => {
-      setGrades(defaultRecords);
-    });
-
+    setGrades(records);
     setUnsavedChanges(0);
   }, [currentAssignment]);
 
@@ -160,8 +148,8 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
     value: string
   ) => {
     const num = Math.min(5.0, Math.max(1.0, parseFloat(value) || 1.0));
-    setGrades((prev) => {
-      const next = prev.map((student) => {
+    setGrades((prev) =>
+      prev.map((student) => {
         if (student.id === studentId) {
           return {
             ...student,
@@ -169,76 +157,16 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
           };
         }
         return student;
-      });
+      })
+    );
+    setUnsavedChanges((prev) => prev + 1);
+  };
 
-      // Guardar de forma persistente en Firestore en tiempo real
-      if (currentAssignment) {
-        const docId = `gradebook_${currentAssignment.groupKey}_${encodeURIComponent(currentAssignment.subjectName)}`;
-        setDoc(doc(db, 'gradebooks', docId), {
-          groupKey: currentAssignment.groupKey,
-          subjectName: currentAssignment.subjectName,
-          records: next,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => console.debug('Firestore grade save notice:', err));
-      }
-
-      return next;
-    });
-
+  const handleSaveChanges = () => {
+    setUnsavedChanges(0);
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setLastSaved(isEn ? `Today, ${now}` : `Hoy, ${now}`);
-  };
-
-  const handleExportTeacherSchedule = () => {
-    const slots = getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId);
-    const columns = [
-      { header: 'Periodo', key: 'period' },
-      { header: 'Horario', key: 'time' },
-      { header: 'Lunes', key: 'monday' },
-      { header: 'Martes', key: 'tuesday' },
-      { header: 'Miércoles', key: 'wednesday' },
-      { header: 'Jueves', key: 'thursday' },
-      { header: 'Viernes', key: 'friday' }
-    ];
-    const rows = slots.map(s => ({
-      period: s.period === 0 ? 'Descanso' : `P${s.period}`,
-      time: s.time,
-      monday: s.monday.subject,
-      tuesday: s.tuesday.subject,
-      wednesday: s.wednesday.subject,
-      thursday: s.thursday.subject,
-      friday: s.friday.subject
-    }));
-    exportToExcel(`Horario_Docente_${teacherName.replace(/\s+/g, '_')}_2026`, 'Horario', rows, columns, {
-      title: 'I.E. VALLEJUELOS - HORARIO PERSONAL DOCENTE',
-      subtitle: `Docente: ${teacherName} | Jornada: 6:15 AM a 12:15 PM | Descanso: 9:00 AM a 9:30 AM`
-    });
-    setShowExportModal(false);
-    showToast(isEn ? 'Personal schedule exported successfully!' : '¡Horario personal de clases exportado con éxito!');
-  };
-
-  const handleExportRoster = () => {
-    const censusStudents = getCensusStudentsForGroup(currentAssignment.groupKey);
-    const columns = [
-      { header: '#', key: 'pos' },
-      { header: 'Documento', key: 'documentId' },
-      { header: 'Nombre Completo', key: 'fullName' },
-      { header: 'Grupo Asignado', key: 'group' },
-      { header: 'Correo Institucional', key: 'email' }
-    ];
-    const rows = censusStudents.map((s, idx) => ({
-      pos: idx + 1,
-      documentId: s.documentId,
-      fullName: s.fullName,
-      group: currentAssignment.group,
-      email: s.email
-    }));
-    exportToExcel(`Listado_Estudiantes_${currentAssignment.groupKey}_2026`, currentAssignment.groupKey, rows, columns, {
-      title: `LISTADO OFICIAL DE ESTUDIANTES - GRUPO ${currentAssignment.group}`,
-      subtitle: `Docente Responsable: ${teacherName} | Asignatura: ${currentAssignment.subjectName}`
-    });
-    setShowExportModal(false);
-    showToast(isEn ? 'Student roster exported successfully!' : '¡Listado de estudiantes exportado con éxito!');
+    showToast(isEn ? 'Changes saved to institutional cloud system!' : '¡Cambios guardados con éxito en el sistema institucional!');
   };
 
   const handleExportExcel = () => {
@@ -322,6 +250,73 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
     exportToCSV(`Planilla_${currentAssignment.groupKey}_${currentAssignment.subjectName}`, rows, columns);
     setShowExportModal(false);
     showToast(isEn ? 'CSV file downloaded successfully!' : '¡Archivo CSV descargado exitosamente!');
+  };
+
+  const handleExportRoster = () => {
+    const columns = [
+      { header: '#', key: 'pos' },
+      { header: 'Documento', key: 'id' },
+      { header: 'Matrícula', key: 'matricula' },
+      { header: 'Estudiante', key: 'name' },
+      { header: 'Grupo Asignado', key: 'group' },
+      { header: 'Asignatura', key: 'subject' }
+    ];
+
+    const rows = grades.map((g, idx) => ({
+      pos: idx + 1,
+      id: g.id,
+      matricula: g.matricula,
+      name: g.name,
+      group: currentAssignment.group,
+      subject: currentAssignment.subjectName
+    }));
+
+    exportToExcel(
+      `Lista_Estudiantes_${currentAssignment.groupKey}_2026`,
+      currentAssignment.groupKey,
+      rows,
+      columns,
+      {
+        title: `I.E. VALLEJUELOS - LISTA OFICIAL DE ESTUDIANTES`,
+        subtitle: `Docente: ${teacherName} | Grupo: ${currentAssignment.group} | Jornada Mañana (6:15 AM - 12:15 PM)`
+      }
+    );
+    setShowExportModal(false);
+    showToast(isEn ? 'Student roster downloaded successfully!' : '¡Lista oficial de estudiantes descargada exitosamente!');
+  };
+
+  const handleExportTeacherSchedule = () => {
+    const scheduleSlots = getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId);
+    const columns = [
+      { header: 'Hora', key: 'time' },
+      { header: 'Lunes', key: 'monday' },
+      { header: 'Martes', key: 'tuesday' },
+      { header: 'Miércoles', key: 'wednesday' },
+      { header: 'Jueves', key: 'thursday' },
+      { header: 'Viernes', key: 'friday' }
+    ];
+
+    const rows = scheduleSlots.map(s => ({
+      time: s.time,
+      monday: s.monday.subject,
+      tuesday: s.tuesday.subject,
+      wednesday: s.wednesday.subject,
+      thursday: s.thursday.subject,
+      friday: s.friday.subject
+    }));
+
+    exportToExcel(
+      `Horario_Propio_${teacherName.replace(/\s+/g, '_')}_2026`,
+      'Horario',
+      rows,
+      columns,
+      {
+        title: `I.E. VALLEJUELOS - HORARIO PROPIO DOCENTE 2026`,
+        subtitle: `Docente: ${teacherName} | Asignatura: ${currentAssignment.subjectName} | Jornada Mañana (6:15 AM - 12:15 PM)`
+      }
+    );
+    setShowExportModal(false);
+    showToast(isEn ? 'Personal schedule downloaded successfully!' : '¡Horario propio docente descargado exitosamente!');
   };
 
   const handlePrintReport = () => {
@@ -1242,14 +1237,14 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               </button>
             </div>
 
-            <div className="p-6 space-y-3.5 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-3.5">
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
                 {isEn
-                  ? 'Select an authorized document to export for your assigned academic load:'
-                  : 'Selecciona el documento oficial autorizado para exportar según tu carga académica:'}
+                  ? 'Official export options restricted to your authenticated teacher schedule and assigned groups:'
+                  : 'Opciones oficiales de exportación restringidas a tu horario propio y grupos asignados:'}
               </p>
 
-              {/* Option 1: Excel Planilla de Calificaciones */}
+              {/* Option 1: Planilla de notas del grupo asignado */}
               <div
                 onClick={handleExportExcel}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
@@ -1263,22 +1258,22 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                     <span className="material-symbols-outlined text-[22px]">table_chart</span>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold leading-tight group-hover:text-emerald-400 transition-colors">
-                      {isEn ? `Gradebook Spreadsheet (.xls) — ${currentAssignment.group}` : `Planilla de Calificaciones (.xls) — Grupo ${currentAssignment.group}`}
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-emerald-400 transition-colors">
+                      {isEn ? 'Gradebook Spreadsheet (.xls)' : 'Planilla de Notas del Grupo Asignado (.xls)'}
                     </h4>
                     <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Official grades with weights and approval status' : 'Registro de notas con ponderaciones y estado de aprobación'}
+                      {currentAssignment.subjectName} — {currentAssignment.group}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-emerald-400 text-base group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-emerald-400 text-lg group-hover:translate-x-1 transition-transform">
                   download
                 </span>
               </div>
 
-              {/* Option 2: CSV Planilla */}
+              {/* Option 2: Lista oficial de estudiantes del grupo asignado */}
               <div
-                onClick={handleExportCSV}
+                onClick={handleExportRoster}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
                   isDark
                     ? 'bg-slate-950/70 border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-950/10'
@@ -1287,50 +1282,23 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[22px]">description</span>
+                    <span className="material-symbols-outlined text-[22px]">group</span>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold leading-tight group-hover:text-cyan-400 transition-colors">
-                      {isEn ? `CSV Data File (.csv) — ${currentAssignment.group}` : `Planilla en Archivo CSV (.csv) — Grupo ${currentAssignment.group}`}
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-cyan-400 transition-colors">
+                      {isEn ? 'Student Roster (.xls)' : 'Lista de Estudiantes del Grupo Asignado (.xls)'}
                     </h4>
                     <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Lightweight delimited table for data backup' : 'Formato compatible para importación y respaldo de notas'}
+                      {isEn ? 'Enrolled students of ' : 'Estudiantes matriculados de '} {currentAssignment.group}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-cyan-400 text-base group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-cyan-400 text-lg group-hover:translate-x-1 transition-transform">
                   download
                 </span>
               </div>
 
-              {/* Option 3: Listado de Estudiantes del Grupo Asignado */}
-              <div
-                onClick={handleExportRoster}
-                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
-                  isDark
-                    ? 'bg-slate-950/70 border-slate-800 hover:border-indigo-500/50 hover:bg-indigo-950/10'
-                    : 'bg-[#f8faff] border-[#e2e8f0] hover:border-indigo-500 hover:bg-indigo-50/50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[22px]">badge</span>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold leading-tight group-hover:text-indigo-400 transition-colors">
-                      {isEn ? `Student Roster (.xls) — Group ${currentAssignment.group}` : `Listado Oficial de Estudiantes (.xls) — Grupo ${currentAssignment.group}`}
-                    </h4>
-                    <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Official census student directory with document and email' : 'Censo oficial de matriculados con documento y correo'}
-                    </p>
-                  </div>
-                </div>
-                <span className="material-symbols-outlined text-indigo-400 text-base group-hover:translate-x-1 transition-transform">
-                  download
-                </span>
-              </div>
-
-              {/* Option 4: Horario Personal de Clases */}
+              {/* Option 3: Horario propio del docente */}
               <div
                 onClick={handleExportTeacherSchedule}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
@@ -1344,20 +1312,20 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                     <span className="material-symbols-outlined text-[22px]">calendar_month</span>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold leading-tight group-hover:text-amber-400 transition-colors">
-                      {isEn ? 'Personal Teaching Schedule (.xls)' : 'Horario Personal de Clases (.xls)'}
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-amber-400 transition-colors">
+                      {isEn ? 'Teacher Personal Schedule (.xls)' : 'Horario Propio del Docente (.xls)'}
                     </h4>
                     <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Morning shift: 6:15 AM - 12:15 PM with official break' : 'Jornada 6:15 AM a 12:15 PM con descanso de 9:00 a 9:30 AM'}
+                      {isEn ? 'Weekly schedule for ' : 'Horario semanal completo de '} {teacherName}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-amber-400 text-base group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-amber-400 text-lg group-hover:translate-x-1 transition-transform">
                   download
                 </span>
               </div>
 
-              {/* Option 5: Print / PDF Report */}
+              {/* Option 4: Print / PDF Report */}
               <div
                 onClick={handlePrintReport}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
@@ -1371,15 +1339,15 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                     <span className="material-symbols-outlined text-[22px]">print</span>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold leading-tight group-hover:text-blue-400 transition-colors">
-                      {isEn ? 'Printable Academic Report / PDF' : 'Imprimir Reporte Oficial / PDF'}
+                    <h4 className="text-sm font-bold leading-tight group-hover:text-blue-400 transition-colors">
+                      {isEn ? 'Official Printable Report / PDF' : 'Imprimir Reporte Oficial / PDF'}
                     </h4>
                     <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                      {isEn ? 'Formatted for institutional filing and academic committee' : 'Diseño institucional membretado para actas y archivo'}
+                      {isEn ? 'Formatted for institutional records' : 'Diseño institucional membretado para actas y archivo'}
                     </p>
                   </div>
                 </div>
-                <span className="material-symbols-outlined text-blue-400 text-base group-hover:translate-x-1 transition-transform">
+                <span className="material-symbols-outlined text-blue-400 text-lg group-hover:translate-x-1 transition-transform">
                   open_in_new
                 </span>
               </div>

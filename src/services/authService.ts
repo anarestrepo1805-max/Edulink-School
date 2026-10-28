@@ -62,6 +62,66 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     subjects: INITIAL_SUBJECTS,
     assignments: []
   },
+  '30880317': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10° y 11°)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  '30.880.317': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10° y 11°)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  'patricia.quintero@edulink.edu.co': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10° y 11°)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  'patricia_quintero@ejemplo.edu': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10° y 11°)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
   '71394821': {
     id: 'demo-teacher-1',
     email: 'daniela.alvarez@edulink.edu.co',
@@ -273,6 +333,24 @@ export interface EnrolledStudentDirectoryRecord {
 
 // Institutional Teacher Registry: Each code is UNIQUE & IRREPETIBLE and has fixed assigned subjects & grades
 export const TEACHER_ASSIGNMENTS: Record<string, TeacherAssignmentRecord> = {
+  'DOC-FILO-3088': {
+    code: 'DOC-FILO-3088',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    description: 'Docente de Filosofía de vida (Grados 10° y 11°) - Patricia Quintero'
+  },
+  '015': {
+    code: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    description: 'Docente de Filosofía de vida (Grados 10° y 11°) - Patricia Quintero'
+  },
+  '30880317': {
+    code: '30880317',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2',
+    description: 'Docente de Filosofía de vida (Grados 10° y 11°) - Patricia Quintero'
+  },
   'DOC-VALLE-2026': {
     code: 'DOC-VALLE-2026',
     subjectArea: 'Tecnología e Informática',
