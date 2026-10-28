@@ -8,7 +8,8 @@ export type TeacherActiveTab =
   | 'attendance'
   | 'schedule'
   | 'assignments'
-  | 'messaging';
+  | 'messaging'
+  | 'forum';
 
 interface TeacherSidebarProps {
   activeTab?: TeacherActiveTab;
@@ -33,7 +34,8 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     activeScreen === 'teacher_grades' ? 'grades' :
     activeScreen === 'teacher_attendance' ? 'attendance' :
     activeScreen === 'teacher_assignments' ? 'assignments' :
-    activeScreen === 'teacher_messaging' ? 'messaging' : 'grades'
+    activeScreen === 'teacher_messaging' ? 'messaging' :
+    activeScreen === 'teacher_forum' ? 'forum' : 'grades'
   );
 
   const teacherName = currentUser?.fullName || (isEn ? 'Teacher' : 'Docente');
@@ -74,6 +76,13 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
       icon: 'chat',
       action: () => onNavigate('teacher_messaging'),
       isActive: resolvedTab === 'messaging'
+    },
+    {
+      id: 'forum' as const,
+      label: isEn ? 'Forums & Polls' : 'Foro y encuestas',
+      icon: 'forum',
+      action: () => onNavigate('teacher_forum'),
+      isActive: resolvedTab === 'forum'
     }
   ];
 

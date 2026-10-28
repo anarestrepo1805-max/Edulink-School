@@ -5,9 +5,9 @@ import {
   subscribeUserConversations,
   subscribeConversationMessages,
   sendChatMessage,
-  markConversationAsRead,
-  deleteConversationForUser,
   getAuthorizedContactsForUser,
+  deleteConversationForUser,
+  markConversationAsRead,
   Conversation,
   ChatMessage,
   AuthorizedContact,
@@ -30,9 +30,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
   const effectiveUserId = currentUser?.documentId || currentUser?.id || '43521980';
   const familyName = currentUser?.fullName || 'Elena Gómez Jiménez';
-  const studentRef = currentUser?.representedStudentName
-    ? `${currentUser.representedStudentName} (11°1)`
-    : 'Miguel Ángel Jiménez (11°1)';
+  const studentRef = 'Valentina Gómez Suárez (Grado 8°1)';
 
   // State
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -43,10 +41,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Modals
+  // New Chat Modal
   const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeletingConv, setIsDeletingConv] = useState(false);
   const [authorizedContacts, setAuthorizedContacts] = useState<AuthorizedContact[]>([]);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState<AuthorizedContact | null>(null);
@@ -60,26 +56,18 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
   // 1. Subscribe to real-time conversations for this guardian
   useEffect(() => {
-    const targetId = effectiveUserId;
-    const unsubscribe = subscribeUserConversations(targetId, (convs) => {
+    const unsubscribe = subscribeUserConversations(effectiveUserId, (convs) => {
       setConversations(convs);
       if (convs.length > 0 && !selectedConvId) {
         setSelectedConvId(convs[0].id);
-        markConversationAsRead(convs[0].id, targetId);
+        markConversationAsRead(convs[0].id, effectiveUserId);
       }
     });
 
     return () => unsubscribe();
-  }, [effectiveUserId]);
+  }, [effectiveUserId, selectedConvId]);
 
-  // Mark as read when selectedConvId changes
-  useEffect(() => {
-    if (selectedConvId && effectiveUserId) {
-      markConversationAsRead(selectedConvId, effectiveUserId);
-    }
-  }, [selectedConvId, effectiveUserId]);
-
-  // 2. Fetch authorized contacts (Teachers and Admin Staff)
+  // 2. Fetch authorized contacts (Teachers of 8°1 and Admin Staff)
   useEffect(() => {
     getAuthorizedContactsForUser(currentUser).then((contacts) => {
       setAuthorizedContacts(contacts);
@@ -93,6 +81,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       return;
     }
 
+    markConversationAsRead(selectedConvId, effectiveUserId);
     setIsLoadingMessages(true);
     const unsubscribe = subscribeConversationMessages(selectedConvId, (msgs) => {
       setMessages(msgs);
@@ -103,7 +92,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
     });
 
     return () => unsubscribe();
-  }, [selectedConvId]);
+  }, [selectedConvId, effectiveUserId]);
 
   // Active conversation object
   const activeConversation = useMemo(() => {
@@ -113,9 +102,12 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   // The other participant in the conversation (Teacher or Directivo)
   const otherParticipant = useMemo(() => {
     if (!activeConversation) return null;
-    const participantsList = Object.values(activeConversation.participants || {}) as ConversationParticipant[];
-    return participantsList.find((p) => p.id !== effectiveUserId && p.id !== currentUser?.id) || null;
-  }, [activeConversation, effectiveUserId, currentUser?.id]);
+    const otherId = activeConversation.participantIds.find(
+      (id) => id !== effectiveUserId && id !== currentUser?.id && id !== currentUser?.email
+    );
+    if (!otherId) return null;
+    return activeConversation.participants[otherId] || null;
+  }, [activeConversation, effectiveUserId, currentUser]);
 
   // Filtered contacts in "Nuevo mensaje" modal
   const filteredContacts = useMemo(() => {
@@ -145,9 +137,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       id: effectiveUserId,
       fullName: familyName,
       role: 'family',
-      documentId: effectiveUserId,
-      email: currentUser?.email || 'elena.gomez@edulink.edu.co',
-      avatarUrl: currentUser?.avatarUrl
+      documentId: currentUser?.documentId || '43521980',
+      email: currentUser?.email || 'elena.jimenez@vallejuelos.edu.co'
     };
 
     setIsSending(true);
@@ -159,8 +150,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           fullName: recipient.fullName,
           role: recipient.role,
           email: recipient.email,
-          detail: recipient.detail,
-          avatarUrl: recipient.avatarUrl
+          detail: recipient.detail
         },
         text: content.trim()
       });
@@ -188,20 +178,22 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
     }
   };
 
-  // Delete / Hide conversation for user
   const handleDeleteConversation = async () => {
-    if (!selectedConvId) return;
-    setIsDeletingConv(true);
+    if (!activeConversation) return;
+    const confirmDelete = window.confirm(
+      isEn
+        ? 'Are you sure you want to remove this conversation from your inbox?'
+        : '¿Estás seguro de que deseas eliminar esta conversación de tu bandeja?'
+    );
+    if (!confirmDelete) return;
+
     try {
-      await deleteConversationForUser(selectedConvId, effectiveUserId);
-      setShowDeleteModal(false);
+      await deleteConversationForUser(activeConversation.id, effectiveUserId);
       setSelectedConvId(null);
-      showToast(isEn ? 'Conversation removed from your inbox.' : 'Conversación eliminada de tu bandeja.');
+      showToast(isEn ? 'Conversation removed from inbox.' : 'Conversación eliminada de tu bandeja.');
     } catch (err) {
       console.error('Error deleting conversation:', err);
       showToast(isEn ? 'Could not delete conversation.' : 'No se pudo eliminar la conversación.');
-    } finally {
-      setIsDeletingConv(false);
     }
   };
 
@@ -225,7 +217,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           <div className={`h-20 px-6 flex items-center gap-3 border-b ${
             isDark ? 'border-slate-800' : 'border-[#eff4ff]'
           }`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
               isDark ? 'bg-amber-950 border-amber-800 text-amber-300' : 'bg-[#eff4ff] border-[#dce9ff] text-[#00288e]'
             }`}>
               <span className="material-symbols-outlined text-2xl">family_restroom</span>
@@ -257,7 +249,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-xl">assignment</span>
-              <span className="text-xs font-semibold">{isEn ? 'Grades & Reports' : 'Calificaciones y Boletines'}</span>
+              <span className="text-xs font-semibold">{isEn ? 'Grades & Reports' : 'Calificaciones y Boletín'}</span>
             </button>
             <button
               onClick={() => onNavigate('family_dashboard')}
@@ -266,7 +258,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-xl">calendar_today</span>
-              <span className="text-xs font-semibold">{isEn ? 'Schedule & Subjects' : 'Horario y Asignaturas'}</span>
+              <span className="text-xs font-semibold">{isEn ? 'Schedule 8°1' : 'Horario Escolar (8°1)'}</span>
             </button>
             <button
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all text-left cursor-default ${
@@ -281,7 +273,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           <div className="px-4 mt-2">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">edit_square</span>
               <span>{isEn ? 'Contact Teacher' : 'Contactar Docente'}</span>
@@ -290,7 +282,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
         </div>
 
         <div className={`p-4 border-t ${isDark ? 'border-slate-800' : 'border-[#eff4ff]'}`}>
-          <div className={`p-3.5 rounded-xl flex flex-col gap-1 border ${
+          <div className={`p-3.5 rounded-2xl flex flex-col gap-1 border ${
             isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
           }`}>
             <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
@@ -307,30 +299,26 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       {/* MAIN CONTAINER */}
       <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
         {/* Header Bar */}
-        <header className={`sticky top-12 h-16 backdrop-blur-xl shadow-xs z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b transition-colors ${
+        <header className={`sticky top-12 h-20 backdrop-blur-xl shadow-xs z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b transition-colors ${
           isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-[#e5eeff]'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-              {currentUser?.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                familyName.charAt(0)
-              )}
+            <div className="w-10 h-10 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              {familyName.charAt(0)}
             </div>
             <div>
               <span className="text-xs font-bold block">{familyName}</span>
-              <span className="text-[10px] text-amber-400 font-semibold">{isEn ? 'Authorized Guardian' : 'Acudiente Autorizada'}</span>
+              <span className="text-[10px] text-cyan-500 font-semibold">{isEn ? 'Authorized Guardian • Grade 8°1' : 'Acudiente Autorizada • Valentina Gómez (8°1)'}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">chat</span>
-              <span className="hidden sm:inline">{isEn ? 'New Chat' : 'Nuevo Mensaje'}</span>
+              <span className="hidden sm:inline">{isEn ? 'New Message' : 'Nuevo Mensaje'}</span>
             </button>
           </div>
         </header>
@@ -364,7 +352,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                     <p className="text-xs text-slate-400 mb-4 max-w-xs mx-auto">
                       {isEn
                         ? 'When a teacher sends you an official citation or message, it will appear here.'
-                        : 'Cuando un docente te envíe una citación oficial o mensaje, aparecerá registrado aquí en tiempo real.'}
+                        : 'Cuando un docente de 8°1 te envíe una citación oficial o mensaje, aparecerá registrado aquí en tiempo real.'}
                     </p>
                     <button
                       onClick={() => setShowNewChatModal(true)}
@@ -384,11 +372,12 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                       );
                       const name = other?.fullName || 'Docente Institucional';
                       const role = other?.role || 'Docente';
-                      const unread = ch.unreadCount?.[effectiveUserId] || 0;
+                      const avatar = other?.avatar;
                       const timeFormatted = new Date(ch.lastMessageTime || ch.updatedAt || Date.now()).toLocaleTimeString(
                         [],
                         { hour: '2-digit', minute: '2-digit' }
                       );
+                      const unread = (ch.unreadCount?.[effectiveUserId] || 0) > 0 || (ch.unreadBy || []).includes(effectiveUserId);
 
                       return (
                         <div
@@ -406,34 +395,26 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                               : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                           }`}
                         >
-                          {/* Avatar with fallback initial letter (no Edulink logo) */}
-                          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-300">
-                            {other?.avatarUrl ? (
-                              <img src={other.avatarUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              name.charAt(0)
-                            )}
-                          </div>
+                          {avatar ? (
+                            <img src={avatar} alt={name} className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-amber-500/30" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-amber-700 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                              {name.charAt(0)}
+                            </div>
+                          )}
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="font-bold truncate max-w-[150px] text-slate-100">{name}</span>
-                              <span className="text-[10px] text-slate-400 font-medium">{timeFormatted}</span>
+                              <span className="font-bold truncate text-slate-100">{name}</span>
+                              <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-2">{timeFormatted}</span>
                             </div>
                             <p className="text-xs text-slate-400 line-clamp-1 mb-1.5">{ch.lastMessage}</p>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-semibold text-amber-400 px-2 py-0.5 rounded-md bg-amber-950/40 border border-amber-800/40">
                                 {role}
                               </span>
-                              {unread > 0 ? (
-                                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-[10px] animate-pulse">
-                                  {unread} nuevo{unread > 1 ? 's' : ''}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                  {isEn ? 'Official' : 'Oficial'}
-                                </span>
+                              {unread && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
                               )}
                             </div>
                           </div>
@@ -463,16 +444,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               }`}>
                 {otherParticipant || selectedRecipient ? (
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0">
-                      {(otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl) ? (
-                        <img
-                          src={otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        (otherParticipant?.fullName || selectedRecipient?.fullName || 'D').charAt(0)
-                      )}
+                    <div className="w-10 h-10 rounded-2xl bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm">
+                      {(otherParticipant?.fullName || selectedRecipient?.fullName || 'D').charAt(0)}
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-slate-100">
@@ -489,25 +462,24 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                 ) : (
                   <div className="flex items-center gap-2 text-slate-400 text-xs font-medium">
                     <span className="material-symbols-outlined text-lg text-slate-500">forum</span>
-                    <span>{isEn ? 'Select a conversation' : 'Selecciona una conversación'}</span>
+                    <span>{isEn ? 'Select a conversation' : 'Selecciona una conversación de la lista'}</span>
                   </div>
                 )}
 
                 <div className="flex items-center gap-2">
-                  {selectedConvId && (
+                  {activeConversation && (
                     <button
                       type="button"
-                      onClick={() => setShowDeleteModal(true)}
-                      className="px-2.5 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-rose-900/40"
-                      title={isEn ? 'Delete conversation' : 'Eliminar conversación'}
+                      onClick={handleDeleteConversation}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      title={isEn ? 'Delete conversation' : 'Eliminar conversación de la bandeja'}
                     >
-                      <span className="material-symbols-outlined text-[17px]">delete</span>
-                      <span className="hidden sm:inline">{isEn ? 'Delete' : 'Eliminar'}</span>
+                      <span className="material-symbols-outlined text-[20px]">delete_outline</span>
                     </button>
                   )}
                   <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span>Canal Oficial</span>
+                    <span>Canal Seguro</span>
                   </span>
                 </div>
               </div>
@@ -530,8 +502,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                           ? 'Send a message to confirm attendance or ask a question.'
                           : 'Envía un mensaje para confirmar asistencia o realizar una consulta.'
                         : isEn
-                        ? 'No active conversation selected.'
-                        : 'Todavía no tienes conversaciones activas seleccionadas.'}
+                        ? 'Select a conversation to start reading.'
+                        : 'Selecciona una conversación para leer y responder.'}
                     </p>
                   </div>
                 )}
@@ -545,16 +517,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
                   return (
                     <div key={msg.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'}`}>
-                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 mb-1 px-1">
-                        {/* Avatar */}
-                        <div className="w-4 h-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center text-[9px] text-white">
-                          {msg.senderAvatar ? (
-                            <img src={msg.senderAvatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            msg.senderName.charAt(0)
-                          )}
-                        </div>
-                        <span>{isSelf ? `Tú (${familyName})` : `${msg.senderName} • ${msg.senderRole}`}</span>
+                      <div className="text-[10px] font-semibold text-slate-400 mb-1 px-1">
+                        {isSelf ? `Tú (${familyName})` : `${msg.senderName} • ${msg.senderRole}`}
                       </div>
 
                       <div
@@ -610,12 +574,12 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSendMessage(undefined, 'Cordial saludo, solicito información sobre las fechas de recuperación del periodo.')}
+                  onClick={() => handleSendMessage(undefined, 'Cordial saludo profesor(a), quedo atenta al informe y agradezco su acompañamiento pedagógico.')}
                   className={`px-3 py-1 rounded-full border whitespace-nowrap cursor-pointer transition-all ${
                     isDark ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
                   }`}
                 >
-                  ? Consultar recuperaciones
+                  ✉ Agradecer reporte
                 </button>
               </div>
 
@@ -633,26 +597,26 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                   placeholder={
                     otherParticipant || selectedRecipient
                       ? isEn
-                        ? 'Type reply as guardian...'
-                        : 'Escribir respuesta al docente...'
+                        ? `Message ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
+                        : `Escribir a ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
                       : isEn
-                      ? 'Select a teacher to reply...'
-                      : 'Selecciona un docente para escribir...'
+                      ? 'Select a conversation first...'
+                      : 'Selecciona una conversación...'
                   }
-                  disabled={(!otherParticipant && !selectedRecipient) || isSending}
-                  className={`flex-1 px-4 py-3 rounded-2xl text-xs border transition-colors outline-none ${
+                  disabled={!otherParticipant && !selectedRecipient}
+                  className={`flex-1 px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
                     isDark
-                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-amber-500'
-                      : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500'
-                  } disabled:opacity-50`}
+                      ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                      : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-cyan-600'
+                  }`}
                 />
                 <button
                   type="submit"
-                  disabled={(!otherParticipant && !selectedRecipient) || !replyText.trim() || isSending}
-                  className="px-5 py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md shadow-amber-900/20 active:scale-95"
+                  disabled={isSending || (!otherParticipant && !selectedRecipient) || !replyText.trim()}
+                  className="px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-600/20 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
                 >
-                  <span>{isSending ? (isEn ? 'Sending...' : 'Enviando...') : isEn ? 'Reply' : 'Responder'}</span>
                   <span className="material-symbols-outlined text-base">send</span>
+                  <span className="hidden sm:inline">{isEn ? 'Send' : 'Enviar'}</span>
                 </button>
               </form>
             </div>
@@ -660,146 +624,71 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Modal: Eliminar Conversación */}
-      {showDeleteModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
-        >
-          <div className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden p-6 ${
-            isDark ? 'bg-slate-900 border-rose-900/50 text-white' : 'bg-white border-rose-200 text-slate-900'
-          }`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl">delete_forever</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-base leading-tight">
-                  {isEn ? 'Delete conversation?' : '¿Eliminar conversación?'}
-                </h3>
-                <p className="text-xs text-rose-400 font-semibold">
-                  {isEn ? 'Action only affects your view' : 'Esta acción solo afectará tu bandeja'}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              {isEn
-                ? 'This conversation will be hidden from your inbox. The other participant will keep their full chat history.'
-                : 'Esta conversación se ocultará de tu bandeja de comunicaciones. El docente destinatario conservará el historial completo de mensajes.'}
-            </p>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={isDeletingConv}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
-              >
-                {isEn ? 'Cancel' : 'Cancelar'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConversation}
-                disabled={isDeletingConv}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <span>{isDeletingConv ? (isEn ? 'Deleting...' : 'Eliminando...') : (isEn ? 'Yes, delete' : 'Sí, eliminar conversación')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Select Authorized Teacher */}
+      {/* MODAL: NUEVO MENSAJE PARA ACUDIENTE */}
       {showNewChatModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
-        >
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden ${
-              isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border ${
+              isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
             }`}
           >
-            <div className={`p-5 border-b flex items-center justify-between ${isDark ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'}`}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center font-bold">
-                  <span className="material-symbols-outlined text-xl">school</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base">{isEn ? 'Institutional Teachers' : 'Docentes Institucionales'}</h3>
-                  <p className="text-xs text-slate-400">Docentes y directivos oficiales de la I.E. Vallejuelos</p>
-                </div>
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400">person_add</span>
+                <h3 className="font-bold text-sm">{isEn ? 'Contact Teacher' : 'Contactar Docente o Directivo'}</h3>
               </div>
               <button
                 onClick={() => setShowNewChatModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <div className="p-4 border-b border-slate-800">
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
+            <div className="p-4">
+              <div className="mb-3">
                 <input
                   type="text"
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
-                  placeholder={isEn ? 'Search by teacher name or area...' : 'Buscar por nombre o asignatura...'}
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-xs border outline-none ${
-                    isDark ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  placeholder={isEn ? 'Search teachers...' : 'Buscar profesor de 8°1 o directivo...'}
+                  className={`w-full px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-amber-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-[#00288e]'
                   }`}
                 />
               </div>
-            </div>
 
-            <div className="p-4 max-h-[360px] overflow-y-auto space-y-2">
-              {filteredContacts.length === 0 ? (
-                <p className="text-center text-xs text-slate-400 py-8">
-                  {isEn ? 'No teachers found.' : 'No se encontraron docentes con esa búsqueda.'}
-                </p>
-              ) : (
-                filteredContacts.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => handleStartChatWithContact(c)}
-                    className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center justify-between ${
-                      isDark
-                        ? 'bg-slate-950/60 border-slate-800 hover:border-cyan-500/60 hover:bg-cyan-500/10'
-                        : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-300 shrink-0">
-                        {c.avatarUrl ? (
-                          <img src={c.avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          c.fullName.charAt(0)
-                        )}
-                      </div>
+              <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-1">
+                {filteredContacts.length === 0 ? (
+                  <p className="text-center py-8 text-xs text-slate-400">
+                    {isEn ? 'No teachers found.' : 'No se encontraron docentes disponibles.'}
+                  </p>
+                ) : (
+                  filteredContacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      onClick={() => handleStartChatWithContact(contact)}
+                      className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center justify-between group ${
+                        isDark
+                          ? 'bg-slate-950/60 border-slate-800/80 hover:border-amber-500/50 hover:bg-amber-950/20'
+                          : 'bg-slate-50 border-slate-200 hover:border-[#00288e] hover:bg-blue-50/50'
+                      }`}
+                    >
                       <div>
-                        <h5 className="font-bold text-xs text-slate-100">{c.fullName}</h5>
-                        <p className="text-[11px] text-cyan-400 font-medium">{c.roleLabel}</p>
-                        {c.detail && <p className="text-[10px] text-slate-400">{c.detail}</p>}
+                        <span className="font-bold text-xs block text-slate-100 group-hover:text-amber-400 transition-colors">
+                          {contact.fullName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 block">{contact.detail || contact.email}</span>
                       </div>
+                      <span className="text-[10px] font-bold text-amber-400 px-2 py-0.5 rounded-md bg-amber-950/40 border border-amber-800/40 shrink-0">
+                        {contact.roleLabel}
+                      </span>
                     </div>
-                    <span className="material-symbols-outlined text-sm text-cyan-400">send</span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className={`p-4 border-t flex justify-end ${isDark ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'}`}>
-              <button
-                onClick={() => setShowNewChatModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
-              >
-                {isEn ? 'Cancel' : 'Cancelar'}
-              </button>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

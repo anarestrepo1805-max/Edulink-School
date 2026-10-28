@@ -1,15 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ActiveScreen, NewsFeedItem, UserProfile } from '../types';
-import { INITIAL_NEWS_FEED } from '../data/mockData';
-import {
-  getOfficialScheduleForGrade,
-  lookupCensusGuardian,
-  lookupCensusStudent,
-  CENSUS_STUDENTS
-} from '../data/institutionalCensus';
+import { ASSETS, INITIAL_NEWS_FEED } from '../data/mockData';
+import { OFFICIAL_SCHEDULE_8_1 } from '../data/institutionalCensus';
 import { saveUserConfiguration } from '../services/authService';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
-import { downloadOfficialBulletinPDF } from '../services/bulletinService';
+import { generateStudentReportCardPdf } from '../services/reportCardPdfService';
 
 interface FamilyDashboardViewProps {
   currentUser?: UserProfile | null;
@@ -30,68 +25,11 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
 
   const isConfigured = Boolean(currentUser?.hasConfigured);
   const parentName = currentUser?.fullName || (isEn ? 'Elena Gómez Jiménez' : 'Elena Gómez Jiménez');
-
-  // Single assigned student lookup from census or user profile (no fake multi-child switching)
-  const currentStudent = useMemo(() => {
-    // 1. Direct from currentUser if already represented
-    if (currentUser?.representedStudentName) {
-      return {
-        name: currentUser.representedStudentName,
-        documentId: currentUser.representedStudentCode || '1092837465',
-        grade: currentUser.gradeLevel?.includes('°') ? currentUser.gradeLevel : '11°1',
-        matricula: currentUser.representedStudentCode ? `2026-${currentUser.representedStudentCode.slice(-4)}` : '2026-1101',
-        director: 'Jorge Castaño',
-        average: '4.4',
-        attendance: '98%',
-        attendanceDetail: isEn ? '48 of 49 classes attended' : '48 de 49 clases asistidas',
-        rank: isEn ? 'Rank 3° of 35' : 'Puesto 3° de 35',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-      };
-    }
-
-    // 2. Query census by guardian cédula
-    const guardianDoc = currentUser?.documentId || '43521980';
-    const guardianRel = lookupCensusGuardian(guardianDoc);
-    if (guardianRel) {
-      const student = lookupCensusStudent(guardianRel.studentDocumentId);
-      if (student) {
-        const gradeDisplay = student.group.replace('-', '°');
-        return {
-          name: student.fullName,
-          documentId: student.documentId,
-          grade: gradeDisplay,
-          matricula: `2026-${student.documentId.slice(-4)}`,
-          director: gradeDisplay.includes('11') ? 'Jorge Castaño' : gradeDisplay.includes('10') ? 'Patricia Quintero' : 'Diana Gómez',
-          average: '4.4',
-          attendance: '98%',
-          attendanceDetail: isEn ? '48 of 49 classes attended' : '48 de 49 clases asistidas',
-          rank: isEn ? 'Rank 3° of 35' : 'Puesto 3° de 35',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-        };
-      }
-    }
-
-    // 3. Official institutional census student for demo guardian (Miguel Ángel Jiménez - Grado 11°1)
-    return {
-      name: 'Miguel Ángel Jiménez',
-      documentId: '1092837465',
-      grade: '11°1',
-      matricula: '2026-1101',
-      director: 'Jorge Castaño',
-      average: '4.4',
-      attendance: '98%',
-      attendanceDetail: isEn ? '48 of 49 classes attended' : '48 de 49 clases asistidas',
-      rank: isEn ? 'Rank 3° of 35' : 'Puesto 3° de 35',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-    };
-  }, [currentUser, isEn]);
-
   const [activeCategory, setActiveCategory] = useState<'all' | 'grades' | 'meetings' | 'notices'>('all');
   const [confirmedMeeting, setConfirmedMeeting] = useState(false);
   const [isConfiguringDemo, setIsConfiguringDemo] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [isDownloadingBulletin, setIsDownloadingBulletin] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -106,7 +44,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
           hasConfigured: true
         });
         if (onUpdateUser) onUpdateUser(updated);
-        showToast(isEn ? 'Family demo profile loaded.' : 'Perfil familiar cargado correctamente.');
+        showToast(isEn ? 'Family demo profile loaded.' : 'Perfil familiar cargado exitosamente.');
       } catch (err) {
         console.warn('Error saving family config:', err);
       }
@@ -114,34 +52,34 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
     setIsConfiguringDemo(false);
   };
 
-  // Download official academic report card (Boletín oficial)
-  const handleDownloadReportCard = async () => {
-    setIsDownloadingBulletin(true);
-    try {
-      showToast(isEn ? `Generating official report card for ${currentStudent.name}...` : `Generando boletín oficial de calificaciones para ${currentStudent.name}...`);
-      await downloadOfficialBulletinPDF({
-        studentName: currentStudent.name,
-        studentDocumentId: currentStudent.documentId,
-        gradeLevel: currentStudent.grade,
-        matricula: currentStudent.matricula,
-        guardianName: parentName,
-        guardianRelationship: currentUser?.relationship || 'Madre de Familia',
-        period: '1° Período Académico',
-        schoolYear: '2026'
-      });
-      showToast(isEn ? 'Report card downloaded successfully.' : '¡Boletín oficial descargado exitosamente en PDF!');
-    } catch (err) {
-      console.error('Error generating bulletin PDF:', err);
-      showToast(isEn ? 'Could not generate report card. Please try again.' : 'No se pudo generar el boletín. Intente nuevamente.');
-    } finally {
-      setIsDownloadingBulletin(false);
-    }
+  // Real student: Valentina Gómez Suárez, Grado 8°1, doc: 1007855552
+  const currentStudent = {
+    name: currentUser?.representedStudentName || 'Valentina Gómez Suárez',
+    grade: currentUser?.gradeLevel || (isEn ? 'Grade 8°1' : 'Grado 8°1'),
+    matricula: currentUser?.representedStudentCode || '1007855552',
+    avatar: ASSETS.studentSofia || ASSETS.studentAvatar,
+    director: 'Lic. Gabriel Mendoza C.',
+    average: '4.6',
+    attendance: '98%',
+    attendanceDetail: isEn ? '48 of 49 classes attended' : '48 de 49 clases asistidas',
+    rank: isEn ? 'Rank 2nd of 34' : 'Puesto 2° de 34'
   };
 
-  // Official student schedule matching student's enrolled grade
-  const studentSchedule = useMemo(() => {
-    return getOfficialScheduleForGrade(currentStudent.grade);
-  }, [currentStudent.grade]);
+  const handleDownloadReportCard = () => {
+    try {
+      generateStudentReportCardPdf({
+        studentName: currentStudent.name,
+        documentId: currentStudent.matricula,
+        grade: currentStudent.grade,
+        term: '1° Período 2026',
+        groupDirector: currentStudent.director
+      });
+      showToast(isEn ? 'Official report card PDF downloaded.' : 'Boletín oficial PDF descargado exitosamente.');
+    } catch (e) {
+      console.error(e);
+      showToast(isEn ? 'Error generating PDF report card.' : 'Error al generar el boletín en PDF.');
+    }
+  };
 
   const filteredFeed: NewsFeedItem[] = INITIAL_NEWS_FEED.filter((item) => {
     if (activeCategory === 'all') return true;
@@ -195,13 +133,12 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
             </button>
             <button
               onClick={handleDownloadReportCard}
-              disabled={isDownloadingBulletin}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
             >
               <span className="material-symbols-outlined text-xl">assignment</span>
-              <span>{isDownloadingBulletin ? (isEn ? 'Generating PDF...' : 'Generando Boletín...') : (isEn ? 'Report Card (PDF)' : 'Boletín Oficial (PDF)')}</span>
+              <span>{isEn ? 'Grades & Official Report Card' : 'Calificaciones y Boletín'}</span>
             </button>
             <button
               onClick={() => setShowScheduleModal(true)}
@@ -210,10 +147,10 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-xl">calendar_today</span>
-              <span>{isEn ? 'Schedule & Subjects' : 'Horario y Asignaturas'}</span>
+              <span>{isEn ? 'Class Schedule 8°1' : 'Horario Escolar (8°1)'}</span>
             </button>
             <button
-              onClick={() => showToast(isEn ? 'Behavior log: Exemplary conduct Type A. No disciplinary notes.' : 'Observador convivencial: Conducta Ejemplar Tipo A. Sin faltas.')}
+              onClick={() => showToast(isEn ? 'Behavior log: Exemplary conduct Type A. No disciplinary notes.' : 'Observador convivencial: Conducta Ejemplar Tipo A. Sin anotaciones.')}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
                 isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-[#444653] hover:bg-[#eff4ff] hover:text-[#0b1c30]'
               }`}
@@ -228,7 +165,10 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-xl">mail</span>
-              <span className="text-xs font-semibold">{isEn ? 'Notices & Citations' : 'Comunicados y Citaciones'}</span>
+              <span className="text-xs font-semibold">{isEn ? 'Chat & Notices' : 'Chat y Comunicados'}</span>
+              <span className="ml-auto px-1.5 py-0.2 bg-amber-500 text-white text-[10px] font-bold rounded-full">
+                1
+              </span>
             </button>
           </nav>
         </div>
@@ -254,30 +194,30 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
         <header className={`sticky top-12 h-20 backdrop-blur-xl shadow-xs z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b transition-colors ${
           isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-[#e5eeff]'
         }`}>
-          {/* Active Student identity banner (single assigned student) */}
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm shrink-0 overflow-hidden ${
-              isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-[#dbe1ff] text-[#00288e]'
-            }`}>
-              {currentStudent.avatarUrl ? (
-                <img src={currentStudent.avatarUrl} alt={currentStudent.name} className="w-full h-full object-cover" />
-              ) : (
-                currentStudent.name.charAt(0)
-              )}
-            </div>
-            <div className="flex flex-col text-left">
-              <span className={`text-[10px] font-medium leading-none ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                {isEn ? 'Represented Student:' : 'Estudiante Representado:'}
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                  {currentStudent.name}
+          {/* Active Student badge (No switcher) */}
+          <div className="flex items-center">
+            <div
+              className={`flex items-center gap-3 px-3.5 py-1.5 rounded-xl border ${
+                isDark ? 'bg-slate-800 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-sm shrink-0 ${
+                isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-[#dbe1ff] text-[#00288e]'
+              }`}>
+                {currentStudent.name[0]}
+              </div>
+              <div className="flex flex-col text-left">
+                <span className={`text-[10px] font-medium leading-none ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
+                  {isEn ? 'Student in charge:' : 'Estudiante a cargo:'}
                 </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  isDark ? 'bg-amber-950 text-amber-300' : 'bg-[#dce9ff] text-[#00288e]'
-                }`}>
-                  {currentStudent.grade}
-                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{currentStudent.name}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isDark ? 'bg-amber-950 text-amber-300' : 'bg-[#dce9ff] text-[#00288e]'
+                  }`}>
+                    {currentStudent.grade}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -291,6 +231,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
               title={isEn ? 'Notifications & Messages' : 'Notificaciones y Mensajes'}
             >
               <span className="material-symbols-outlined text-xl">notifications</span>
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
             </button>
 
             <div className={`h-8 w-px ${isDark ? 'bg-slate-800' : 'bg-[#dce9ff]'}`} />
@@ -299,18 +240,16 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
               <div className="flex flex-col text-right hidden sm:flex">
                 <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{parentName}</span>
                 <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                  {currentUser?.relationship || (isEn ? 'Primary Guardian' : 'Acudiente Autorizada')} • {currentStudent.name}
+                  {isEn ? 'Guardian (Mother)' : 'Acudiente (Madre)'} • {currentStudent.name}
                 </span>
               </div>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ring-2 shadow-xs overflow-hidden ${
-                isDark ? 'bg-amber-900/60 text-amber-200 ring-amber-500/30' : 'bg-[#00288e]/10 text-[#00288e] ring-[#00288e]/20'
-              }`}>
-                {currentUser?.avatarUrl ? (
-                  <img alt={parentName} className="w-full h-full object-cover" src={currentUser.avatarUrl} />
-                ) : (
-                  parentName.charAt(0)
-                )}
-              </div>
+              <img
+                alt="Profile"
+                className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs ${
+                  isDark ? 'ring-amber-500/30' : 'ring-[#00288e]/20'
+                }`}
+                src={currentUser?.avatarUrl || ASSETS.parentAvatar}
+              />
             </div>
           </div>
         </header>
@@ -327,12 +266,12 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                 <span className="material-symbols-outlined text-[36px]">family_restroom</span>
               </div>
               <h3 className={`text-xl font-extrabold mb-2 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                {isEn ? `Represented Student: ${currentStudent.name}` : `Estudiante Vinculado: ${currentStudent.name}`}
+                {isEn ? `Linked Student: ${currentStudent.name}` : `Estudiante vinculada: ${currentStudent.name}`}
               </h3>
               <p className={`text-sm max-w-lg mb-6 leading-relaxed ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                 {isEn
-                  ? 'Your family account is officially registered. Access gradebooks, attendance, and official communications.'
-                  : 'Tu cuenta familiar está oficialmente vinculada. Puedes consultar calificaciones, asistencia, horarios y comunicados institucionales.'}
+                  ? 'Your family account is officially verified for Valentina Gómez Suárez (Grade 8°1). You can explore official report cards, class schedules, and institutional communications.'
+                  : 'Tu cuenta familiar está verificada formalmente para Valentina Gómez Suárez (Grado 8°1). Puedes acceder a calificaciones, boletines oficiales, horarios y comunicados institucionales.'}
               </p>
               <button
                 type="button"
@@ -342,30 +281,23 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                   isDark ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
                 }`}
               >
-                <span className="material-symbols-outlined text-lg">verified</span>
-                <span>{isConfiguringDemo ? (isEn ? 'Configuring...' : 'Configurando...') : (isEn ? 'Confirm Family Access' : 'Confirmar Acceso Familiar')}</span>
+                <span className="material-symbols-outlined text-lg">supervised_user_circle</span>
+                <span>{isConfiguringDemo ? (isEn ? 'Configuring...' : 'Configurando...') : (isEn ? 'Open Family Dashboard' : 'Ingresar al Portal Familiar')}</span>
               </button>
             </div>
           ) : (
             <>
-              {/* 1. BARRA SUPERIOR DE CONTEXTO DEL HIJO / ESTUDIANTE */}
-              <div className={`rounded-2xl shadow-xs p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden border ${
+              {/* 1. BARRA SUPERIOR DE CONTEXTO DEL ESTUDIANTE */}
+              <div className={`rounded-2xl shadow-xs p-6 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 relative overflow-hidden border ${
                 isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
               }`}>
                 <div className="flex items-center gap-4 z-10">
-                  {/* Student photo (never Edulink logo, never guardian photo) */}
                   <div className="relative shrink-0">
-                    <div className="w-20 h-20 rounded-full overflow-hidden shadow-xs ring-4 ring-amber-500/20 bg-slate-800 flex items-center justify-center font-bold text-2xl text-amber-300">
-                      {currentStudent.avatarUrl ? (
-                        <img
-                          alt={currentStudent.name}
-                          className="w-full h-full object-cover"
-                          src={currentStudent.avatarUrl}
-                        />
-                      ) : (
-                        currentStudent.name.charAt(0)
-                      )}
-                    </div>
+                    <img
+                      alt={currentStudent.name}
+                      className="w-20 h-20 rounded-full object-cover shadow-xs ring-4 ring-amber-500/20"
+                      src={currentStudent.avatar}
+                    />
                     <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold shadow-xs">
                       <span className="material-symbols-outlined text-[15px]">school</span>
                     </span>
@@ -379,22 +311,20 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         isDark ? 'bg-amber-950 text-amber-300' : 'bg-[#dde1ff] text-[#001453]'
                       }`}>
-                        Grado {currentStudent.grade}
+                        {currentStudent.grade}
                       </span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
                         isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#e5eeff] text-[#0051d5]'
                       }`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        {isEn ? 'Enrolled Student' : 'Estudiante Matriculado'}
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {isEn ? 'Enrolled Student' : 'Hija matriculada'}
                       </span>
                     </div>
 
                     <p className={`text-xs mt-1.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                      {isEn ? 'ID / Document: ' : 'Documento: '}
-                      <strong className={`font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{currentStudent.documentId}</strong> •{' '}
-                      {isEn ? 'Matricula: ' : 'Matrícula: '}
+                      {isEn ? 'ID / Document: ' : 'Documento de Identidad: '}
                       <strong className={`font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{currentStudent.matricula}</strong> •{' '}
-                      {isEn ? 'Active Term: ' : 'Período: '}
+                      {isEn ? 'Term: ' : 'Período Activo: '}
                       <strong className={`font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{isEn ? '1st Term 2026' : '1° Período 2026'}</strong> •{' '}
                       {isEn ? 'Group Director: ' : 'Director de Grupo: '}
                       <strong className={`font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>{currentStudent.director}</strong>
@@ -411,18 +341,27 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                   </div>
                 </div>
 
-                {/* Right Action: Download Bulletin directly */}
-                <div className="flex items-center gap-3 z-10">
+                {/* Direct Action: Download PDF Report Card */}
+                <div className="flex flex-wrap items-center gap-3 z-10 w-full xl:w-auto justify-start xl:justify-end">
                   <button
                     type="button"
                     onClick={handleDownloadReportCard}
-                    disabled={isDownloadingBulletin}
-                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-md cursor-pointer ${
+                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs cursor-pointer ${
                       isDark ? 'bg-amber-600 hover:bg-amber-500' : 'bg-[#00288e] hover:bg-[#1e40af]'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-lg">download</span>
-                    <span>{isDownloadingBulletin ? (isEn ? 'Generating PDF...' : 'Generando...') : (isEn ? 'Download Report Card (PDF)' : 'Descargar Boletín Oficial (PDF)')}</span>
+                    <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                    <span>{isEn ? 'Download Official Report Card (PDF)' : 'Descargar Boletín Oficial (PDF)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs border cursor-pointer ${
+                      isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-750' : 'bg-[#eff4ff] border-[#dce9ff] text-[#00288e] hover:bg-[#e5eeff]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">calendar_month</span>
+                    <span>{isEn ? 'View Schedule' : 'Ver Horario Escolar'}</span>
                   </button>
                 </div>
               </div>
@@ -454,11 +393,11 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
 
                   <div className="mt-4 flex flex-col gap-1.5">
                     <div className={`flex justify-between text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                      <span>{isEn ? 'Academic Progress' : 'Rendimiento Académico'}</span>
-                      <span className={`font-bold ${isDark ? 'text-amber-300' : 'text-[#00288e]'}`}>88%</span>
+                      <span>{isEn ? 'Academic Performance' : 'Desempeño Académico'}</span>
+                      <span className={`font-bold ${isDark ? 'text-amber-300' : 'text-[#00288e]'}`}>92% (Superior)</span>
                     </div>
                     <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-[#e5eeff]'}`}>
-                      <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: '88%' }} />
+                      <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: '92%' }} />
                     </div>
                   </div>
 
@@ -466,7 +405,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
                       isDark ? 'bg-amber-950 text-amber-300' : 'bg-[#eff4ff] text-[#00288e]'
                     }`}>
-                      <span className="material-symbols-outlined text-xs">trending_up</span> +0.2 {isEn ? 'vs previous term' : 'vs ciclo anterior'}
+                      <span className="material-symbols-outlined text-xs">trending_up</span> +0.4 {isEn ? 'vs previous term' : 'vs ciclo anterior'}
                     </span>
                     <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>{currentStudent.rank}</span>
                   </div>
@@ -509,7 +448,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                       isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#e5eeff] text-[#0b1c30]'
                     }`}>
                       <span className="material-symbols-outlined text-xs text-cyan-400">check_circle</span>
-                      {isEn ? '1 medical excuse (Feb 02)' : '1 falta justificada con soporte médico'}
+                      {isEn ? '1 medical excuse justified' : '1 falta justificada con constancia'}
                     </span>
                   </div>
                 </div>
@@ -706,15 +645,15 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => showToast(isEn ? 'Event synced with school Google Calendar.' : 'Evento añadido a Google Calendar institucional.')}
+                                  onClick={handleDownloadReportCard}
                                   className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-all border cursor-pointer ${
                                     isDark
                                       ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                                       : 'bg-white border-[#e2e8f0] text-[#444653] hover:text-[#0b1c30]'
                                   }`}
                                 >
-                                  <span className="material-symbols-outlined text-sm">event</span>
-                                  <span>{isEn ? 'Add to Calendar' : 'Añadir a mi calendario'}</span>
+                                  <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                                  <span>{isEn ? 'View Report Card' : 'Ver Boletín Oficial'}</span>
                                 </button>
                               </div>
                             ) : item.attachment ? (
@@ -726,7 +665,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                                 }`}
                               >
                                 <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-                                <span>{isEn ? 'Download Official Report' : 'Descargar Informe Oficial'}</span>
+                                <span>{isEn ? 'Download Official Report Card (PDF)' : 'Descargar Boletín Oficial (PDF)'}</span>
                               </button>
                             ) : (
                               <button
@@ -736,7 +675,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                                   isDark ? 'text-amber-400 hover:text-amber-300' : 'text-[#0051d5] hover:text-[#00288e]'
                                 }`}
                               >
-                                <span>{item.actionText || (isEn ? 'Open in Chat' : 'Abrir en Mensajería')}</span>
+                                <span>{item.actionText || (isEn ? 'View details' : 'Ver detalles')}</span>
                                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
                               </button>
                             )}
@@ -747,25 +686,23 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                   </div>
                 </div>
 
-                {/* COLUMNA DERECHA: Accesos Rápidos & Soporte Oficial */}
+                {/* COLUMNA DERECHA: Accesos Rápidos & Canales de Atención */}
                 <div className="lg:col-span-4 flex flex-col gap-4">
-                  {/* Quick actions (No tasks/assignment access for guardian) */}
+                  {/* Quick shortcuts */}
                   <div className={`p-5 rounded-2xl shadow-xs flex flex-col gap-4 border ${
                     isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
                   }`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-6 rounded-full ${isDark ? 'bg-amber-500' : 'bg-[#0051d5]'}`} />
                       <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                        {isEn ? 'Official Actions' : 'Accesos Directos'}
+                        {isEn ? 'Quick Shortcuts' : 'Accesos Rápidos'}
                       </h2>
                     </div>
 
                     <div className="flex flex-col gap-2.5">
-                      {/* 1. Download official report card */}
                       <button
                         type="button"
                         onClick={handleDownloadReportCard}
-                        disabled={isDownloadingBulletin}
                         className={`w-full text-left p-3.5 rounded-xl transition-all group flex items-start gap-3 shadow-xs border cursor-pointer ${
                           isDark
                             ? 'bg-slate-800 border-slate-700 hover:bg-slate-750'
@@ -777,15 +714,14 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                         </div>
                         <div className="flex flex-col">
                           <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#00288e]'}`}>
-                            {isDownloadingBulletin ? (isEn ? 'Generating PDF...' : 'Generando...') : (isEn ? 'Download Report Card (PDF)' : 'Descargar Boletín Oficial (PDF)')}
+                            {isEn ? 'Download Report Card (PDF)' : 'Descargar Boletín Oficial (PDF)'}
                           </span>
                           <span className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            {isEn ? 'Digitally certified 1st term 2026 report' : 'Informe oficial 1° Período 2026 firmado por Rectoría'}
+                            {isEn ? 'Digitally certified 1st term 2026 report' : 'Informe oficial 1° Período 2026 firmado digitalmente'}
                           </span>
                         </div>
                       </button>
 
-                      {/* 2. Open chat with teachers */}
                       <button
                         type="button"
                         onClick={() => onNavigate('family_messaging')}
@@ -800,15 +736,14 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                         </div>
                         <div className="flex flex-col">
                           <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                            {isEn ? 'Message Teachers & Staff' : 'Mensajería con Docentes y Directivos'}
+                            {isEn ? 'Online Institutional Chat' : 'Chat Institucional en Línea'}
                           </span>
                           <span className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            {isEn ? 'Direct authorized communication channel' : 'Canal oficial autorizado en tiempo real'}
+                            {isEn ? 'Direct communication with teachers' : 'Comunicación bidireccional con docentes'}
                           </span>
                         </div>
                       </button>
 
-                      {/* 3. Schedule modal */}
                       <button
                         type="button"
                         onClick={() => setShowScheduleModal(true)}
@@ -823,75 +758,71 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                         </div>
                         <div className="flex flex-col">
                           <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                            {isEn ? 'School Schedule' : 'Horario de Clases Oficial'}
+                            {isEn ? 'Official Schedule 8°1' : 'Horario Escolar Oficial (8°1)'}
                           </span>
                           <span className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            {isEn ? `Grade ${currentStudent.grade} • Morning Shift (6:15 AM - 12:15 PM)` : `Grado ${currentStudent.grade} • Jornada Mañana (6:15 AM - 12:15 PM)`}
+                            {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM a 12:15 PM)'}
                           </span>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  {/* Canales Oficiales de Atención (Cleaned of fake phones and fake emails) */}
+                  {/* Direct Contact Channels (Presencial + Chat en línea only) */}
                   <div className={`p-5 rounded-2xl shadow-xs flex flex-col gap-4 border ${
                     isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
                   }`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-6 rounded-full ${isDark ? 'bg-amber-500' : 'bg-[#00394f]'}`} />
                       <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                        {isEn ? 'School Attention Channels' : 'Canales de Atención Institucional'}
+                        {isEn ? 'Attention Channels' : 'Canales de Atención Institucional'}
                       </h2>
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                      {/* Horario Presencial */}
-                      <div className={`flex items-start gap-3 p-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-[#eff4ff]'}`}>
+                    <div className="flex flex-col gap-2.5">
+                      <div className={`flex items-start gap-3 p-3 rounded-xl border ${
+                        isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
+                      }`}>
                         <span className={`material-symbols-outlined text-xl shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-[#00288e]'}`}>
-                          access_time
+                          location_on
                         </span>
                         <div className="flex flex-col">
                           <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                            {isEn ? 'In-Person Attention Hours' : 'Horario de Atención Presencial'}
+                            {isEn ? 'In-Person Attention' : 'Atención Presencial en Sede'}
                           </span>
-                          <span className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-slate-300' : 'text-[#00288e]'}`}>
-                            Lunes a Viernes: 6:15 AM a 12:15 PM
+                          <span className={`text-[11px] mt-0.5 font-semibold ${isDark ? 'text-amber-300' : 'text-[#00288e]'}`}>
+                            {isEn ? 'Mon - Fri: 7:00 AM - 3:00 PM' : 'Lunes a viernes 7:00 a.m. - 3:00 p.m.'}
                           </span>
                           <span className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            Sede principal I.E. Vallejuelos • Medellín
+                            Secretaría Académica y Rectoría • I.E. Vallejuelos
                           </span>
                         </div>
                       </div>
 
-                      {/* Chat en Línea con Docentes */}
-                      <div className={`flex items-start gap-3 p-3 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-[#eff4ff]'}`}>
+                      <div className={`flex items-start gap-3 p-3 rounded-xl border ${
+                        isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
+                      }`}>
                         <span className={`material-symbols-outlined text-xl shrink-0 mt-0.5 ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
-                          chat_bubble
+                          forum
                         </span>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col flex-1">
                           <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                            {isEn ? 'Direct Online Chat' : 'Chat en Línea'}
+                            {isEn ? 'Online Official Chat' : 'Chat en Línea Institucional'}
                           </span>
-                          <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            Comunicación directa y oficial con docentes y directivos institucionales.
+                          <span className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
+                            {isEn ? 'Direct channel with assigned teachers and administrators' : 'Atención institucional directa con docentes de 8°1 y directivos'}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('family_messaging')}
+                            className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all self-start cursor-pointer ${
+                              isDark ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-[#0051d5] hover:bg-[#00288e]'
+                            }`}
+                          >
+                            {isEn ? 'Open Chat Now' : 'Ir al Chat Institucional'}
+                          </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => onNavigate('family_messaging')}
-                        className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-                          isDark
-                            ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                            : 'bg-[#00288e] hover:bg-[#1e40af] text-white'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-lg">forum</span>
-                        <span>{isEn ? 'Open Institutional Chat' : 'Abrir Chat en Línea'}</span>
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -901,7 +832,7 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
         </main>
       </div>
 
-      {/* INSTITUTIONAL SCHEDULE MODAL FOR FAMILY (Dynamic based on student enrolled grade) */}
+      {/* INSTITUTIONAL SCHEDULE MODAL FOR GRADE 8°1 */}
       {showScheduleModal && (
         <div
           role="dialog"
@@ -927,8 +858,8 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
                     {isEn
-                      ? `Grade ${currentStudent.grade} • Morning Shift (6:15 AM - 12:15 PM) • Institutional Academic Plan`
-                      : `Grado ${currentStudent.grade} • Jornada Mañana (6:15 AM - 12:15 PM) • Plan de Estudios Institucional`}
+                      ? `Grade 8°1 • Morning Shift (6:15 AM - 12:15 PM) • I.E. Vallejuelos`
+                      : `Grado 8°1 • Jornada Mañana (6:15 AM - 12:15 PM) • I.E. Vallejuelos`}
                   </p>
                 </div>
               </div>
@@ -943,12 +874,12 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
               </button>
             </div>
 
-            {/* Schedule Table Body (Dynamic from census schedule for the student's exact grade) */}
+            {/* Schedule Table Body */}
             <div className="p-4 sm:p-6 overflow-x-auto overflow-y-auto flex-1">
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
-                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
+                    isDark ? 'border-slate-800 text-slate-300' : 'border-slate-200 text-[#0b1c30]'
                   }`}>
                     <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
                     <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
@@ -958,40 +889,64 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
                     <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                  {studentSchedule.map((slot) => (
-                    <tr
-                      key={slot.period}
-                      className={`transition-colors ${
-                        isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
-                      }`}
-                    >
-                      <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-amber-500 dark:text-amber-400">
-                        <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
-                          {slot.period === 0 ? (isEn ? 'Break' : 'Descanso') : (isEn ? `Period ${slot.period}` : `Hora ${slot.period}`)}
-                        </div>
-                        <div>{slot.time}</div>
-                      </td>
-                      {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
-                        <td key={idx} className="py-2.5 px-3 align-top">
-                          <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
-                            slot.period === 0
-                              ? isDark ? 'bg-amber-950/20 border-amber-900/30' : 'bg-amber-50/60 border-amber-200/60'
-                              : isDark
-                              ? 'bg-slate-800/80 border-slate-700/60'
-                              : 'bg-white border-slate-200/80 shadow-2xs'
-                          }`}>
-                            <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
-                              {cell.subject}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                              {cell.teacher}
-                            </span>
+                <tbody className="divide-y divide-slate-150 dark:divide-slate-800/60 text-xs">
+                  {OFFICIAL_SCHEDULE_8_1.map((slot) => {
+                    const isBreak = slot.period === 0;
+                    return (
+                      <tr
+                        key={slot.period}
+                        className={`transition-colors ${
+                          isBreak
+                            ? isDark ? 'bg-amber-950/20' : 'bg-amber-50/60'
+                            : isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="py-3 px-3 align-middle font-mono font-bold text-[11px] text-amber-500 dark:text-amber-400">
+                          <div className="font-sans font-extrabold text-slate-900 dark:text-slate-100">
+                            {isBreak ? (isEn ? 'Recess' : 'Descanso') : (isEn ? `Period ${slot.period}` : `Hora ${slot.period}`)}
                           </div>
+                          <div className="text-slate-600 dark:text-slate-400">{slot.time}</div>
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+
+                        {isBreak ? (
+                          <td colSpan={5} className="py-3 px-3 align-middle">
+                            <div className={`p-3 rounded-2xl flex items-center justify-center gap-3 border ${
+                              isDark
+                                ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                                : 'bg-amber-100/80 border-amber-300 text-amber-950'
+                            }`}>
+                              <span className="material-symbols-outlined text-2xl text-amber-500 shrink-0">restaurant</span>
+                              <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+                                <span className="font-extrabold text-xs uppercase tracking-wider">
+                                  {isEn ? 'Institutional Recess & Break' : 'Descanso y Recreo Pedagógico'}
+                                </span>
+                                <span className="text-[11px] font-semibold opacity-90">
+                                  (9:00 AM - 9:30 AM) • {isEn ? 'Educational Community' : 'Comunidad Educativa'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        ) : (
+                          [slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
+                            <td key={idx} className="py-2.5 px-3 align-top">
+                              <div className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all ${
+                                isDark
+                                  ? 'bg-slate-800/90 border-slate-700/80 shadow-xs'
+                                  : 'bg-white border-slate-200/90 shadow-2xs'
+                              }`}>
+                                <span className="font-extrabold text-xs leading-tight text-slate-950 dark:text-slate-50">
+                                  {cell.subject}
+                                </span>
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                  {cell.teacher}
+                                </span>
+                              </div>
+                            </td>
+                          ))
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1002,8 +957,8 @@ export const FamilyDashboardView: React.FC<FamilyDashboardViewProps> = ({
             }`}>
               <span>
                 {isEn
-                  ? 'Official Schedule source: Academic Direction • I.E. Vallejuelos'
-                  : 'Fuente oficial: Coordinación Académica • I.E. Vallejuelos (Medellín)'}
+                  ? 'Official Schedule source: Academic Direction • Grade 8°1 I.E. Vallejuelos'
+                  : 'Fuente oficial: Coordinación Académica • Grado 8°1 I.E. Vallejuelos'}
               </span>
               <button
                 type="button"

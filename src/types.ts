@@ -18,6 +18,7 @@ export interface UserProfile {
   relationship?: string;
   representedStudentName?: string;
   representedStudentCode?: string;
+  representedStudentDocumentId?: string;
   emergencyPhone?: string;
   phone?: string;
   avatarUrl?: string;
@@ -63,6 +64,7 @@ export type ActiveScreen =
   | 'teacher_assignments'
   | 'teacher_attendance'
   | 'teacher_messaging'
+  | 'teacher_forum'
   // Acudiente / Familia
   | 'family_dashboard'
   | 'family_messaging'

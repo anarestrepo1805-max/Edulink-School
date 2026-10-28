@@ -19,6 +19,7 @@ import {
   CENSUS_ADMIN_STAFF,
   CENSUS_STUDENTS,
   getTeacherAcademicAssignments,
+  getTeacherAssignedGroups,
   normalizeGroupKey
 } from '../data/institutionalCensus';
 
@@ -47,7 +48,7 @@ export interface ConversationParticipant {
   role: string;
   email?: string;
   detail?: string;
-  avatarUrl?: string;
+  avatar?: string;
 }
 
 export interface Conversation {
@@ -58,7 +59,8 @@ export interface Conversation {
   lastMessageTime: number;
   lastSenderId: string;
   unreadCount?: Record<string, number>;
-  hiddenFor?: Record<string, boolean>;
+  unreadBy?: string[];
+  deletedBy?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -70,18 +72,7 @@ export interface AuthorizedContact {
   roleLabel: string;
   email?: string;
   detail?: string;
-  avatarUrl?: string;
-}
-
-export interface ChatNotification {
-  conversationId: string;
-  senderId: string;
-  senderName: string;
-  senderRole: string;
-  senderAvatar?: string;
-  text: string;
-  time: number;
-  unreadCount: number;
+  avatar?: string;
 }
 
 // Aliases for compatibility
@@ -97,6 +88,7 @@ export interface InstitutionalConversation {
   lastMessageSenderName?: string;
   lastMessageAt?: string;
   unreadBy?: string[];
+  deletedBy?: string[];
 }
 export interface RecipientOption {
   id: string;
@@ -105,7 +97,6 @@ export interface RecipientOption {
   category: string;
   detail: string;
   email?: string;
-  avatarUrl?: string;
 }
 
 /**
@@ -131,9 +122,7 @@ export function formatRoleLabel(role?: string): string {
 
 /**
  * Subscribes in real-time to conversations involving the specified user in Firestore.
- * Filters out conversations that the user has hidden/deleted.
- * If no conversations exist in the database, returns an empty array [].
- * Does NOT generate mock, demo, or fake conversations.
+ * Automatically filters out any logically deleted conversations for this user.
  */
 export function subscribeUserConversations(
   userId: string,
@@ -158,9 +147,10 @@ export function subscribeUserConversations(
       const convList: Conversation[] = [];
       snapshot.forEach((d) => {
         const data = d.data() as any;
+        const deletedBy: string[] = data.deletedBy || [];
 
-        // Verify if user deleted/hidden this conversation
-        if (data.hiddenFor && data.hiddenFor[userId] === true) {
+        // Exclude if logically deleted by this user
+        if (deletedBy.includes(userId)) {
           return;
         }
 
@@ -172,7 +162,8 @@ export function subscribeUserConversations(
           lastMessageTime: data.lastMessageTime || (data.lastMessageAt ? new Date(data.lastMessageAt).getTime() : Date.now()),
           lastSenderId: data.lastSenderId || data.lastMessageSenderId || '',
           unreadCount: data.unreadCount || {},
-          hiddenFor: data.hiddenFor || {},
+          unreadBy: data.unreadBy || [],
+          deletedBy: data.deletedBy || [],
           createdAt: data.createdAt ? (typeof data.createdAt === 'number' ? data.createdAt : new Date(data.createdAt).getTime()) : Date.now(),
           updatedAt: data.updatedAt ? (typeof data.updatedAt === 'number' ? data.updatedAt : new Date(data.updatedAt).getTime()) : Date.now()
         });
@@ -183,66 +174,8 @@ export function subscribeUserConversations(
       onUpdate(convList);
     },
     (error) => {
-      console.warn('Real-time conversation subscription notice (fallback empty):', error);
+      console.warn('Real-time conversation subscription notice:', error);
       onUpdate([]);
-    }
-  );
-}
-
-/**
- * Subscribes in real-time to unread chat notifications for a specific user.
- * Generates notification badges and list of pending incoming messages.
- */
-export function subscribeChatNotifications(
-  userId: string,
-  onUpdate: (notifications: ChatNotification[], totalUnread: number) => void
-): Unsubscribe {
-  if (!userId) {
-    onUpdate([], 0);
-    return () => {};
-  }
-
-  const convCol = collection(db, 'conversations');
-  const q = query(convCol, where('participantIds', 'array-contains', userId));
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      if (snapshot.empty) {
-        onUpdate([], 0);
-        return;
-      }
-
-      const notifs: ChatNotification[] = [];
-      let totalUnread = 0;
-
-      snapshot.forEach((d) => {
-        const data = d.data() as any;
-        if (data.hiddenFor && data.hiddenFor[userId] === true) return;
-
-        const unreadForUser = data.unreadCount?.[userId] || 0;
-        if (unreadForUser > 0 && data.lastSenderId !== userId) {
-          totalUnread += unreadForUser;
-          const senderInfo = data.participants?.[data.lastSenderId];
-          notifs.push({
-            conversationId: d.id,
-            senderId: data.lastSenderId,
-            senderName: senderInfo?.fullName || 'Remitente Institucional',
-            senderRole: senderInfo?.role || 'Usuario',
-            senderAvatar: senderInfo?.avatarUrl,
-            text: data.lastMessage || 'Mensaje nuevo',
-            time: data.lastMessageTime || Date.now(),
-            unreadCount: unreadForUser
-          });
-        }
-      });
-
-      notifs.sort((a, b) => b.time - a.time);
-      onUpdate(notifs, totalUnread);
-    },
-    (error) => {
-      console.warn('Notification subscription error:', error);
-      onUpdate([], 0);
     }
   );
 }
@@ -283,7 +216,7 @@ export function subscribeConversationMessages(
           senderId: data.senderId || '',
           senderName: data.senderName || 'Remitente',
           senderRole: data.senderRole || '',
-          senderAvatar: data.senderAvatar,
+          senderAvatar: data.senderAvatar || '',
           recipientId: data.recipientId || '',
           recipientName: data.recipientName || '',
           recipientRole: data.recipientRole || '',
@@ -308,12 +241,11 @@ export function subscribeConversationMessages(
 
 /**
  * Sends a real message in Firestore, creating or updating the conversation.
- * All messages are persisted in Firestore and stay available on refresh.
- * Updates unread count for the recipient and unhides the conversation.
+ * Both participants can send and receive in real time.
  */
 export async function sendChatMessage(params: {
   sender: UserProfile;
-  recipient: AuthorizedContact | { id: string; fullName: string; role: string; email?: string; detail?: string; avatarUrl?: string };
+  recipient: AuthorizedContact | { id: string; fullName: string; role: string; email?: string; detail?: string; avatar?: string };
   text: string;
   citation?: {
     date: string;
@@ -340,7 +272,7 @@ export async function sendChatMessage(params: {
     senderId,
     senderName: sender.fullName || 'Docente Institucional',
     senderRole: senderRoleLabel,
-    senderAvatar: sender.avatarUrl,
+    senderAvatar: sender.avatarUrl || '',
     recipientId,
     recipientName: recipient.fullName,
     recipientRole: recipientRoleLabel,
@@ -355,37 +287,31 @@ export async function sendChatMessage(params: {
     })
   };
 
-  // 1. Fetch current conversation to update unread counts and clear hidden flags
+  // 1. Fetch current conversation to update unread counts
   const convRef = doc(db, 'conversations', conversationId);
-  let currentUnread: Record<string, number> = {};
-  let currentHidden: Record<string, boolean> = {};
-
+  let prevUnreadCount: Record<string, number> = {};
   try {
     const snap = await getDoc(convRef);
     if (snap.exists()) {
-      const data = snap.data();
-      currentUnread = data.unreadCount || {};
-      currentHidden = data.hiddenFor || {};
+      prevUnreadCount = snap.data().unreadCount || {};
     }
-  } catch (err) {
-    console.warn('Could not read existing conv:', err);
-  }
+  } catch {}
 
-  // Sender's unread is 0; recipient's unread increments
-  currentUnread[senderId] = 0;
-  if (sender.id) currentUnread[sender.id] = 0;
-  currentUnread[recipientId] = (currentUnread[recipientId] || 0) + 1;
-
-  // Unhide for both participants when new message is sent
-  currentHidden[senderId] = false;
-  currentHidden[recipientId] = false;
-  if (sender.id) currentHidden[sender.id] = false;
+  const currentRecipUnread = (prevUnreadCount[recipientId] || 0) + 1;
+  const updatedUnreadCount = {
+    ...prevUnreadCount,
+    [recipientId]: currentRecipUnread,
+    [senderId]: 0,
+    [sender.id]: 0
+  };
 
   const participantIds = Array.from(new Set([
     sender.id,
     senderId,
-    recipient.id
-  ])).filter(Boolean);
+    sender.email,
+    recipient.id,
+    recipient.email
+  ])).filter(Boolean) as string[];
 
   const conversationPayload: Partial<Conversation> = {
     id: conversationId,
@@ -396,7 +322,7 @@ export async function sendChatMessage(params: {
         fullName: sender.fullName,
         role: senderRoleLabel,
         email: sender.email,
-        avatarUrl: sender.avatarUrl
+        avatar: sender.avatarUrl
       },
       [recipient.id]: {
         id: recipient.id,
@@ -404,14 +330,15 @@ export async function sendChatMessage(params: {
         role: recipientRoleLabel,
         email: recipient.email,
         detail: recipient.detail,
-        avatarUrl: recipient.avatarUrl
+        avatar: (recipient as any).avatar
       }
     },
     lastMessage: text.trim() || (citation ? `Citación oficial: ${citation.reason}` : 'Mensaje'),
     lastMessageTime: now,
     lastSenderId: senderId,
-    unreadCount: currentUnread,
-    hiddenFor: currentHidden,
+    unreadCount: updatedUnreadCount,
+    unreadBy: [recipientId],
+    deletedBy: [], // Message revives thread if previously deleted
     updatedAt: now
   };
 
@@ -426,27 +353,7 @@ export async function sendChatMessage(params: {
 }
 
 /**
- * Marks all messages in a conversation as read for the current user, resetting unreadCount to 0.
- */
-export async function markConversationAsRead(conversationId: string, userId: string): Promise<void> {
-  if (!conversationId || !userId) return;
-  try {
-    const convRef = doc(db, 'conversations', conversationId);
-    const snap = await getDoc(convRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      const currentUnread = data.unreadCount || {};
-      currentUnread[userId] = 0;
-      await updateDoc(convRef, { unreadCount: currentUnread });
-    }
-  } catch (err) {
-    console.warn('Error marking conversation as read:', err);
-  }
-}
-
-/**
- * Hides or soft-deletes a conversation strictly for the requesting user,
- * without destroying the message history for the other participant.
+ * Logically deletes a conversation thread for the specified user so it disappears from their inbox.
  */
 export async function deleteConversationForUser(conversationId: string, userId: string): Promise<void> {
   if (!conversationId || !userId) return;
@@ -455,19 +362,42 @@ export async function deleteConversationForUser(conversationId: string, userId: 
     const snap = await getDoc(convRef);
     if (snap.exists()) {
       const data = snap.data();
-      const hiddenFor = data.hiddenFor || {};
-      hiddenFor[userId] = true;
-      await updateDoc(convRef, { hiddenFor });
+      const currentDeleted: string[] = data.deletedBy || [];
+      if (!currentDeleted.includes(userId)) {
+        currentDeleted.push(userId);
+      }
+      await updateDoc(convRef, { deletedBy: currentDeleted });
     }
   } catch (err) {
-    console.error('Error hiding conversation for user:', err);
-    throw err;
+    console.warn('Error logically deleting conversation:', err);
+  }
+}
+
+/**
+ * Marks conversation as read by the user, clearing unread badges.
+ */
+export async function markConversationAsRead(conversationId: string, userId: string): Promise<void> {
+  if (!conversationId || !userId) return;
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    const snap = await getDoc(convRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const unreadBy = (data.unreadBy || []).filter((id: string) => id !== userId);
+      const unreadCount = { ...(data.unreadCount || {}) };
+      unreadCount[userId] = 0;
+      await updateDoc(convRef, { unreadBy, unreadCount });
+    }
+  } catch (err) {
+    console.warn('Error marking conversation read:', err);
   }
 }
 
 /**
  * Retrieves the authorized contacts eligible to chat with the current user.
  * Strictly limited to authorized Docentes, Acudientes, and Directivos / Administrativos.
+ * Teachers are strictly mapped to guardians of their assigned groups.
+ * Guardians are mapped to teachers of their student's group.
  */
 export async function getAuthorizedContactsForUser(currentUser?: UserProfile | null): Promise<AuthorizedContact[]> {
   if (!currentUser) return [];
@@ -478,15 +408,6 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
   const currentName = (currentUser.fullName || '').toLowerCase();
 
   const contactsMap = new Map<string, AuthorizedContact>();
-
-  // Helper avatar for teachers from census
-  const teacherAvatars: Record<string, string> = {
-    '30880317': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    '70013115': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    '90137001': 'https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=150&auto=format&fit=crop&q=80',
-    '10198944': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    '30322830': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-  };
 
   // 1. Fetch real registered users from Firestore 'users' collection
   try {
@@ -507,8 +428,8 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
           role: role.includes('teach') || role.includes('docent') ? 'teacher' : (role.includes('fam') || role.includes('acud') ? 'family' : 'admin'),
           roleLabel: formatRoleLabel(role),
           email: u.email,
-          detail: u.subjectArea || (u.role === 'family' ? 'Acudiente registrado' : 'Directivo institucional'),
-          avatarUrl: u.avatarUrl || teacherAvatars[u.documentId || '']
+          avatar: u.avatarUrl,
+          detail: u.subjectArea || (u.role === 'family' ? 'Acudiente registrado' : 'Directivo institucional')
         });
       }
     });
@@ -517,28 +438,34 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
   }
 
   // 2. Add institutional census contacts according to role permissions
+  // If currentUser is Teacher:
   if (currentRole.includes('teach') || currentRole.includes('docent')) {
-    const assignments = getTeacherAcademicAssignments(currentUser.fullName || currentUser.documentId);
-    const assignedGroupKeys = new Set(assignments.map(a => a.groupKey));
+    // Determine teacher's assigned groups
+    const assignedGroupDisplays = getTeacherAssignedGroups(currentUser.fullName || currentUser.documentId);
+    const assignedKeys = new Set(assignedGroupDisplays.map(g => normalizeGroupKey(g)));
 
+    // Acudientes of students in assigned groups
     CENSUS_GUARDIANS.forEach((g) => {
       const student = CENSUS_STUDENTS.find(s => s.documentId === g.studentDocumentId);
       const studentGroupKey = student ? normalizeGroupKey(student.group) : '';
-      const isAssigned = assignedGroupKeys.has(studentGroupKey);
+      const isAssigned = assignedKeys.has(studentGroupKey);
 
-      const contactId = g.cedula;
-      if (!contactsMap.has(contactId)) {
-        contactsMap.set(contactId, {
-          id: contactId,
-          fullName: g.fullName,
-          role: 'family',
-          roleLabel: 'Acudiente',
-          email: g.email,
-          detail: student ? `${g.relationship} de ${student.fullName} (${student.group})` : 'Acudiente oficial'
-        });
+      if (isAssigned || assignedKeys.size === 0) {
+        const contactId = g.cedula;
+        if (!contactsMap.has(contactId)) {
+          contactsMap.set(contactId, {
+            id: contactId,
+            fullName: g.fullName,
+            role: 'family',
+            roleLabel: 'Acudiente',
+            email: g.email,
+            detail: student ? `${g.relationship} de ${student.fullName} (${student.group})` : 'Acudiente oficial'
+          });
+        }
       }
     });
 
+    // Admin staff
     CENSUS_ADMIN_STAFF.forEach((adm) => {
       const contactId = adm.cedula || adm.code;
       if (!contactsMap.has(contactId) && adm.fullName.toLowerCase() !== currentName) {
@@ -553,6 +480,7 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
       }
     });
 
+    // Other Teachers
     CENSUS_TEACHERS.forEach((t) => {
       const contactId = t.cedula || t.code;
       if (!contactsMap.has(contactId) && t.fullName.toLowerCase() !== currentName && t.cedula !== currentDoc) {
@@ -562,27 +490,33 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
           role: 'teacher',
           roleLabel: 'Docente',
           email: t.email,
-          detail: `Área: ${t.area} • Grados: ${t.grades}`,
-          avatarUrl: teacherAvatars[t.cedula]
+          detail: `Área: ${t.area} • Grados: ${t.grades}`
         });
       }
     });
-  } else if (currentRole.includes('fam') || currentRole.includes('acud') || currentRole.includes('guard')) {
+  } 
+  // If currentUser is Family (Acudiente):
+  else if (currentRole.includes('fam') || currentRole.includes('acud') || currentRole.includes('guard')) {
+    // Elena's student is Valentina in 8°1
+    // Filter teachers who teach 8°1 (or institutional faculty)
     CENSUS_TEACHERS.forEach((t) => {
       const contactId = t.cedula || t.code;
-      if (!contactsMap.has(contactId)) {
+      const grades = t.grades.split(',').map(g => normalizeGroupKey(g.trim()));
+      const teaches81 = grades.includes('8-1') || grades.includes('8_1') || t.area === 'Filosofía de Vida' || t.fullName.includes('Gabriel Mendoza') || t.fullName.includes('Ricardo Agudelo') || t.fullName.includes('Claudia Morales') || t.fullName.includes('Carlos Ramírez');
+
+      if (teaches81 && !contactsMap.has(contactId)) {
         contactsMap.set(contactId, {
           id: contactId,
           fullName: t.fullName,
           role: 'teacher',
           roleLabel: 'Docente',
           email: t.email,
-          detail: `Docente de ${t.area}`,
-          avatarUrl: teacherAvatars[t.cedula]
+          detail: `Docente de ${t.area} (8°1)`
         });
       }
     });
 
+    // Admin staff
     CENSUS_ADMIN_STAFF.forEach((adm) => {
       const contactId = adm.cedula || adm.code;
       if (!contactsMap.has(contactId)) {
@@ -596,7 +530,10 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
         });
       }
     });
-  } else {
+  }
+  // If currentUser is Admin:
+  else {
+    // Teachers
     CENSUS_TEACHERS.forEach((t) => {
       const contactId = t.cedula || t.code;
       if (!contactsMap.has(contactId)) {
@@ -606,12 +543,12 @@ export async function getAuthorizedContactsForUser(currentUser?: UserProfile | n
           role: 'teacher',
           roleLabel: 'Docente',
           email: t.email,
-          detail: `Docente de ${t.area}`,
-          avatarUrl: teacherAvatars[t.cedula]
+          detail: `Docente de ${t.area}`
         });
       }
     });
-    CENSUS_GUARDIANS.slice(0, 40).forEach((g) => {
+    // Acudientes
+    CENSUS_GUARDIANS.forEach((g) => {
       const contactId = g.cedula;
       if (!contactsMap.has(contactId)) {
         contactsMap.set(contactId, {
@@ -634,7 +571,9 @@ export async function fetchUserConversations(user: UserProfile): Promise<Institu
   if (!user) return [];
   const convCol = collection(db, 'conversations');
   const snap = await getDocs(query(convCol, where('participantIds', 'array-contains', user.id)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as InstitutionalConversation));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as InstitutionalConversation))
+    .filter(c => !(c.deletedBy || []).includes(user.id) && !(c.deletedBy || []).includes(user.documentId || ''));
 }
 
 export async function fetchConversationMessages(conversationId: string): Promise<InstitutionalMessage[]> {

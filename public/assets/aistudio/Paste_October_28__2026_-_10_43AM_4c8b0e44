@@ -1,0 +1,321 @@
+PROMPT DE CORRECCIÓN INTEGRAL — EDULINK SCHOOL
+Roles de acudiente y docente, mensajería, horarios, calificaciones y exportaciones
+Necesito que revises y corrijas el proyecto existente de EDULINK SCHOOL. La aplicación ya tiene interfaces, una base de datos y funcionalidades desarrolladas. No quiero que crees otro proyecto ni que rediseñes la plataforma desde cero.
+INSTRUCCIÓN PRINCIPAL
+Conserva el diseño actual, los colores principales, las tarjetas, los menús, la distribución visual y el estilo de EDULINK SCHOOL.
+Corrige únicamente las funcionalidades y los errores que se describen a continuación.
+Antes de modificar el código, revisa la estructura del proyecto, los componentes, los servicios, la base de datos y las relaciones entre estudiantes, acudientes, docentes, asignaturas, grupos y horarios.
+Utiliza los registros reales de la base de datos existente. No inventes personas, estudiantes, grupos, notas, asistencias, mensajes, materias ni información institucional.
+Si un dato no existe, muestra un estado vacío adecuado en lugar de presentar información ficticia.
+Respeta los permisos de cada rol. Estudiante, acudiente, docente y administración deben tener interfaces separadas, con sus propios menús, información y acciones.
+No cambies el rol de una sesión automáticamente ni permitas que los datos de un rol se mezclen con los de otro.
+No elimines información real ni reinicies la base de datos para solucionar estos errores.
+Implementa las correcciones en el código real, no solamente cambios visuales. Comprueba que cada botón y función trabaje correctamente.
+1. CORRECCIONES DEL ROL DE ACUDIENTE
+1.1. Mostrar el estudiante correcto y su grupo real
+En el inicio del acudiente debe aparecer únicamente el estudiante que tiene asociado en la base de datos.
+Obtén el nombre, documento, matrícula, fotografía y grado directamente del registro real del estudiante relacionado con la cuenta del acudiente.
+El grado y el grupo deben coincidir exactamente con los datos de la base de datos.
+No asignes un grado fijo ni uses información de demostración.
+Actualmente se muestra a Valentina Gómez Suárez en grado 11°1, pero el registro correcto de la base de datos corresponde al grado 8°1. Corrige la relación y la consulta para que se muestre el grado real del estudiante registrado.
+El horario, las asignaturas, las calificaciones, la asistencia, el boletín y los demás módulos deben consultar los datos del mismo estudiante.
+No muestres opciones para cambiar entre varios hijos ni textos como “1 de 2 hijos matriculados”, ya que en este proyecto cada acudiente tiene un único estudiante asociado.
+1.2. Fotografía del estudiante y foto de perfil
+En el panel del acudiente:
+Muestra la fotografía que el estudiante o usuario autorizado haya cargado y que esté guardada en su registro de la base de datos.
+No utilices una fotografía genérica si ya existe una fotografía registrada.
+Si el estudiante no tiene foto, crea un avatar automático con la inicial de su nombre o sus iniciales.
+La fotografía debe mantenerse sincronizada con el registro del estudiante.
+En el encabezado del acudiente debe aparecer también su propia fotografía de perfil, cuando esté registrada.
+No confundas la foto del acudiente con la foto del estudiante.
+1.3. Eliminar botones y datos innecesarios
+Elimina del rol de acudiente:
+El botón naranja “Ficha del Alumno”, porque actualmente no realiza ninguna acción útil.
+La opción para cambiar de estudiante, porque cada acudiente tiene un único estudiante asociado.
+El texto “1 de 2 hijos matriculados” y cualquier contador de hijos que no corresponda a la estructura real de este proyecto.
+No dejes botones que parezcan funcionales, pero que no ejecuten ninguna acción.
+1.4. Descargar el boletín oficial del estudiante
+Corrige la función de descarga del boletín oficial en PDF.
+Cuando el acudiente presione “Descargar Boletín Oficial (PDF)” o la opción correspondiente del menú, debe generarse y descargarse un archivo PDF real.
+El documento debe:
+Corresponder exclusivamente al estudiante asociado con la sesión del acudiente.
+Obtener el nombre completo, documento, grado, grupo, período académico, asignaturas y calificaciones del registro real.
+Incluir únicamente notas y datos académicos existentes.
+Mostrar los datos de la institución y el formato institucional disponible en el proyecto.
+Presentar un mensaje claro si todavía no existen calificaciones o si no hay un boletín disponible.
+Usar un nombre de archivo identificable, por ejemplo Boletin_NombreEstudiante_Periodo.pdf.
+Descargar el archivo directamente al dispositivo del usuario.
+No muestres “Descargando boletín” si no se está generando ni descargando un archivo real. No generes un PDF vacío o con datos de otra persona.
+Si ya existe un servicio para crear PDF, reutilízalo y corrígelo. Si no existe, implementa uno compatible con las tecnologías instaladas en el proyecto.
+1.5. Horario del estudiante
+Corrige el módulo “Horario y Asignaturas” del acudiente.
+Consulta el grado y grupo reales del estudiante.
+Carga el horario correspondiente a ese grupo.
+Muestra las asignaturas, docentes y horas que correspondan a la programación académica.
+No uses un horario fijo de grado 11°1 para todos los estudiantes.
+Si el estudiante pertenece al grupo 8°1, el encabezado debe decir 8°1 y el horario debe corresponder a ese grupo.
+Evita mezclar materias, docentes u horarios de otros grupos.
+El horario debe ser consistente con el horario que ve el estudiante y con los horarios de los docentes.
+1.6. Mejorar la legibilidad del horario
+En el horario del acudiente:
+Corrige el contraste de los textos para que las asignaturas, los docentes, los días y las horas se lean claramente.
+Mantén la identidad visual oscura de la plataforma.
+Usa colores de texto claros y suficientemente contrastados sobre las tarjetas.
+Rediseña visualmente la tarjeta de “Descanso” para que combine con la paleta actual de EDULINK SCHOOL.
+Evita fondos excesivamente oscuros en los que no se distingan los textos.
+Conserva la estructura de filas, columnas, días y horas del horario actual.
+1.7. Canales de atención
+Elimina los canales de atención inventados o que no hayan sido configurados en la base de datos.
+No muestres números telefónicos, correos institucionales, extensiones, horarios de oficina ni datos de contacto ficticios.
+En esa sección deben aparecer únicamente:
+Horario presencial: lunes a viernes, de 7:00 a. m. a 3:00 p. m.
+Chat en línea: comunicación con los docentes y administradores disponibles en el sistema.
+No agregues otros canales de atención que no hayan sido proporcionados oficialmente.
+2. CORREGIR EL CHAT EN LÍNEA
+El chat funcionaba anteriormente, pero actualmente en los roles de acudiente y docente no permite enviar mensajes. Corrige el problema sin eliminar ni reemplazar innecesariamente el sistema existente.
+2.1. Restaurar el envío y la recepción de mensajes
+Comprueba y corrige:
+El botón de enviar mensaje.
+El evento que procesa el envío.
+La validación del campo de texto.
+La persistencia de los mensajes en la base de datos.
+La consulta de conversaciones.
+La actualización de mensajes nuevos.
+Las reglas de seguridad y permisos.
+Los errores de conexión, las suscripciones y la sincronización entre usuarios.
+Un mensaje enviado por un acudiente debe aparecer en la conversación del docente destinatario. Un mensaje enviado por el docente debe aparecer en la conversación del acudiente correspondiente.
+No muestres un mensaje como enviado si no se guardó correctamente. Muestra un estado de envío, confirmación o error cuando corresponda.
+No permitas que un usuario lea conversaciones privadas de personas que no estén autorizadas para acceder a ellas.
+2.2. Notificaciones de mensajes nuevos
+Implementa notificaciones para los dos sentidos de la conversación:
+Si el acudiente escribe al docente, el docente debe recibir una notificación.
+Si el docente escribe al acudiente, el acudiente debe recibir una notificación.
+Las notificaciones deben:
+Identificar al remitente.
+Indicar que hay un mensaje nuevo.
+Mostrar el nombre del remitente y una vista previa breve, sin exponer conversaciones privadas innecesariamente.
+Actualizar el contador de mensajes no leídos.
+Marcar el mensaje como leído cuando el destinatario abra la conversación, según el funcionamiento definido en el proyecto.
+Evitar notificar al propio remitente sobre sus propios mensajes.
+Evitar notificaciones duplicadas.
+Mantenerse sincronizadas con la conversación real.
+Usa el sistema de notificaciones que ya tenga el proyecto. Si se requieren notificaciones cuando el usuario no tiene abierta la página, verifica si la infraestructura actual permite notificaciones push o en segundo plano y configura únicamente las que sean compatibles con el proyecto. No simules notificaciones push con un simple aviso dentro de la pantalla.
+2.3. Fotografías en el chat
+Cada mensaje debe mostrar la fotografía de perfil del remitente correspondiente.
+Consulta la foto guardada en la base de datos.
+En el chat del acudiente, muestra la foto del acudiente y la del docente.
+En el chat del docente, muestra la foto del docente y la del acudiente.
+Si una persona no tiene foto, muestra un avatar con sus iniciales.
+No uses la fotografía de otro usuario.
+Actualiza las fotografías cuando cambien en el perfil.
+2.4. Bandeja institucional
+Organiza la bandeja institucional para que las conversaciones existentes queden visibles y sean fáciles de encontrar.
+Debe permitir:
+Consultar las conversaciones autorizadas del usuario.
+Identificar el nombre y la foto de cada contacto.
+Mostrar la fecha y hora del último mensaje.
+Indicar si hay mensajes sin leer.
+Abrir una conversación y consultar su historial.
+Enviar y recibir mensajes.
+Eliminar u ocultar una conversación desde la bandeja mediante una opción clara de borrar chat.
+La opción de borrar chat debe funcionar realmente. Antes de borrar, solicita confirmación. No elimines por accidente registros compartidos que el otro participante necesite conservar. Si el diseño de la base de datos permite borrado lógico, utiliza ese mecanismo para que el usuario pueda quitar la conversación de su propia bandeja sin destruir el historial del otro participante.
+No elimines los chats existentes al hacer esta corrección.
+3. CORRECCIONES DEL ROL DOCENTE
+3.1. Mostrar únicamente docentes reales
+Revisa la base de datos de docentes y la asignación de materias.
+Muestra únicamente los docentes registrados en la base de datos institucional.
+No incluyas nombres inventados ni docentes que no pertenezcan al registro institucional.
+Por ejemplo, no asignes a Antonio Rueda como docente si no aparece en la base de datos oficial de docentes.
+No sustituyas a un docente real por una persona ficticia.
+Mantén las relaciones entre cada docente, su asignatura y sus grupos.
+3.2. Filosofía de vida en todos los grupos
+Organiza la asignatura Filosofía de vida para que pueda impartirse en los 12 grupos contemplados en la base de datos del proyecto.
+Deben existir dos docentes reales o correctamente registrados para distribuir la asignatura entre los 12 grupos.
+Revisa primero si ya existe un segundo docente de Filosofía de vida en la base de datos.
+Si no existe, crea un segundo registro docente únicamente con los datos institucionales disponibles o con los datos de demostración expresamente autorizados para este proyecto.
+No inventes una identidad institucional real ni reemplaces a un profesor existente.
+Vincula correctamente a ambos docentes con la asignatura Filosofía de vida.
+Distribuye los 12 grupos entre ambos docentes sin duplicar innecesariamente la asignación de un mismo grupo.
+Asegúrate de que cada grupo tenga un docente asignado y que ambos docentes tengan sus respectivos grupos visibles en sus perfiles.
+Conserva las demás asignaturas y asignaciones existentes.
+Si no hay información suficiente para identificar al segundo docente, deja el registro claramente identificado como pendiente de completar en la configuración administrativa, en vez de inventar datos personales.
+3.3. Grupos asignados a cada docente
+La sección “Grupos asignados” debe mostrar solamente los grupos que realmente le corresponden al docente conectado.
+Cada docente debe ver:
+Sus asignaturas asignadas.
+Sus grupos asignados.
+Los estudiantes que pertenecen a esos grupos.
+Sus horarios correspondientes.
+No muestres los 12 grupos a todos los docentes si no les corresponden. La distribución debe depender de las asignaciones guardadas en la base de datos.
+3.4. Exportar planillas de calificaciones
+Corrige el módulo “Exportar” de la planilla de calificaciones.
+Al abrirlo, el docente debe poder elegir entre los grupos que tiene asignados y seleccionar qué documento desea descargar.
+Las únicas opciones de exportación que deben aparecer son:
+Planilla de calificaciones del grupo seleccionado (.xlsx o .xls).
+Lista de estudiantes matriculados del grupo seleccionado (.xlsx o .xls).
+Horario propio del docente (.xlsx o .xls).
+Elimina de este menú la opción “Imprimir Reporte Oficial / PDF” y cualquier otra exportación que no esté incluida en estas tres opciones.
+La exportación debe funcionar de verdad:
+El selector debe cargar los grupos asignados al docente actual.
+La planilla de calificaciones debe contener los estudiantes reales del grupo seleccionado y sus calificaciones registradas.
+La lista debe contener únicamente los estudiantes matriculados en el grupo elegido.
+El horario debe corresponder al docente que inició sesión.
+Los archivos deben descargarse correctamente.
+Usa nombres de archivo claros y diferenciados.
+Si no existen calificaciones, permite descargar la planilla con los estudiantes y las celdas de notas vacías, sin inventar calificaciones.
+No permitas que un docente exporte las planillas de grupos que no tiene asignados.
+No basta con cambiar los nombres que aparecen en el modal: cada opción debe generar el archivo correcto con datos reales.
+4. CREAR Y ORGANIZAR LOS 12 HORARIOS DOCENTES
+Necesito organizar un horario individual para cada uno de los 12 docentes registrados o contemplados en la base de datos institucional.
+4.1. Usar la programación académica real
+Antes de generar los horarios, revisa:
+La lista de docentes registrados.
+La asignatura que imparte cada docente.
+Los grados y grupos que tiene asignados.
+El horario institucional existente.
+Las horas disponibles de la jornada.
+Los descansos.
+La duración de cada bloque.
+La distribución semanal de materias por grupo.
+No inventes asignaturas ni asignes una materia a un profesor que no la imparte.
+4.2. Jornada escolar
+Usa como referencia la jornada de la mañana que ya existe en el proyecto:
+Inicio: 6:15 a. m.
+Finalización: 12:15 p. m.
+Respeta las horas de clase y el descanso que figuran en la programación institucional existente.
+No supongas que un docente debe impartir la misma asignatura durante toda la jornada ni que debe dar clase todos los días en el mismo grupo.
+4.3. Horario semanal individual
+Crea un horario de lunes a viernes para cada docente.
+Por ejemplo, si Jorge Castaño imparte Español, su horario debe distribuir sus clases de Español entre los grados y grupos que tiene asignados. Puede impartir Español en un grupo durante un bloque y en otro grupo en otro bloque, de acuerdo con la programación institucional.
+No asignes automáticamente Español de 6:15 a. m. a 12:15 p. m. todos los días en el mismo grupo.
+Cada día debe tener una distribución razonable de las materias y los grupos, respetando las asignaciones existentes.
+4.4. Evitar conflictos de horarios
+Valida que:
+Un docente no esté asignado a dos grupos diferentes durante el mismo bloque.
+Un grupo no tenga dos asignaturas simultáneas.
+Cada docente imparta únicamente sus asignaturas autorizadas.
+Los descansos se respeten.
+Los horarios de estudiantes, acudientes y docentes sean consistentes entre sí.
+Cada estudiante reciba las materias que corresponden a su grupo.
+La programación semanal permita que un estudiante pueda recibir varias materias diferentes durante un día.
+No distribuyas horarios al azar. Usa la información existente para construir una programación coherente. Si hay datos insuficientes o conflictos que no se pueden resolver con la base de datos, informa cuáles asignaciones requieren revisión administrativa en lugar de inventar una solución como si fuera oficial.
+4.5. Mostrar el horario en el perfil docente
+Cada docente debe poder consultar su horario propio desde su panel.
+El horario debe mostrar:
+Los días de lunes a viernes.
+La hora de inicio y finalización de cada bloque.
+La asignatura.
+El grado y grupo.
+El descanso institucional.
+El horario que aparece en “Exportar” debe coincidir exactamente con el horario que el docente ve en pantalla.
+5. ELIMINAR “TAREAS Y CONTACTO DE PROFESORES” DEL ROL ACUDIENTE
+Quita la opción o interfaz “Tareas y contacto de profesores” del menú del acudiente.
+Motivos:
+Las tareas deben gestionarse desde el rol del estudiante.
+La comunicación con los profesores ya existe en el chat en línea.
+No debe haber módulos duplicados que confundan a los usuarios.
+Elimina la opción del menú y sus rutas específicas del rol acudiente cuando corresponda, sin eliminar el módulo de tareas del estudiante ni el sistema de chat.
+No elimines datos que sean utilizados por otros módulos.
+6. SEPARACIÓN ESTRICTA DE LOS ROLES
+Comprueba todo el sistema para asegurar que cada usuario solamente acceda a su interfaz y a los datos que le corresponden.
+El estudiante no debe entrar al panel del acudiente, docente o administración.
+El acudiente no debe convertirse visualmente en estudiante ni mostrar menús o información del rol estudiante como si fuera su propia cuenta.
+El docente debe ver su panel docente y sus grupos asignados.
+Administración debe conservar su panel administrativo.
+Los datos del estudiante representado por un acudiente no deben cambiar el rol autenticado del acudiente.
+No uses nombres, grados o fotografías fijos para construir los paneles.
+Protege las rutas y las consultas con los permisos correspondientes.
+La navegación, el encabezado, el avatar, los menús y las acciones deben depender del usuario autenticado y de su rol real.
+Si un acudiente consulta los datos de su estudiante, debe hacerlo desde su panel familiar sin que la aplicación cambie la sesión o el rol del usuario.
+7. PRUEBAS OBLIGATORIAS ANTES DE TERMINAR
+Después de realizar las correcciones, prueba todo lo siguiente:
+Iniciar sesión como acudiente y comprobar que aparece su estudiante real y su grupo correcto.
+Confirmar que la foto del estudiante corresponde a la que está guardada en la base de datos.
+Descargar el boletín y verificar que el PDF contiene los datos del estudiante correcto.
+Consultar el horario y comprobar que coincide con el grado y grupo registrados.
+Enviar un mensaje desde el acudiente al docente y confirmar que el docente lo recibe.
+Enviar un mensaje desde el docente al acudiente y confirmar que el acudiente lo recibe.
+Verificar las notificaciones en ambos sentidos.
+Comprobar que el chat muestra las fotos correctas y que se puede borrar una conversación de la bandeja sin eliminar accidentalmente el historial compartido.
+Iniciar sesión como docente y comprobar que solamente aparecen sus grupos reales.
+Verificar la distribución de Filosofía de vida entre los dos docentes y los 12 grupos.
+Exportar una planilla, una lista de estudiantes y el horario docente, comprobando que cada archivo contiene los datos correctos.
+Revisar los 12 horarios docentes y detectar conflictos de asignación.
+Confirmar que el acudiente no ve el menú “Tareas y contacto de profesores”.
+Confirmar que los roles no se mezclan al navegar, actualizar la página o cerrar y volver a iniciar sesión.
+Verificar que no se hayan introducido datos ficticios ni eliminado registros reales.
+REGLA FINAL
+No respondas únicamente con una explicación de lo que harías. Realiza las modificaciones en el código existente, reutiliza los componentes y servicios que ya funcionan, corrige los errores detectados y valida los resultados.
+Si una funcionalidad depende de datos que no existen en la base de datos o de una configuración externa que no puedes verificar, indica exactamente qué falta y no simules que está funcionando.
+Al terminar, presenta un resumen de las correcciones realizadas, los archivos modificados, las pruebas que pasaron y los problemas que aún requieren intervención.
+8. NUEVA INTERFAZ DOCENTE: FORO Y ENCUESTAS
+Necesito agregar al menú lateral del rol docente una interfaz llamada “Foro y Encuestas”, conectada con la interfaz que ya existe en el rol estudiante.
+8.1. Interfaz del docente
+Agrega una opción visible en el menú del docente con el nombre “Foro y Encuestas”, manteniendo el diseño actual de EDULINK SCHOOL.
+Desde esta sección, el docente debe poder crear, publicar, consultar y administrar dos tipos de contenido:
+A. Publicar un foro
+Título del foro.
+Descripción o tema de discusión.
+Instrucciones para participar.
+Fecha de publicación.
+Estado: borrador o publicado.
+Destinatarios: todos los estudiantes o únicamente los grupos que el docente tiene asignados.
+Opción para publicar, editar o eliminar sus propios foros.
+B. Publicar una encuesta
+Título de la encuesta.
+Descripción o pregunta principal.
+Campo para agregar varias opciones de respuesta.
+Posibilidad de añadir o quitar opciones antes de publicar.
+Selección de los grupos destinatarios entre los que el docente tiene asignados.
+Fecha de publicación.
+Fecha límite de respuesta, si el docente desea establecerla.
+Estado: borrador, publicada o cerrada.
+Opción para publicar, editar o cerrar la encuesta.
+Visualización de resultados y cantidad de respuestas recibidas.
+Valida que el título, el contenido y las opciones obligatorias estén completos antes de permitir publicar.
+8.2. Conexión con el rol estudiante
+Cuando un docente publique un foro o una encuesta, debe aparecer automáticamente en la sección “Foro y Encuestas” del estudiante, siempre que ese estudiante pertenezca a uno de los grupos destinatarios.
+Consulta el contenido publicado desde la base de datos real.
+No muestres borradores a los estudiantes.
+No muestres contenido dirigido a grupos a los que el estudiante no pertenece.
+Muestra el título, la descripción, el nombre del docente que publicó, la fecha y el estado.
+Actualiza la interfaz cuando se publique contenido nuevo, sin que sea necesario inventar publicaciones de ejemplo.
+Si todavía no hay publicaciones, muestra un estado vacío claro y agradable.
+8.3. Participación en foros
+El estudiante debe poder abrir el foro y participar de acuerdo con las instrucciones del docente.
+Si se habilitan comentarios o respuestas:
+Guarda las participaciones en la base de datos.
+Relaciona cada respuesta con el foro y con el estudiante autenticado.
+Muestra el autor y la fecha de cada participación.
+Permite al docente consultar las respuestas de los estudiantes de sus grupos.
+Impide que usuarios no autorizados modifiquen o eliminen publicaciones ajenas.
+No conviertas esta sección en un chat privado entre acudientes y docentes. El foro debe ser una herramienta académica separada del chat en línea.
+8.4. Responder encuestas
+Los estudiantes destinatarios deben poder seleccionar una opción y enviar su respuesta.
+Guarda la respuesta real en la base de datos.
+Registra la encuesta, el estudiante y la opción elegida.
+Evita que el estudiante envíe varias respuestas a la misma encuesta, salvo que el docente haya habilitado explícitamente la posibilidad de cambiar su respuesta.
+Si la encuesta está cerrada o vencida, deshabilita la participación y muestra un mensaje informativo.
+Indica al estudiante si ya respondió.
+Permite al docente consultar los resultados y el total de respuestas.
+Calcula los resultados a partir de las respuestas guardadas, no de números inventados.
+Respeta la privacidad: no muestres públicamente la respuesta individual de un estudiante si la encuesta se configuró como anónima. Los resultados agregados deben seguir disponibles para el docente según la configuración de la encuesta.
+8.5. Permisos y seguridad
+El docente solo puede publicar para los grupos que tiene asignados, a menos que un administrador le otorgue explícitamente permisos más amplios.
+Cada publicación debe registrar al docente que la creó.
+Los estudiantes solo pueden consultar el contenido dirigido a su grupo y enviar sus propias respuestas o participaciones.
+Administración debe poder supervisar las publicaciones conforme a los permisos que ya tenga en el sistema.
+Aplica las reglas de seguridad de la base de datos; no confíes únicamente en ocultar botones en la interfaz.
+Conserva el historial y las relaciones entre publicaciones, grupos, docentes y estudiantes.
+8.6. Pruebas obligatorias
+Antes de terminar, comprueba lo siguiente:
+El docente puede crear y publicar un foro.
+El foro aparece en la sección correspondiente de los estudiantes destinatarios.
+El docente puede crear y publicar una encuesta con varias opciones.
+Los estudiantes pueden responder y la respuesta queda guardada.
+El docente puede consultar los resultados reales.
+Los estudiantes de otros grupos no ven publicaciones que no les corresponden.
+Los borradores no aparecen en la interfaz del estudiante.
+Los foros y las encuestas siguen disponibles después de cerrar sesión y volver a entrar.
+La función funciona con la base de datos existente y no utiliza publicaciones ficticias.
+Importante: integra esta función en las interfaces actuales de docente y estudiante. No crees un segundo módulo de estudiante ni cambies el diseño general de EDULINK SCHOOL. Implementa y prueba la conexión real entre ambas interfaces.

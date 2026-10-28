@@ -202,6 +202,12 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       icon: 'chat',
       category: currentLang === 'es' ? 'Docente' : 'Teacher'
     },
+    {
+      id: 'teacher_forum',
+      label: currentLang === 'es' ? 'Foro y encuestas' : 'Forums & Polls',
+      icon: 'forum',
+      category: currentLang === 'es' ? 'Docente' : 'Teacher'
+    },
 
     // ROL ACUDIENTE / FAMILIA
     {
@@ -241,7 +247,8 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
         screen.id === 'teacher_grades' ||
         screen.id === 'teacher_assignments' ||
         screen.id === 'teacher_attendance' ||
-        screen.id === 'teacher_messaging'
+        screen.id === 'teacher_messaging' ||
+        screen.id === 'teacher_forum'
       );
     }
     if (role === 'family' || role === 'acudiente' || role === 'guardian') {
@@ -270,7 +277,8 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
         screenId === 'teacher_grades' ||
         screenId === 'teacher_assignments' ||
         screenId === 'teacher_attendance' ||
-        screenId === 'teacher_messaging';
+        screenId === 'teacher_messaging' ||
+        screenId === 'teacher_forum';
       const isFamilyScreen = screenId === 'family_dashboard' || screenId === 'family_messaging';
       const isAdminScreen = screenId === 'admin_dashboard';
 

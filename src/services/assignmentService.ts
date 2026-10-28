@@ -25,6 +25,15 @@ export interface StudentSubmission {
   score?: number;
 }
 
+export interface AssignmentAttachment {
+  name: string;
+  size: string;
+  type?: string;
+  url?: string;
+  dataUrl?: string;
+  uploadedAt?: string;
+}
+
 export interface InstitutionalAssignmentDoc {
   id: string;
   title: string;
@@ -47,6 +56,7 @@ export interface InstitutionalAssignmentDoc {
   pdfUrl?: string;
   pdfName?: string;
   pdfSize?: string;
+  attachment?: AssignmentAttachment;
   isEvaluation?: boolean;
   percentage?: string;
   createdAt: string;
@@ -318,6 +328,7 @@ export async function publishInstitutionalAssignment(assignment: {
   pdfUrl?: string;
   pdfName?: string;
   pdfSize?: string;
+  attachment?: AssignmentAttachment;
   isEvaluation?: boolean;
   percentage?: string;
 }): Promise<InstitutionalAssignmentDoc> {
@@ -341,9 +352,10 @@ export async function publishInstitutionalAssignment(assignment: {
     points: assignment.points || '100 pts',
     instructions: assignment.instructions || '',
     borderAccent: assignment.borderAccent || 'border-l-4 border-cyan-500',
-    pdfUrl: assignment.pdfUrl,
-    pdfName: assignment.pdfName,
-    pdfSize: assignment.pdfSize,
+    pdfUrl: assignment.attachment?.url || assignment.pdfUrl,
+    pdfName: assignment.attachment?.name || assignment.pdfName,
+    pdfSize: assignment.attachment?.size || assignment.pdfSize,
+    attachment: assignment.attachment,
     isEvaluation: assignment.isEvaluation || false,
     percentage: assignment.percentage || '20%',
     createdAt: new Date().toISOString()

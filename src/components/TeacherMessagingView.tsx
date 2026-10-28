@@ -7,15 +7,20 @@ import {
   subscribeUserConversations,
   subscribeConversationMessages,
   sendChatMessage,
-  markConversationAsRead,
-  deleteConversationForUser,
   getAuthorizedContactsForUser,
+  deleteConversationForUser,
+  markConversationAsRead,
   Conversation,
   ChatMessage,
   AuthorizedContact,
   ConversationParticipant
 } from '../services/messagingService';
-import { CENSUS_STUDENTS, CENSUS_GUARDIANS, getTeacherAcademicAssignments } from '../data/institutionalCensus';
+import {
+  CENSUS_STUDENTS,
+  CENSUS_GUARDIANS,
+  getTeacherAcademicAssignments,
+  normalizeGroupKey
+} from '../data/institutionalCensus';
 
 interface TeacherMessagingViewProps {
   currentUser?: UserProfile | null;
@@ -33,26 +38,14 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const teacherName = currentUser?.fullName || 'Patricia Quintero';
-
-  // Strict retrieval of assignments from census
-  const teacherAssignments = useMemo(() => {
-    return getTeacherAcademicAssignments(
-      currentUser?.fullName || currentUser?.documentId || currentUser?.email,
-      currentUser?.subjectArea,
-      currentUser?.assignedGrades
-    );
-  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email, currentUser?.subjectArea, currentUser?.assignedGrades]);
-
-  const teacherArea = teacherAssignments[0]?.subjectName || currentUser?.subjectArea || 'Filosofía de vida';
-  const effectiveUserId = currentUser?.documentId || currentUser?.id || '30880317';
+  const teacherName = currentUser?.fullName || 'Prof. Carlos Ramírez';
+  const teacherArea = currentUser?.subjectArea || 'Filosofía de Vida';
+  const effectiveUserId = currentUser?.documentId || currentUser?.id || 'demo-teacher-1';
 
   // Navigation & Modals
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showCitationModal, setShowCitationModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeletingConv, setIsDeletingConv] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Firestore Live State
@@ -89,7 +82,7 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 1. Suscripción en tiempo real a las conversaciones del usuario en Firestore
+  // 1. Subscribe to user conversations
   useEffect(() => {
     const unsubscribe = subscribeUserConversations(effectiveUserId, (convs) => {
       setConversations(convs);
@@ -100,87 +93,49 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     });
 
     return () => unsubscribe();
-  }, [effectiveUserId]);
+  }, [effectiveUserId, selectedConvId]);
 
-  // Mark as read when selectedConvId changes
-  useEffect(() => {
-    if (selectedConvId && effectiveUserId) {
-      markConversationAsRead(selectedConvId, effectiveUserId);
-    }
-  }, [selectedConvId, effectiveUserId]);
-
-  // 2. Cargar contactos autorizados reales (docentes, acudientes y administrativos)
+  // 2. Fetch authorized contacts strictly for this teacher
   useEffect(() => {
     getAuthorizedContactsForUser(currentUser).then((contacts) => {
       setAuthorizedContacts(contacts);
     });
   }, [currentUser]);
 
-  // 3. Suscripción en tiempo real a los mensajes de la conversación activa
+  // 3. Subscribe to active conversation messages
   useEffect(() => {
     if (!selectedConvId) {
       setMessages([]);
       return;
     }
 
+    markConversationAsRead(selectedConvId, effectiveUserId);
     setIsLoadingMessages(true);
     const unsubscribe = subscribeConversationMessages(selectedConvId, (msgs) => {
       setMessages(msgs);
       setIsLoadingMessages(false);
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     });
 
     return () => unsubscribe();
-  }, [selectedConvId]);
+  }, [selectedConvId, effectiveUserId]);
 
-  // Auto-scroll al recibir o enviar nuevos mensajes
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Conversación activa
+  // Selected conversation object
   const activeConversation = useMemo(() => {
     return conversations.find((c) => c.id === selectedConvId) || null;
   }, [conversations, selectedConvId]);
 
-  // Participante destinatario
-  const otherParticipant = useMemo<ConversationParticipant | null>(() => {
+  // Contact details for active conversation
+  const otherParticipant = useMemo(() => {
     if (!activeConversation) return null;
-    const participantsList = Object.values(activeConversation.participants || {}) as ConversationParticipant[];
-    return participantsList.find((p) => p.id !== effectiveUserId && p.id !== currentUser?.id) || null;
-  }, [activeConversation, effectiveUserId, currentUser?.id]);
+    const otherId = activeConversation.participantIds.find((id) => id !== effectiveUserId && id !== currentUser?.id && id !== currentUser?.email);
+    if (!otherId) return null;
+    return activeConversation.participants[otherId] || null;
+  }, [activeConversation, effectiveUserId, currentUser]);
 
-  // Estudiantes asignados al docente para citaciones
-  const assignedStudents = useMemo(() => {
-    const assignedGroupKeys = new Set(teacherAssignments.map((a) => a.groupKey));
-    const filtered = CENSUS_STUDENTS.filter((s) => {
-      const normGroup = s.group.replace(/°/g, '-').replace(/_/g, '-').trim();
-      return assignedGroupKeys.has(normGroup);
-    });
-    return filtered.length > 0 ? filtered : CENSUS_STUDENTS.slice(0, 30);
-  }, [teacherAssignments]);
-
-  // Al cambiar el estudiante seleccionado en el modal de citación, vincular su acudiente oficial del censo
-  useEffect(() => {
-    if (assignedStudents.length > 0 && !citationStudentDoc) {
-      const first = assignedStudents[0];
-      setCitationStudentDoc(first.documentId);
-    }
-  }, [assignedStudents, citationStudentDoc]);
-
-  useEffect(() => {
-    if (citationStudentDoc) {
-      const guardian = CENSUS_GUARDIANS.find((g) => g.studentDocumentId === citationStudentDoc);
-      if (guardian) {
-        setCitationGuardianName(guardian.fullName);
-        setCitationGuardianId(guardian.cedula);
-      } else {
-        setCitationGuardianName('Elena Gómez Jiménez');
-        setCitationGuardianId('43521980');
-      }
-    }
-  }, [citationStudentDoc]);
-
-  // Filtrado de contactos autorizados en el buscador
+  // Filtered contacts in "Nuevo mensaje" modal
   const filteredContacts = useMemo(() => {
     const query = contactSearch.toLowerCase().trim();
     if (!query) return authorizedContacts;
@@ -192,24 +147,59 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     );
   }, [authorizedContacts, contactSearch]);
 
-  // Enviar mensaje en el chat
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Teacher assignments for student & guardian dropdowns in citation modal
+  const teacherAssignments = useMemo(() => {
+    return getTeacherAcademicAssignments(teacherName);
+  }, [teacherName]);
+
+  const assignedStudents = useMemo(() => {
+    const groupKeys = new Set(teacherAssignments.map((a) => a.groupKey));
+    return CENSUS_STUDENTS.filter((s) => {
+      const norm = normalizeGroupKey(s.group);
+      return groupKeys.has(norm);
+    });
+  }, [teacherAssignments]);
+
+  // Auto-fill guardian when student selected in citation modal
+  useEffect(() => {
+    if (!citationStudentDoc && assignedStudents.length > 0) {
+      setCitationStudentDoc(assignedStudents[0].documentId);
+    }
+  }, [assignedStudents, citationStudentDoc]);
+
+  useEffect(() => {
+    if (citationStudentDoc) {
+      const guardian = CENSUS_GUARDIANS.find((g) => g.studentDocumentId === citationStudentDoc);
+      if (guardian) {
+        setCitationGuardianName(`${guardian.fullName} (${guardian.relationship})`);
+        setCitationGuardianId(guardian.cedula);
+      } else {
+        setCitationGuardianName('Acudiente Institucional');
+        setCitationGuardianId(citationStudentDoc);
+      }
+    }
+  }, [citationStudentDoc]);
+
+  // Send a regular text message
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!replyText.trim() || isSending) return;
 
-    const recipient = otherParticipant || selectedRecipient;
-    if (!recipient) {
-      showToast(isEn ? 'Please select a recipient first.' : 'Selecciona un destinatario primero.');
+    if (!otherParticipant && !selectedRecipient) {
+      showToast(isEn ? 'Please select a recipient first.' : 'Por favor selecciona un destinatario primero.');
       return;
     }
+
+    const recipient = otherParticipant || selectedRecipient;
+    if (!recipient) return;
 
     const senderProfile: UserProfile = currentUser || {
       id: effectiveUserId,
       fullName: teacherName,
       role: 'teacher',
-      documentId: effectiveUserId,
-      email: currentUser?.email || 'patricia.quintero@edulink.edu.co',
-      avatarUrl: currentUser?.avatarUrl
+      subjectArea: teacherArea,
+      documentId: currentUser?.documentId || '71839201',
+      email: currentUser?.email || 'carlos.ramirez@vallejuelos.edu.co'
     };
 
     setIsSending(true);
@@ -221,14 +211,13 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
           fullName: recipient.fullName,
           role: recipient.role,
           email: recipient.email,
-          detail: recipient.detail,
-          avatarUrl: recipient.avatarUrl
+          detail: recipient.detail
         },
         text: replyText.trim()
       });
 
       setReplyText('');
-      showToast(isEn ? 'Message sent and notified.' : 'Mensaje enviado y notificado al destinatario.');
+      showToast(isEn ? 'Message delivered.' : 'Mensaje enviado correctamente.');
     } catch (err) {
       console.error('Error sending message:', err);
       showToast(isEn ? 'Failed to send message.' : 'Error al enviar el mensaje.');
@@ -237,11 +226,12 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     }
   };
 
-  // Iniciar diálogo con contacto seleccionado
-  const handleStartChatWithContact = (contact: AuthorizedContact) => {
+  // Start chat with selected contact
+  const handleStartChatWithContact = async (contact: AuthorizedContact) => {
     setShowNewChatModal(false);
     setSelectedRecipient(contact);
 
+    // Look for existing conversation
     const existing = conversations.find((c) => c.participantIds.includes(contact.id));
     if (existing) {
       setSelectedConvId(existing.id);
@@ -251,24 +241,22 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     }
   };
 
-  // Crear Citación Oficial Institucional
+  // Create an official citation and dispatch message
   const handleCreateCitation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!citationStudentDoc || isSending) return;
+    if (!citationGuardianId || isSending) return;
 
-    const studentFound = CENSUS_STUDENTS.find((s) => s.documentId === citationStudentDoc);
-    const studentLabel = studentFound ? `${studentFound.fullName} (${studentFound.group})` : 'Estudiante Oficial';
+    const student = CENSUS_STUDENTS.find((s) => s.documentId === citationStudentDoc);
+    const studentLabel = student ? `${student.fullName} (${student.group})` : 'Estudiante institucional';
 
     const senderProfile: UserProfile = currentUser || {
       id: effectiveUserId,
       fullName: teacherName,
       role: 'teacher',
-      documentId: effectiveUserId,
-      email: 'patricia.quintero@edulink.edu.co',
-      avatarUrl: currentUser?.avatarUrl
+      subjectArea: teacherArea,
+      documentId: currentUser?.documentId || '71839201',
+      email: currentUser?.email || 'carlos.ramirez@vallejuelos.edu.co'
     };
-
-    const citationText = `CITACIÓN INSTITUCIONAL OFICIAL\nEstimado(a) ${citationGuardianName}:\nSe le convoca a reunión presencial de seguimiento académico en la sede institucional.\n• Estudiante: ${studentLabel}\n• Motivo: ${citationReason}\n• Fecha y Hora: ${citationDate} a las ${citationTime}\n• Indicaciones: ${citationNotes}`;
 
     setIsSending(true);
     try {
@@ -278,10 +266,9 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
           id: citationGuardianId,
           fullName: citationGuardianName,
           role: 'family',
-          email: `acudiente_${citationGuardianId}@edulink.edu.co`,
           detail: `Acudiente de ${studentLabel}`
         },
-        text: citationText,
+        text: `CITACIÓN INSTITUCIONAL OFICIAL:\nEstimado(a) ${citationGuardianName}, se le convoca de manera obligatoria a una reunión el día ${citationDate} a las ${citationTime} para tratar el siguiente asunto: ${citationReason}.\n\nObservaciones adicionales: ${citationNotes}`,
         citation: {
           date: citationDate,
           time: citationTime,
@@ -302,674 +289,585 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     }
   };
 
-  // Eliminar conversación de la vista del usuario
+  // Logical deletion of conversation
   const handleDeleteConversation = async () => {
-    if (!selectedConvId) return;
-    setIsDeletingConv(true);
+    if (!activeConversation) return;
+    const confirmDelete = window.confirm(
+      isEn
+        ? 'Are you sure you want to delete this conversation from your inbox?'
+        : '¿Estás seguro de que deseas eliminar esta conversación de tu bandeja?'
+    );
+    if (!confirmDelete) return;
+
     try {
-      await deleteConversationForUser(selectedConvId, effectiveUserId);
-      setShowDeleteModal(false);
+      await deleteConversationForUser(activeConversation.id, effectiveUserId);
       setSelectedConvId(null);
-      showToast(isEn ? 'Conversation removed from your inbox.' : 'Conversación eliminada de tu bandeja.');
+      showToast(isEn ? 'Conversation removed from inbox.' : 'Conversación eliminada de tu bandeja.');
     } catch (err) {
       console.error('Error deleting conversation:', err);
       showToast(isEn ? 'Could not delete conversation.' : 'No se pudo eliminar la conversación.');
-    } finally {
-      setIsDeletingConv(false);
     }
   };
 
   return (
-    <div className={`min-h-screen flex flex-col selection:bg-cyan-500 selection:text-white ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-[#f4f7fb] text-[#0b1c30]'
+    <div className={`min-h-screen flex transition-colors duration-200 ${
+      isDark ? 'bg-slate-950 text-slate-100' : 'bg-[#f8f9ff] text-[#0b1c30]'
     }`}>
-      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 right-4 z-50 bg-slate-900 border border-cyan-500/40 text-cyan-300 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-in fade-in duration-200">
-          <span className="material-symbols-outlined text-[18px]">check_circle</span>
-          <span>{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-cyan-600 text-white font-medium shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <span className="material-symbols-outlined text-xl">info</span>
+          <span className="text-sm font-semibold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Menú lateral docente exclusivo */}
+      {/* FIXED TEACHER SIDEBAR */}
       <TeacherSidebar
         activeTab="messaging"
+        currentUser={currentUser}
         onNavigate={onNavigate}
         onOpenSchedule={() => setShowScheduleModal(true)}
-        currentUser={currentUser}
       />
 
-      {/* Modal Horario Propio */}
-      {showScheduleModal && (
-        <TeacherScheduleModal
-          isOpen={showScheduleModal}
-          onClose={() => setShowScheduleModal(false)}
-          teacherName={teacherName}
-          teacherDoc={currentUser?.documentId}
-        />
-      )}
-
-      {/* MAIN CONTAINER */}
+      {/* MAIN CONTAINER (Matching TeacherGradesView architecture) */}
       <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
-        {/* HEADER BAR FIJO */}
+        {/* Header Bar */}
         <header className={`sticky top-12 h-20 backdrop-blur-xl shadow-xs z-30 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 border-b transition-colors ${
           isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-[#e5eeff]'
         }`}>
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
-              forum
-            </span>
-            <div className="min-w-0">
-              <h1 className={`text-sm sm:text-base font-extrabold truncate ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                {isEn ? 'Messaging & Citations' : 'Mensajería y Citaciones Oficiales'}
-              </h1>
-              <p className={`text-[11px] truncate ${isDark ? 'text-slate-400' : 'text-[#757684]'}`}>
-                {teacherArea} • {teacherName} • I.E. Vallejuelos
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+              isDark ? 'bg-cyan-950 border-cyan-800 text-cyan-300' : 'bg-[#eff4ff] border-[#dce9ff] text-[#00288e]'
+            }`}>
+              <span className="material-symbols-outlined text-2xl">mail</span>
+            </div>
+            <div>
+              <h2 className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
+                {isEn ? 'Institutional Messaging & Citations' : 'Mensajería y Citaciones a Acudientes'}
+              </h2>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
+                {teacherName} • {teacherArea} • I.E. Vallejuelos
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="h-11 px-3.5 sm:px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-sm cursor-pointer transition-all flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-base">chat</span>
-              <span className="hidden sm:inline">{isEn ? 'New Chat' : 'Nuevo Mensaje'}</span>
+              <span className="material-symbols-outlined text-base">add_comment</span>
+              <span className="hidden sm:inline">{isEn ? 'New Message' : 'Nuevo Mensaje'}</span>
             </button>
 
             <button
               onClick={() => setShowCitationModal(true)}
-              className="h-11 px-3.5 sm:px-4 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-sm cursor-pointer transition-all flex items-center gap-2"
             >
               <span className="material-symbols-outlined text-base">event_note</span>
-              <span className="hidden sm:inline">{isEn ? 'Cite Guardian' : 'Citar Acudiente'}</span>
+              <span className="hidden sm:inline">{isEn ? 'Official Citation' : 'Citar Acudiente'}</span>
             </button>
           </div>
         </header>
 
-        {/* CONTENIDO PRINCIPAL */}
-        <main className="p-4 sm:p-6 lg:p-8 flex-1 flex flex-col min-w-0">
-          <div className={`flex-1 rounded-3xl border shadow-xs overflow-hidden flex flex-col lg:flex-row min-h-[640px] ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-[#e5eeff]'
-          }`}>
-            {/* PANEL IZQUIERDO: Bandeja de entrada */}
-            <aside className={`w-full lg:w-80 xl:w-96 flex flex-col border-b lg:border-b-0 lg:border-r shrink-0 ${
-              isDark ? 'border-slate-800 bg-slate-950/50' : 'border-[#e5eeff] bg-[#f8faff]'
-            }`}>
-              <div className={`p-4 border-b flex items-center justify-between shrink-0 ${
-                isDark ? 'border-slate-800' : 'border-[#e5eeff]'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-lg ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
-                    inbox
+        {/* Messaging Main Grid */}
+        <main className="p-4 sm:p-6 lg:p-8 flex-1 max-w-[1440px] w-full mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[620px]">
+            {/* Conversation List / Inbox */}
+            <div
+              className={`md:col-span-5 rounded-3xl border p-4 flex flex-col justify-between ${
+                isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+              } shadow-sm`}
+            >
+              <div>
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/40">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-cyan-400">mark_chat_unread</span>
+                    <h3 className="font-bold text-sm">{isEn ? 'Institutional Inbox' : 'Bandeja Institucional'}</h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">
+                    {conversations.length}
                   </span>
-                  <h2 className={`font-extrabold text-xs uppercase tracking-wider ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                    {isEn ? 'Institutional Inbox' : 'Bandeja Institucional'}
-                  </h2>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
-                  isDark ? 'bg-cyan-950 text-cyan-300 border border-cyan-800/40' : 'bg-[#dce9ff] text-[#00288e]'
-                }`}>
-                  {conversations.length}
-                </span>
-              </div>
 
-              {/* Lista de Conversaciones */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {conversations.length === 0 ? (
-                  <div className="py-16 px-4 text-center">
-                    <div className={`w-14 h-14 mx-auto mb-3 rounded-2xl flex items-center justify-center ${
-                      isDark ? 'bg-slate-800/60 text-slate-400 border border-slate-700/60' : 'bg-white text-slate-400 border border-slate-200 shadow-xs'
-                    }`}>
+                  <div className="py-12 px-4 text-center">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-slate-400">
                       <span className="material-symbols-outlined text-3xl">chat_bubble_outline</span>
                     </div>
-                    <h3 className={`font-bold text-sm mb-1 ${isDark ? 'text-slate-200' : 'text-[#0b1c30]'}`}>
+                    <h4 className="font-bold text-sm text-slate-200 mb-1">
                       {isEn ? 'No conversations yet' : 'Todavía no tienes conversaciones'}
-                    </h3>
-                    <p className={`text-xs mb-4 max-w-xs mx-auto ${isDark ? 'text-slate-400' : 'text-[#757684]'}`}>
+                    </h4>
+                    <p className="text-xs text-slate-400 mb-4 max-w-xs mx-auto">
                       {isEn
-                        ? 'Select an authorized contact to start an official institutional conversation.'
-                        : 'Selecciona un acudiente o directivo autorizado para iniciar una conversación oficial en tiempo real.'}
+                        ? 'Select an authorized guardian, directivo, or colleague to start an official institutional conversation.'
+                        : 'Selecciona un acudiente autorizado de tus grupos, directivo o colega docente para iniciar un diálogo institucional seguro.'}
                     </p>
                     <button
                       onClick={() => setShowNewChatModal(true)}
-                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-base">person_search</span>
-                      <span>{isEn ? 'Search Contacts' : 'Buscar Contactos'}</span>
+                      <span>{isEn ? 'Search authorized contacts' : 'Buscar acudientes y contactos'}</span>
                     </button>
                   </div>
                 ) : (
-                  conversations.map((ch) => {
-                    const isSelected = selectedConvId === ch.id;
-                    const participantsList = Object.values(ch.participants || {}) as ConversationParticipant[];
-                    const other = participantsList.find((p) => p.id !== effectiveUserId && p.id !== currentUser?.id);
-                    const name = other?.fullName || 'Usuario institucional';
-                    const role = other?.role || 'Acudiente';
-                    const unread = ch.unreadCount?.[effectiveUserId] || 0;
-                    const timeFormatted = new Date(ch.lastMessageTime || ch.updatedAt || Date.now()).toLocaleTimeString(
-                      [],
-                      { hour: '2-digit', minute: '2-digit' }
-                    );
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                    {conversations.map((conv) => {
+                      const isSelected = selectedConvId === conv.id;
+                      const participantsList = Object.values(conv.participants || {}) as ConversationParticipant[];
+                      const other = participantsList.find(
+                        (p) => p.id !== effectiveUserId && p.id !== currentUser?.id
+                      );
+                      const name = other?.fullName || 'Usuario Institucional';
+                      const role = other?.role || 'Acudiente';
+                      const avatar = other?.avatar;
+                      const timeFormatted = new Date(conv.lastMessageTime || conv.updatedAt || Date.now()).toLocaleTimeString(
+                        [],
+                        { hour: '2-digit', minute: '2-digit' }
+                      );
+                      const unread = (conv.unreadCount?.[effectiveUserId] || 0) > 0 || (conv.unreadBy || []).includes(effectiveUserId);
 
-                    return (
-                      <div
-                        key={ch.id}
-                        onClick={() => {
-                          setSelectedConvId(ch.id);
-                          setSelectedRecipient(null);
-                          markConversationAsRead(ch.id, effectiveUserId);
-                        }}
-                        className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                          isSelected
-                            ? isDark
-                              ? 'bg-cyan-950/40 border-cyan-500/60 shadow-xs'
-                              : 'bg-white border-[#0051d5] shadow-xs'
-                            : isDark
-                            ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                            : 'bg-white border-[#e5eeff] hover:border-slate-300'
-                        }`}
-                      >
-                        {/* Real Avatar */}
-                        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-cyan-300">
-                          {other?.avatarUrl ? (
-                            <img src={other.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      return (
+                        <div
+                          key={conv.id}
+                          onClick={() => {
+                            setSelectedConvId(conv.id);
+                            setSelectedRecipient(null);
+                            markConversationAsRead(conv.id, effectiveUserId);
+                          }}
+                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
+                            isSelected
+                              ? 'bg-cyan-500/10 border-cyan-500/60 shadow-md shadow-cyan-950/20'
+                              : isDark
+                              ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                              : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          {avatar ? (
+                            <img src={avatar} alt={name} className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-cyan-500/30" />
                           ) : (
-                            name.charAt(0)
+                            <div className="w-10 h-10 rounded-full bg-cyan-700 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                              {name.charAt(0)}
+                            </div>
                           )}
-                        </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className={`font-extrabold truncate max-w-[150px] ${isDark ? 'text-slate-100' : 'text-[#0b1c30]'}`}>
-                              {name}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-medium">{timeFormatted}</span>
-                          </div>
-                          <p className={`text-xs line-clamp-1 mb-1.5 ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                            {ch.lastMessage}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                              isDark ? 'bg-slate-800 text-cyan-300' : 'bg-[#eff4ff] text-[#0051d5]'
-                            }`}>
-                              {role}
-                            </span>
-                            {unread > 0 ? (
-                              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-[10px] animate-pulse">
-                                {unread} nuevo{unread > 1 ? 's' : ''}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="font-bold truncate text-slate-100">{name}</span>
+                              <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-2">{timeFormatted}</span>
+                            </div>
+                            <p className="text-xs text-slate-400 line-clamp-1 mb-1.5">{conv.lastMessage}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-cyan-400 px-2 py-0.5 rounded-md bg-cyan-950/40 border border-cyan-800/40">
+                                {role}
                               </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                {isEn ? 'Active' : 'Oficial'}
-                              </span>
-                            )}
+                              {unread && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
-              <div className={`p-3 border-t flex items-center justify-between text-[11px] shrink-0 ${
-                isDark ? 'border-slate-800 text-slate-400 bg-slate-950/80' : 'border-[#e5eeff] text-[#757684] bg-white'
-              }`}>
+              <div className="pt-3 border-t border-slate-800/40 text-[11px] text-slate-400 flex items-center justify-between">
+                <span>I.E. Vallejuelos • Canal Oficial</span>
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-cyan-400">lock</span>
-                  <span>{isEn ? 'Encrypted messaging' : 'Mensajería institucional cifrada'}</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  Conexión segura
                 </span>
-                <span>I.E. Vallejuelos</span>
               </div>
-            </aside>
+            </div>
 
-            {/* PANEL DERECHO: Ventana de conversación activa */}
-            <section className="flex-1 flex flex-col min-w-0">
-              {/* Header del Chat */}
-              <div className={`p-4 border-b flex items-center justify-between shrink-0 ${
-                isDark ? 'border-slate-800 bg-slate-950/60' : 'border-[#e5eeff] bg-slate-50'
-              }`}>
+            {/* Chat Box */}
+            <div
+              className={`md:col-span-7 rounded-3xl border flex flex-col justify-between overflow-hidden ${
+                isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+              } shadow-sm`}
+            >
+              {/* Header */}
+              <div
+                className={`p-4 border-b flex items-center justify-between shrink-0 ${
+                  isDark ? 'border-slate-800 bg-slate-950/70' : 'border-slate-200 bg-slate-50'
+                }`}
+              >
                 {otherParticipant || selectedRecipient ? (
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-sm shrink-0">
-                      {(otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl) ? (
-                        <img
-                          src={otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        (otherParticipant?.fullName || selectedRecipient?.fullName || 'U').charAt(0)
-                      )}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center font-bold text-sm">
+                      {(otherParticipant?.fullName || selectedRecipient?.fullName || 'U').charAt(0)}
                     </div>
-                    <div className="min-w-0">
-                      <h3 className={`font-black text-sm truncate ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-100">
                         {otherParticipant?.fullName || selectedRecipient?.fullName}
-                      </h3>
-                      <p className={`text-xs font-semibold truncate ${isDark ? 'text-cyan-400' : 'text-[#0051d5]'}`}>
+                      </h4>
+                      <p className="text-xs text-cyan-400 font-medium">
                         {otherParticipant?.role || selectedRecipient?.roleLabel}
                         {(otherParticipant?.detail || selectedRecipient?.detail) && (
-                          <span className="text-slate-400 font-normal"> • {otherParticipant?.detail || selectedRecipient?.detail}</span>
+                          <span className="text-slate-400 font-normal">
+                            {' '}
+                            • {otherParticipant?.detail || selectedRecipient?.detail}
+                          </span>
                         )}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-slate-400">chat</span>
-                    <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                      {isEn ? 'Select or start a conversation' : 'Selecciona o inicia una conversación'}
-                    </span>
+                  <div className="flex items-center gap-2 text-slate-400 text-xs font-medium">
+                    <span className="material-symbols-outlined text-lg text-slate-500">forum</span>
+                    <span>{isEn ? 'Select a conversation' : 'Selecciona una conversación de la bandeja'}</span>
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {selectedConvId && (
+                <div className="flex items-center gap-2">
+                  {activeConversation && (
                     <button
                       type="button"
-                      onClick={() => setShowDeleteModal(true)}
-                      className="px-2.5 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-rose-900/40"
-                      title={isEn ? 'Delete conversation' : 'Eliminar conversación'}
+                      onClick={handleDeleteConversation}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      title={isEn ? 'Delete conversation' : 'Eliminar conversación de la bandeja'}
                     >
-                      <span className="material-symbols-outlined text-[17px]">delete</span>
-                      <span className="hidden sm:inline">{isEn ? 'Delete' : 'Eliminar'}</span>
+                      <span className="material-symbols-outlined text-[20px]">delete_outline</span>
                     </button>
                   )}
-                  <button
-                    onClick={() => setShowCitationModal(true)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
-                      isDark
-                        ? 'border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300'
-                        : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm">event_note</span>
-                    <span className="hidden sm:inline">{isEn ? 'Cite' : 'Citación'}</span>
-                  </button>
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Canal Seguro</span>
+                  </span>
                 </div>
               </div>
 
-              {/* Mensajes del Chat */}
-              <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
-                {isLoadingMessages ? (
-                  <div className="py-16 text-center">
-                    <div className="w-8 h-8 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    <p className="text-xs text-slate-400">{isEn ? 'Loading messages...' : 'Cargando mensajes cifrados...'}</p>
+              {/* Messages Area */}
+              <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-[460px]">
+                {isLoadingMessages && (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    <span className="inline-block animate-spin mr-2">⟳</span>
+                    {isEn ? 'Loading messages...' : 'Cargando mensajes en tiempo real...'}
                   </div>
-                ) : !selectedConvId && !selectedRecipient ? (
-                  <div className="py-24 text-center max-w-sm mx-auto">
-                    <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-3 ${
-                      isDark ? 'bg-slate-800 text-cyan-400' : 'bg-[#eff4ff] text-[#0051d5]'
-                    }`}>
-                      <span className="material-symbols-outlined text-3xl">mark_email_unread</span>
-                    </div>
-                    <h3 className={`font-black text-sm mb-1 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                      {isEn ? 'No conversation selected' : 'Ninguna conversación seleccionada'}
-                    </h3>
-                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#757684]'}`}>
-                      {isEn
-                        ? 'Select an existing conversation from the inbox on the left or create a new message.'
-                        : 'Elige una conversación de la bandeja de entrada o haz clic en "Nuevo Mensaje" para comunicarte.'}
-                    </p>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="py-20 text-center max-w-sm mx-auto">
-                    <span className="material-symbols-outlined text-4xl text-cyan-400 mb-2">waving_hand</span>
-                    <h3 className={`font-black text-sm mb-1 ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
-                      {isEn ? 'Start of this conversation' : 'Inicio de esta conversación'}
-                    </h3>
-                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#757684]'}`}>
-                      {isEn
-                        ? 'Send the first message to connect officially with this contact.'
-                        : 'Envía el primer mensaje para establecer comunicación oficial con este usuario.'}
-                    </p>
-                  </div>
-                ) : (
-                  messages.map((m) => {
-                    const isMine = m.senderId === effectiveUserId;
-                    const timeFormatted = new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
+                )}
 
-                    return (
+                {!isLoadingMessages && messages.length === 0 && (
+                  <div className="py-16 text-center text-slate-400">
+                    <span className="material-symbols-outlined text-4xl mb-2 text-slate-400">chat</span>
+                    <p className="text-xs font-medium">
+                      {otherParticipant || selectedRecipient
+                        ? isEn
+                          ? 'Send an official notification or citation to begin.'
+                          : 'Escribe un mensaje o genera una citación para iniciar la comunicación.'
+                        : isEn
+                        ? 'Select a conversation from the left.'
+                        : 'Selecciona una conversación de la lista.'}
+                    </p>
+                  </div>
+                )}
+
+                {messages.map((msg) => {
+                  const isSelf = msg.senderId === effectiveUserId || msg.senderId === currentUser?.id || msg.senderRole.includes('Docente');
+                  const timeString = new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'}`}>
+                      <div className="text-[10px] font-semibold text-slate-400 mb-1 px-1">
+                        {isSelf ? `Tú (${teacherName})` : `${msg.senderName} • ${msg.senderRole}`}
+                      </div>
+
                       <div
-                        key={m.id}
-                        className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} animate-in fade-in`}
+                        className={`max-w-[85%] p-4 rounded-3xl text-xs shadow-md ${
+                          isSelf
+                            ? 'bg-cyan-600 text-white rounded-br-xs shadow-cyan-950/30'
+                            : isDark
+                            ? 'bg-slate-800 text-slate-100 rounded-bl-xs border border-slate-700/60 shadow-slate-950/40'
+                            : 'bg-slate-100 text-slate-900 rounded-bl-xs border border-slate-200'
+                        }`}
                       >
-                        <div className="flex items-center gap-1.5 mb-1 px-1">
-                          <div className="w-4 h-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center text-[9px] text-white">
-                            {m.senderAvatar ? (
-                              <img src={m.senderAvatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              m.senderName.charAt(0)
+                        {msg.citationDate && (
+                          <div className="mb-2.5 p-3 rounded-2xl bg-black/25 text-[11px] font-semibold border border-white/20">
+                            <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
+                              <span className="material-symbols-outlined text-sm">event</span>
+                              <span>CITACIÓN ACADÉMICA OFICIAL</span>
+                            </div>
+                            {msg.citationStudentName && (
+                              <p className="text-white/90">
+                                <span className="text-white/70">Estudiante:</span> {msg.citationStudentName}
+                              </p>
+                            )}
+                            <p className="text-white/90">
+                              <span className="text-white/70">Fecha:</span> {msg.citationDate} a las {msg.citationTime}
+                            </p>
+                            {msg.citationReason && (
+                              <p className="text-white/90">
+                                <span className="text-white/70">Motivo:</span> {msg.citationReason}
+                              </p>
                             )}
                           </div>
-                          <span className={`text-[11px] font-extrabold ${isDark ? 'text-slate-300' : 'text-[#0b1c30]'}`}>
-                            {isMine ? (isEn ? 'You (Teacher)' : 'Tú (Docente)') : m.senderName}
-                          </span>
-                          <span className="text-[10px] text-slate-400">{timeFormatted}</span>
-                        </div>
-                        <div
-                          className={`max-w-xl rounded-2xl p-4 text-xs leading-relaxed whitespace-pre-wrap shadow-xs ${
-                            isMine
-                              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-br-xs'
-                              : isDark
-                              ? 'bg-slate-800 text-slate-100 rounded-bl-xs border border-slate-700/80'
-                              : 'bg-[#eff4ff] text-[#0b1c30] rounded-bl-xs border border-[#dce9ff]'
-                          }`}
-                        >
-                          {m.text}
-                        </div>
+                        )}
+
+                        <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
+                        <span className="text-[10px] opacity-75 block text-right mt-1.5 font-medium">{timeString}</span>
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Formulario de Envío de Mensajes */}
-              {(selectedConvId || selectedRecipient) && (
-                <form
-                  onSubmit={handleSendMessage}
-                  className={`p-4 border-t flex items-center gap-3 shrink-0 ${
-                    isDark ? 'border-slate-800 bg-slate-950/80' : 'border-[#e5eeff] bg-white'
+              {/* Reply Form */}
+              <form
+                onSubmit={handleSendMessage}
+                className={`p-3.5 border-t flex gap-2 shrink-0 ${
+                  isDark ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={
+                    otherParticipant || selectedRecipient
+                      ? isEn
+                        ? `Message ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
+                        : `Escribir a ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
+                      : isEn
+                      ? 'Select an authorized recipient first...'
+                      : 'Selecciona una conversación...'
+                  }
+                  disabled={!otherParticipant && !selectedRecipient}
+                  className={`flex-1 px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                      : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-cyan-600'
                   }`}
+                />
+                <button
+                  type="submit"
+                  disabled={isSending || (!otherParticipant && !selectedRecipient) || !replyText.trim()}
+                  className="px-5 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
                 >
-                  <input
-                    type="text"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={
-                      isEn
-                        ? 'Type an official message or response...'
-                        : 'Escribe un mensaje o respuesta institucional...'
-                    }
-                    className={`flex-1 px-4 py-3 rounded-xl text-xs focus:outline-none border transition-all ${
-                      isDark
-                        ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500'
-                        : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30] placeholder:text-[#757684] focus:border-[#0051d5]'
-                    }`}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSending || !replyText.trim()}
-                    className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-2"
-                  >
-                    <span>{isEn ? 'Send' : 'Enviar'}</span>
-                    <span className="material-symbols-outlined text-base">send</span>
-                  </button>
-                </form>
-              )}
-            </section>
+                  <span className="material-symbols-outlined text-base">send</span>
+                  <span className="hidden sm:inline">{isEn ? 'Send' : 'Enviar'}</span>
+                </button>
+              </form>
+            </div>
           </div>
         </main>
       </div>
 
-      {/* MODAL: CONFIRMACIÓN ELIMINAR CONVERSACIÓN */}
-      {showDeleteModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
-        >
-          <div className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden p-6 ${
-            isDark ? 'bg-slate-900 border-rose-900/50 text-white' : 'bg-white border-rose-200 text-slate-900'
-          }`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl">delete_forever</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-base leading-tight">
-                  {isEn ? 'Delete conversation?' : '¿Eliminar conversación?'}
-                </h3>
-                <p className="text-xs text-rose-400 font-semibold">
-                  {isEn ? 'Action only affects your inbox' : 'Esta acción solo afectará tu bandeja'}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              {isEn
-                ? 'This conversation will be hidden from your inbox. The other participant will keep their full chat history.'
-                : 'Esta conversación se ocultará de tu bandeja de comunicaciones. El acudiente o usuario destinatario conservará el historial completo de mensajes.'}
-            </p>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={isDeletingConv}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
-              >
-                {isEn ? 'Cancel' : 'Cancelar'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConversation}
-                disabled={isDeletingConv}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <span>{isDeletingConv ? (isEn ? 'Deleting...' : 'Eliminando...') : (isEn ? 'Yes, delete' : 'Sí, eliminar conversación')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: SELECCIONAR CONTACTO AUTORIZADO (NUEVO MENSAJE) */}
+      {/* MODAL 1: NUEVO MENSAJE */}
       {showNewChatModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className={`w-full max-w-lg rounded-3xl border shadow-2xl p-6 overflow-hidden flex flex-col max-h-[85vh] ${
-            isDark ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
-          }`}>
-            <div className={`flex items-center justify-between pb-3 border-b shrink-0 ${
-              isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-            }`}>
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-cyan-400 text-2xl">person_search</span>
-                <h3 className="font-extrabold text-base">{isEn ? 'New Official Conversation' : 'Nuevo Diálogo Institucional'}</h3>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border ${
+              isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-cyan-400">person_add</span>
+                <h3 className="font-bold text-sm">{isEn ? 'Start Conversation' : 'Iniciar Nueva Conversación'}</h3>
               </div>
               <button
-                type="button"
                 onClick={() => setShowNewChatModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <div className="mt-3 mb-2 shrink-0">
-              <input
-                type="text"
-                value={contactSearch}
-                onChange={(e) => setContactSearch(e.target.value)}
-                placeholder={isEn ? 'Search by name, role or student...' : 'Buscar acudiente, estudiante o directivo...'}
-                className={`w-full px-3.5 py-2 rounded-xl text-xs border focus:outline-none ${
-                  isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
-                }`}
-              />
-            </div>
+            <div className="p-4">
+              <div className="mb-3">
+                <input
+                  type="text"
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  placeholder={isEn ? 'Search authorized contacts...' : 'Buscar acudiente o directivo autorizado...'}
+                  className={`w-full px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-cyan-600'
+                  }`}
+                />
+              </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-2">
-              {filteredContacts.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  {isEn ? 'No matching authorized contacts found.' : 'No se encontraron contactos autorizados para esa búsqueda.'}
-                </div>
-              ) : (
-                filteredContacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    onClick={() => handleStartChatWithContact(contact)}
-                    className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
-                      isDark
-                        ? 'bg-slate-950/60 border-slate-800 hover:border-cyan-500/60 hover:bg-slate-950'
-                        : 'bg-[#f8faff] border-[#e5eeff] hover:border-[#0051d5] hover:bg-white shadow-xs'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-sm shrink-0">
-                        {contact.avatarUrl ? (
-                          <img src={contact.avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          contact.fullName.charAt(0)
-                        )}
+              <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-1">
+                {filteredContacts.length === 0 ? (
+                  <p className="text-center py-8 text-xs text-slate-400">
+                    {isEn ? 'No authorized contacts found.' : 'No se encontraron contactos autorizados para tus grupos.'}
+                  </p>
+                ) : (
+                  filteredContacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      onClick={() => handleStartChatWithContact(contact)}
+                      className={`p-3 rounded-2xl border text-left cursor-pointer transition-all flex items-center justify-between group ${
+                        isDark
+                          ? 'bg-slate-950/60 border-slate-800/80 hover:border-cyan-500/50 hover:bg-cyan-950/20'
+                          : 'bg-slate-50 border-slate-200 hover:border-cyan-500 hover:bg-cyan-50/50'
+                      }`}
+                    >
+                      <div>
+                        <span className="font-bold text-xs block text-slate-100 group-hover:text-cyan-400 transition-colors">
+                          {contact.fullName}
+                        </span>
+                        <span className="text-[11px] text-slate-400 block">{contact.detail || contact.email}</span>
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="font-extrabold text-xs truncate">{contact.fullName}</h4>
-                        <p className="text-[11px] text-cyan-400 font-semibold">{contact.roleLabel}</p>
-                        {contact.detail && <p className="text-[10px] text-slate-400 truncate">{contact.detail}</p>}
-                      </div>
+                      <span className="text-[10px] font-bold text-cyan-400 px-2 py-0.5 rounded-md bg-cyan-950/40 border border-cyan-800/40 shrink-0">
+                        {contact.roleLabel}
+                      </span>
                     </div>
-                    <span className="material-symbols-outlined text-cyan-400 text-lg">chat</span>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: CITACIÓN OFICIAL A ACUDIENTE */}
+      {/* MODAL 2: CITACIÓN OFICIAL A ACUDIENTE */}
       {showCitationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className={`w-full max-w-lg rounded-3xl border shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] ${
-            isDark ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
-          }`}>
-            <div className={`flex items-center justify-between pb-3 border-b shrink-0 ${
-              isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-            }`}>
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-amber-500 text-2xl">event_note</span>
-                <div>
-                  <h3 className="font-extrabold text-base">{isEn ? 'Official Guardian Citation' : 'Citación Oficial a Acudiente'}</h3>
-                  <p className="text-xs text-amber-400 font-medium">I.E. Vallejuelos • Medellín</p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border ${
+              isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-blue-950/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-400">event_note</span>
+                <h3 className="font-bold text-sm">{isEn ? 'Official Citation to Guardian' : 'Generar Citación Oficial a Acudiente'}</h3>
               </div>
               <button
-                type="button"
                 onClick={() => setShowCitationModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreateCitation} className="space-y-3.5 mt-4 text-xs overflow-y-auto pr-1 flex-1">
+            <form onSubmit={handleCreateCitation} className="p-6 space-y-4">
               <div>
-                <label className="block font-bold text-slate-400 mb-1">
-                  {isEn ? 'Assigned Student' : 'Estudiante del Grupo Asignado'} *
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  {isEn ? 'Student (Assigned Groups) *' : 'Estudiante (Grupos Asignados) *'}
                 </label>
                 <select
                   value={citationStudentDoc}
                   onChange={(e) => setCitationStudentDoc(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs font-semibold border outline-none cursor-pointer ${
-                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
+                  className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-700 text-white focus:border-cyan-500'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-600'
                   }`}
                 >
                   {assignedStudents.map((s) => (
-                    <option key={s.documentId} value={s.documentId} className={isDark ? 'bg-slate-900 text-white' : 'bg-white'}>
-                      {s.fullName} — Grado {s.group} (Doc: {s.documentId})
+                    <option key={s.documentId} value={s.documentId}>
+                      {s.fullName} ({s.group}) • Doc: {s.documentId}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 mb-1">
-                  {isEn ? 'Official Guardian (Linked):' : 'Acudiente Oficial Vinculado:'}
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  {isEn ? 'Identified Guardian' : 'Acudiente Identificado'}
                 </label>
-                <div className={`w-full p-2.5 rounded-xl text-xs font-bold border flex items-center justify-between ${
-                  isDark ? 'bg-slate-950/80 border-slate-800 text-cyan-300' : 'bg-slate-100 border-slate-300 text-blue-900'
-                }`}>
-                  <span>{citationGuardianName}</span>
-                  <span className="material-symbols-outlined text-sm opacity-60">verified</span>
-                </div>
+                <input
+                  type="text"
+                  readOnly
+                  value={citationGuardianName}
+                  className={`w-full h-11 px-3.5 rounded-xl text-xs border opacity-80 cursor-not-allowed ${
+                    isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-400 mb-1">
-                    {isEn ? 'Date' : 'Fecha'} *
-                  </label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">{isEn ? 'Date *' : 'Fecha *'}</label>
                   <input
                     type="date"
+                    required
                     value={citationDate}
                     onChange={(e) => setCitationDate(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl text-xs font-semibold border outline-none cursor-pointer ${
-                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
+                    className={`w-full h-11 px-3 rounded-xl text-xs border focus:outline-none ${
+                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-400 mb-1">
-                    {isEn ? 'Time' : 'Hora'} *
-                  </label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">{isEn ? 'Time *' : 'Hora *'}</label>
                   <input
                     type="time"
+                    required
                     value={citationTime}
                     onChange={(e) => setCitationTime(e.target.value)}
-                    className={`w-full p-2.5 rounded-xl text-xs font-semibold border outline-none cursor-pointer ${
-                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
+                    className={`w-full h-11 px-3 rounded-xl text-xs border focus:outline-none ${
+                      isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 mb-1">
-                  {isEn ? 'Reason for Citation' : 'Motivo de la Citación'} *
-                </label>
-                <input
-                  type="text"
+                <label className="block text-xs font-bold text-slate-300 mb-1">{isEn ? 'Reason *' : 'Motivo *'}</label>
+                <select
                   value={citationReason}
                   onChange={(e) => setCitationReason(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs border outline-none ${
-                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
+                  className={`w-full h-11 px-3.5 rounded-xl text-xs border focus:outline-none ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
-                />
+                >
+                  <option value="Informe Académico y Rendimiento Bajo">Informe Académico y Rendimiento Bajo</option>
+                  <option value="Seguimiento Disciplinario / Convivencia">Seguimiento Disciplinario / Convivencia</option>
+                  <option value="Citación General Entrega de Informes">Citación General Entrega de Informes</option>
+                  <option value="Compromiso Pedagógico Especial">Compromiso Pedagógico Especial</option>
+                </select>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-400 mb-1">
-                  {isEn ? 'Academic Notes & Guidance' : 'Indicaciones y Observaciones'}
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  {isEn ? 'Observations' : 'Observaciones y Recomendaciones'}
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={citationNotes}
                   onChange={(e) => setCitationNotes(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl text-xs border outline-none resize-none ${
-                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30]'
+                  className={`w-full p-3 rounded-xl text-xs border focus:outline-none resize-none ${
+                    isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
                 />
               </div>
 
-              <div className={`pt-3 border-t flex justify-end gap-2.5 ${
-                isDark ? 'border-slate-800' : 'border-[#eff4ff]'
-              }`}>
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCitationModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
                 >
                   {isEn ? 'Cancel' : 'Cancelar'}
                 </button>
                 <button
                   type="submit"
                   disabled={isSending}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md"
                 >
-                  <span className="material-symbols-outlined text-sm">send</span>
-                  <span>{isSending ? (isEn ? 'Generating...' : 'Generando...') : isEn ? 'Emit Citation' : 'Emitir Citación'}</span>
+                  {isSending ? (isEn ? 'Dispatching...' : 'Emitiendo...') : (isEn ? 'Dispatch Citation' : 'Emitir Citación')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* SCHEDULE MODAL */}
+      <TeacherScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

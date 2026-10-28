@@ -66,9 +66,9 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
     time: '7:10 - 8:05',
     period: 2,
     monday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    tuesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    thursday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     friday: { subject: 'Física', teacher: 'Claudia Montoya' },
   },
   {
@@ -103,7 +103,7 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
     period: 5,
     monday: { subject: 'Química', teacher: 'Mauricio Salazar' },
     tuesday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     friday: { subject: 'Inglés', teacher: 'Felipe Torres' },
   },
@@ -121,27 +121,27 @@ export const OFFICIAL_SCHEDULE_11_1: ScheduleSlot[] = [
 export const OFFICIAL_SCHEDULE_11_2: ScheduleSlot[] = [
   {
     time: '6:15 - 7:10', period: 1,
-    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    monday: { subject: 'Física', teacher: 'Claudia Montoya' },
     tuesday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
     thursday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    friday: { subject: 'Química', teacher: 'Mauricio Salazar' },
   },
   {
     time: '7:10 - 8:05', period: 2,
-    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    tuesday: { subject: 'Química', teacher: 'Mauricio Salazar' },
-    wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    thursday: { subject: 'Química', teacher: 'Mauricio Salazar' },
-    friday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    monday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+    tuesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    wednesday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+    thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    friday: { subject: 'Español', teacher: 'Jorge Castaño' },
   },
   {
     time: '8:05 - 9:00', period: 3,
-    monday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    tuesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
-    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
-    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    monday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    wednesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
   {
     time: '9:00 - 9:30', period: 0,
@@ -153,27 +153,27 @@ export const OFFICIAL_SCHEDULE_11_2: ScheduleSlot[] = [
   },
   {
     time: '9:30 - 10:25', period: 4,
-    monday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    wednesday: { subject: 'Español', teacher: 'Jorge Castaño' },
-    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    friday: { subject: 'Español', teacher: 'Jorge Castaño' },
+    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    tuesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    friday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
   },
   {
     time: '10:25 - 11:20', period: 5,
-    monday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    tuesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
-    wednesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    thursday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
-    friday: { subject: 'Química', teacher: 'Mauricio Salazar' },
+    monday: { subject: 'Español', teacher: 'Jorge Castaño' },
+    tuesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    thursday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
   },
   {
     time: '11:20 - 12:15', period: 6,
-    monday: { subject: 'Química', teacher: 'Mauricio Salazar' },
-    tuesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
-    friday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    wednesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
+    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    friday: { subject: 'Química', teacher: 'Mauricio Salazar' },
   },
 ];
 
@@ -188,18 +188,18 @@ export const OFFICIAL_SCHEDULE_10_1: ScheduleSlot[] = [
   },
   {
     time: '7:10 - 8:05', period: 2,
-    monday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    monday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     tuesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    wednesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     thursday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    friday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    friday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
   },
   {
     time: '8:05 - 9:00', period: 3,
     monday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    tuesday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    tuesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    thursday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    thursday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     friday: { subject: 'Tecnología', teacher: 'Sandra López' },
   },
   {
@@ -229,9 +229,9 @@ export const OFFICIAL_SCHEDULE_10_1: ScheduleSlot[] = [
   {
     time: '11:20 - 12:15', period: 6,
     monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
-    tuesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    thursday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     friday: { subject: 'Física', teacher: 'Claudia Montoya' },
   },
 ];
@@ -243,23 +243,23 @@ export const OFFICIAL_SCHEDULE_10_2: ScheduleSlot[] = [
     tuesday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
     wednesday: { subject: 'Física', teacher: 'Claudia Montoya' },
     thursday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
-    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
   },
   {
     time: '7:10 - 8:05', period: 2,
-    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    monday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
+    tuesday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    wednesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    thursday: { subject: 'Física', teacher: 'Claudia Montoya' },
+    friday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
   },
   {
     time: '8:05 - 9:00', period: 3,
-    monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     tuesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    wednesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    wednesday: { subject: 'Filosofía de Vida', teacher: 'Patricia Quintero' },
     thursday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
   {
     time: '9:00 - 9:30', period: 0,
@@ -271,27 +271,27 @@ export const OFFICIAL_SCHEDULE_10_2: ScheduleSlot[] = [
   },
   {
     time: '9:30 - 10:25', period: 4,
-    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    tuesday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
-    wednesday: { subject: 'Tecnología', teacher: 'Sandra López' },
-    thursday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
-    friday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    tuesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    wednesday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
+    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
   },
   {
     time: '10:25 - 11:20', period: 5,
-    monday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
-    tuesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
+    monday: { subject: 'Tecnología', teacher: 'Sandra López' },
+    tuesday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
     wednesday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
-    thursday: { subject: 'Inglés', teacher: 'Felipe Torres' },
-    friday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
+    thursday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    friday: { subject: 'Inglés', teacher: 'Felipe Torres' },
   },
   {
     time: '11:20 - 12:15', period: 6,
-    monday: { subject: 'Química', teacher: 'Mariana Isabel Castro' },
-    tuesday: { subject: 'Física', teacher: 'Claudia Montoya' },
-    wednesday: { subject: 'Filosofía de vida', teacher: 'Patricia Quintero' },
-    thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    friday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    monday: { subject: 'Filosofía', teacher: 'Luis Restrepo' },
+    tuesday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    wednesday: { subject: 'Inglés', teacher: 'Felipe Torres' },
+    thursday: { subject: 'Espiritualidad y valores', teacher: 'Natalia Rojas' },
+    friday: { subject: 'Física', teacher: 'Claudia Montoya' },
   },
 ];
 
@@ -360,7 +360,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     monday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
     tuesday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     wednesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
-    thursday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    thursday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
     friday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
   },
   {
@@ -373,7 +373,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
   },
   {
     time: '8:05 - 9:00', period: 3,
-    monday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    monday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     tuesday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
     wednesday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     thursday: { subject: 'Tecnología', teacher: 'Sebastián David Moreno' },
@@ -399,7 +399,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     time: '10:25 - 11:20', period: 5,
     monday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     tuesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    wednesday: { subject: 'Artística', teacher: 'Diego Cardona' },
+    wednesday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
     thursday: { subject: 'Economía y política', teacher: 'Marcela Vargas' },
     friday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
   },
@@ -409,7 +409,7 @@ export const OFFICIAL_SCHEDULE_8_1: ScheduleSlot[] = [
     tuesday: { subject: 'Español', teacher: 'Natalia Andrea Gómez' },
     wednesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
     thursday: { subject: 'Ciencias Naturales', teacher: 'Gabriel Mendoza' },
-    friday: { subject: 'Artística', teacher: 'Diego Cardona' },
+    friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
 ];
 
@@ -417,9 +417,9 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
   {
     time: '6:15 - 7:10', period: 1,
     monday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
-    tuesday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    tuesday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     wednesday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
-    thursday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    thursday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     friday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
   },
   {
@@ -434,9 +434,9 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
     time: '8:05 - 9:00', period: 3,
     monday: { subject: 'Español', teacher: 'Jorge Castaño' },
     tuesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    wednesday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    wednesday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     thursday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
-    friday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    friday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
   },
   {
     time: '9:00 - 9:30', period: 0,
@@ -459,7 +459,7 @@ export const OFFICIAL_SCHEDULE_7_1: ScheduleSlot[] = [
     monday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
     tuesday: { subject: 'Inglés', teacher: 'Laura Camila Torres' },
     wednesday: { subject: 'Sociales', teacher: 'Ricardo Agudelo' },
-    thursday: { subject: 'Ética y valores', teacher: 'Carlos Ramírez' },
+    thursday: { subject: 'Ética y Valores', teacher: 'Carlos Ramírez' },
     friday: { subject: 'Matemáticas', teacher: 'Diana Gómez' },
   },
   {
@@ -832,26 +832,26 @@ export function validateAcademicDistribution(): {
 // -------------------------------------------------------------
 export const CENSUS_TEACHERS: CensusTeacher[] = [
   { code: '001', cedula: '70013115', area: 'Sociales', grades: '6-1, 6-2', fullName: 'Andrea Pérez', email: 'andrea_pérez@ejemplo.edu' },
-  { code: '002', cedula: '80075058', area: 'Ética y valores', grades: '7-1, 7-2, 8-1, 8-2', fullName: 'Carlos Ramírez', email: 'carlos_ramírez@ejemplo.edu' },
+  { code: '002', cedula: '80075058', area: 'Filosofía de Vida', grades: '6-1, 6-2, 7-1, 7-2, 8-1, 8-2', fullName: 'Carlos Ramírez', email: 'carlos_ramírez@ejemplo.edu' },
   { code: '003', cedula: '90137001', area: 'Matemática', grades: '8-1, 8-2, 9-1, 9-2, 10-1, 10-2, 11-1, 11-2', fullName: 'Diana Gómez', email: 'diana_gómez@ejemplo.edu' },
   { code: '004', cedula: '10198944', area: 'Inglés', grades: '6-1, 6-2, 9-1, 9-2, 10-1, 10-2, 11-1, 11-2', fullName: 'Felipe Torres', email: 'felipe_torres@ejemplo.edu' },
   { code: '005', cedula: '20260887', area: 'Espiritualidad y valores', grades: '10-1, 10-2', fullName: 'Natalia Rojas', email: 'natalia_rojas@ejemplo.edu' },
   { code: '006', cedula: '30322830', area: 'Español', grades: '6-1, 6-2, 7-1, 7-2, 11-1, 11-2', fullName: 'Jorge Castaño', email: 'jorge_castaño@ejemplo.edu' },
   { code: '007', cedula: '40384773', area: 'Biología', grades: '6-1, 6-2', fullName: 'Paola Martínez', email: 'paola_martínez@ejemplo.edu' },
-  { code: '008', cedula: '50446716', area: 'Investigación y Lengua', grades: '10-1, 10-2', fullName: 'Luis Restrepo', email: 'luis_restrepo@ejemplo.edu' },
+  { code: '008', cedula: '50446716', area: 'Filosofía', grades: '10-1, 10-2, 11-1, 11-2', fullName: 'Luis Restrepo', email: 'luis_restrepo@ejemplo.edu' },
   { code: '009', cedula: '60508659', area: 'Economía y política', grades: '8-1, 8-2, 10-1, 10-2, 11-1, 11-2', fullName: 'Marcela Vargas', email: 'marcela_vargas@ejemplo.edu' },
   { code: '010', cedula: '70570602', area: 'Artística', grades: '9-1, 9-2', fullName: 'Diego Cardona', email: 'diego_cardona@ejemplo.edu' },
   { code: '011', cedula: '80632545', area: 'Tecnológica', grades: '10-1, 10-2, 11-1, 11-2', fullName: 'Sandra López', email: 'sandra_lópez@ejemplo.edu' },
   { code: '012', cedula: '90694488', area: 'Química', grades: '11-1, 11-2', fullName: 'Mauricio Salazar', email: 'mauricio_salazar@ejemplo.edu' },
   { code: '013', cedula: '10756431', area: 'Física', grades: '10-1, 10-2, 11-1, 11-2', fullName: 'Claudia Montoya', email: 'claudia_montoya@ejemplo.edu' },
   { code: '014', cedula: '20818374', area: 'Sociales', grades: '7-1, 7-2, 8-1, 8-2', fullName: 'Ricardo Agudelo', email: 'ricardo_agudelo@ejemplo.edu' },
-  { code: '015', cedula: '30880317', area: 'Filosofía de vida', grades: '10-1, 10-2, 11-1, 11-2', fullName: 'Patricia Quintero', email: 'patricia_quintero@ejemplo.edu' },
+  { code: '015', cedula: '30880317', area: 'Filosofía de Vida', grades: '9-1, 9-2, 10-1, 10-2, 11-1, 11-2', fullName: 'Patricia Quintero', email: 'patricia_quintero@ejemplo.edu' },
   { code: '016', cedula: '40942260', area: 'Matemáticas', grades: '6-1, 6-2', fullName: 'Andrés Felipe Ramírez', email: 'andres_ramirez@edulink.edu.co' },
   { code: '017', cedula: '51004203', area: 'Inglés', grades: '7-1, 7-2', fullName: 'Laura Camila Torres', email: 'laura_torres@edulink.edu.co' },
   { code: '018', cedula: '61066146', area: 'Español', grades: '8-1, 8-2', fullName: 'Natalia Andrea Gómez', email: 'natalia_gomez@edulink.edu.co' },
   { code: '019', cedula: '71128089', area: 'Tecnología', grades: '9-1, 9-2', fullName: 'Sebastián David Moreno', email: 'sebastian_moreno@edulink.edu.co' },
   { code: '020', cedula: '81190032', area: 'Química', grades: '10-1, 10-2', fullName: 'Mariana Isabel Castro', email: 'mariana_castro@edulink.edu.co' },
-  { code: '021', cedula: '91251975', area: 'Ciencias Naturales', grades: '6-1, 6-2, 7-1, 7-2, 8-1, 8-2, 9-1, 9-2', fullName: 'Gabriel Mendoza', email: 'gabriel_mendoza@edulink.edu.co' },
+  { code: '021', cedula: '91251975', area: 'Ciencias Naturales', grades: '6-1, 6-2, 7-1, 7-2, 8-1, 8-2, 9-1, 9-2', fullName: 'Gabriel Mendoza', email: 'gabriela_mendoza@edulink.edu.co' },
 ];
 
 // -------------------------------------------------------------
@@ -1150,7 +1150,7 @@ export const CENSUS_GUARDIANS: CensusGuardian[] = [
   { relationship: 'Acudiente legal', cedula: '95084852', studentDocumentId: '1907782423', fullName: 'Manuela Moreno Zapata', phone: '317421779', email: 'manuela_moreno_zapata@ejemplo.com' },
 
   // 8-1
-  { relationship: 'Mamá', cedula: '15146795', studentDocumentId: '1007855552', fullName: 'Sebastián Salazar Giraldo', phone: '317470150', email: 'sebastián_salazar_giraldo@ejemplo.com' },
+  { relationship: 'Madre de familia', cedula: '43521980', studentDocumentId: '1007855552', fullName: 'Elena Gómez Jiménez', phone: '3004175616', email: 'elena.jimenez@vallejuelos.edu.co' },
   { relationship: 'Papá', cedula: '25208738', studentDocumentId: '1107928681', fullName: 'Laura Hernández Vélez', phone: '317518521', email: 'laura_hernández_vélez@ejemplo.com' },
   { relationship: 'Tutor legal', cedula: '35270681', studentDocumentId: '1208001810', fullName: 'Daniel Rojas Quintero', phone: '317566892', email: 'daniel_rojas_quintero@ejemplo.com' },
   { relationship: 'Acudiente legal', cedula: '45332624', studentDocumentId: '1308074939', fullName: 'Camila Quintero Mejía', phone: '317615263', email: 'camila_quintero_mejía@ejemplo.com' },
@@ -1399,28 +1399,6 @@ export function getTeacherAcademicAssignments(
   userAssignedGrades?: string
 ): TeacherAcademicAssignment[] {
   const query = (teacherNameOrDoc || '').trim().toLowerCase();
-  const subjectQuery = (userSubjectArea || '').trim().toLowerCase();
-
-  // Special deterministic check for Patricia Quintero / Filosofía de vida
-  if (
-    query.includes('patricia') ||
-    query.includes('quintero') ||
-    query === '30880317' ||
-    query === '015' ||
-    subjectQuery.includes('filosof')
-  ) {
-    const groups = ['10°1', '10°2', '11°1', '11°2'];
-    return groups.map((grp, idx) => {
-      const groupKey = normalizeGroupKey(grp);
-      return {
-        id: `asg_015_${idx}_${groupKey}`,
-        subjectName: 'Filosofía de vida',
-        group: grp,
-        groupKey,
-        label: `Filosofía de vida — ${grp}`
-      };
-    });
-  }
   
   if (userSubjectArea && userSubjectArea.trim()) {
     const subject = userSubjectArea.trim();
@@ -1471,18 +1449,125 @@ export function getTeacherAcademicAssignments(
     }
   }
 
-  // Asignaciones oficiales predeterminadas para docente del portal (Patricia Quintero - Filosofía de vida)
-  const defaultGroups = ['10°1', '10°2', '11°1', '11°2'];
-  return defaultGroups.map((grp, idx) => {
-    const groupKey = normalizeGroupKey(grp);
-    return {
-      id: `asg_015_${idx}_${groupKey}`,
-      subjectName: 'Filosofía de vida',
-      group: grp,
-      groupKey,
-      label: `Filosofía de vida — ${grp}`
-    };
-  });
+  // Asignaciones docentes estándar de Filosofía de Vida
+  return [
+    {
+      id: 'asg_fil_10_1',
+      subjectName: 'Filosofía de Vida',
+      group: '10°1',
+      groupKey: '10-1',
+      label: 'Filosofía de Vida — 10°1'
+    },
+    {
+      id: 'asg_fil_10_2',
+      subjectName: 'Filosofía de Vida',
+      group: '10°2',
+      groupKey: '10-2',
+      label: 'Filosofía de Vida — 10°2'
+    },
+    {
+      id: 'asg_fil_11_1',
+      subjectName: 'Filosofía de Vida',
+      group: '11°1',
+      groupKey: '11-1',
+      label: 'Filosofía de Vida — 11°1'
+    },
+    {
+      id: 'asg_fil_11_2',
+      subjectName: 'Filosofía de Vida',
+      group: '11°2',
+      groupKey: '11-2',
+      label: 'Filosofía de Vida — 11°2'
+    }
+  ];
 }
+
+/**
+ * Retorna exclusivamente los grupos asignados a un docente en el censo oficial.
+ * Para Patricia Quintero retorna exclusivamente sus grupos asignados (9°1, 9°2, 10°1, 10°2, 11°1, 11°2).
+ * Para Carlos Ramírez retorna (6°1, 6°2, 7°1, 7°2, 8°1, 8°2).
+ * NUNCA incluye "Todos los grupos" ni grupos no asignados.
+ */
+export function getTeacherAssignedGroups(teacherNameOrDoc?: string): string[] {
+  const query = (teacherNameOrDoc || '').trim().toLowerCase();
+  
+  if (
+    query.includes('patricia') ||
+    query.includes('quintero') ||
+    query.includes('30880317') ||
+    query.includes('015')
+  ) {
+    return ['9°1', '9°2', '10°1', '10°2', '11°1', '11°2'];
+  }
+
+  if (
+    (query.includes('carlos') && query.includes('ramírez')) ||
+    query.includes('80075058') ||
+    query.includes('002')
+  ) {
+    return ['6°1', '6°2', '7°1', '7°2', '8°1', '8°2'];
+  }
+
+  if (query) {
+    const teacher = CENSUS_TEACHERS.find(t =>
+      t.fullName.toLowerCase().includes(query) ||
+      t.cedula === query ||
+      t.code === query ||
+      query.includes(t.fullName.toLowerCase()) ||
+      t.email.toLowerCase() === query
+    );
+
+    if (teacher && teacher.grades) {
+      return teacher.grades
+        .split(',')
+        .map(g => formatGroupDisplay(normalizeGroupKey(g.trim())))
+        .filter(Boolean);
+    }
+  }
+
+  return ['10°1', '10°2', '11°1', '11°2'];
+}
+
+/**
+ * Retorna la asignatura oficial asignada a un docente en el censo.
+ */
+export function getTeacherSubjectArea(teacherNameOrDoc?: string): string {
+  const query = (teacherNameOrDoc || '').trim().toLowerCase();
+
+  if (
+    query.includes('patricia') ||
+    query.includes('quintero') ||
+    query.includes('30880317') ||
+    query.includes('015') ||
+    query.includes('filosofía de vida') ||
+    query.includes('filosofia de vida')
+  ) {
+    return 'Filosofía de Vida';
+  }
+
+  if (
+    (query.includes('carlos') && query.includes('ramírez')) ||
+    query.includes('80075058') ||
+    query.includes('002')
+  ) {
+    return 'Filosofía de Vida';
+  }
+
+  if (query) {
+    const teacher = CENSUS_TEACHERS.find(t =>
+      t.fullName.toLowerCase().includes(query) ||
+      t.cedula === query ||
+      t.code === query ||
+      query.includes(t.fullName.toLowerCase()) ||
+      t.email.toLowerCase() === query
+    );
+    if (teacher && teacher.area) {
+      return teacher.area;
+    }
+  }
+
+  return 'Filosofía de Vida';
+}
+
 
 

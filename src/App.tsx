@@ -10,6 +10,7 @@ import { TeacherGradesView } from './components/TeacherGradesView';
 import { TeacherAssignmentsView } from './components/TeacherAssignmentsView';
 import { TeacherAttendanceView } from './components/TeacherAttendanceView';
 import { TeacherMessagingView } from './components/TeacherMessagingView';
+import { TeacherForumView } from './components/TeacherForumView';
 import { FamilyDashboardView } from './components/FamilyDashboardView';
 import { FamilyMessagingView } from './components/FamilyMessagingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
@@ -155,6 +156,14 @@ function MainApp() {
           onNavigate={setCurrentScreen}
           onLogout={handleLogout}
           onUpdateUser={handleUpdateUser}
+        />
+      )}
+
+      {currentScreen === 'teacher_forum' && (
+        <TeacherForumView
+          currentUser={currentUser}
+          onNavigate={setCurrentScreen}
+          onLogout={handleLogout}
         />
       )}
 
