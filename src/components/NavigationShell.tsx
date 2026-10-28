@@ -5,6 +5,11 @@ import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { ASSETS } from '../data/mockData';
 import { StudentProfileModal } from './StudentProfileModal';
 import { TeacherScheduleModal } from './TeacherScheduleModal';
+import {
+  subscribeChatNotifications,
+  markConversationAsRead,
+  ChatNotification
+} from '../services/messagingService';
 
 interface NavigationShellProps {
   currentScreen: ActiveScreen;
@@ -34,6 +39,12 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Notifications state
+  const [notifications, setNotifications] = useState<ChatNotification[]>([]);
+  const [totalUnread, setTotalUnread] = useState(0);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
   // Modals state
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
@@ -51,11 +62,31 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Subscribe to real-time chat notifications
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      setTotalUnread(0);
+      return;
+    }
+
+    const effectiveId = currentUser.documentId || currentUser.id;
+    const unsubscribe = subscribeChatNotifications(effectiveId, (notifs, unread) => {
+      setNotifications(notifs);
+      setTotalUnread(unread);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -106,6 +137,22 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       setDeleteError(msg);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleOpenNotification = (notif: ChatNotification) => {
+    if (!currentUser) return;
+    const effectiveId = currentUser.documentId || currentUser.id;
+    markConversationAsRead(notif.conversationId, effectiveId);
+    setShowNotifMenu(false);
+
+    const role = (currentUser.role || '').toLowerCase();
+    if (role === 'family' || role === 'acudiente' || role === 'guardian') {
+      onSelectScreen('family_messaging');
+    } else if (role === 'teacher' || role === 'docente') {
+      onSelectScreen('teacher_messaging');
+    } else {
+      onSelectScreen('teacher_messaging');
     }
   };
 
@@ -316,6 +363,98 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
                 {currentLang === 'es' ? 'EN' : 'ES'}
               </button>
             </div>
+
+            {/* Notification Bell with Real Unread Counter */}
+            {currentUser && (
+              <div className="relative" ref={notifRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifMenu(!showNotifMenu)}
+                  className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer border border-white/20 shadow-xs focus-visible:ring-1 focus-visible:ring-white"
+                  title={currentLang === 'es' ? 'Notificaciones de Mensajería' : 'Messaging Notifications'}
+                  aria-label="Notifications"
+                >
+                  <span className="material-symbols-outlined text-[19px]">notifications</span>
+                  {totalUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center ring-2 ring-[#00288e] animate-pulse">
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown Menu */}
+                {showNotifMenu && (
+                  <div className={`absolute right-0 mt-2 w-[min(calc(100vw-24px),22rem)] rounded-2xl shadow-2xl border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 ${
+                    isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/60' : 'bg-white border-[#e5eeff] text-[#0b1c30]'
+                  }`}>
+                    <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
+                      isDarkMode ? 'border-slate-800' : 'border-[#eff4ff]'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-amber-400 text-lg">chat_bubble</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {currentLang === 'es' ? 'Mensajes y Notificaciones' : 'Messages & Notices'}
+                        </span>
+                      </div>
+                      {totalUnread > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-extrabold">
+                          {totalUnread} {currentLang === 'es' ? 'sin leer' : 'unread'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 px-4 text-center">
+                          <span className="material-symbols-outlined text-3xl text-slate-400 mb-1">notifications_off</span>
+                          <p className="text-xs text-slate-400 font-medium">
+                            {currentLang === 'es' ? 'No tienes mensajes nuevos pendientes.' : 'No new unread messages.'}
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.conversationId}
+                            onClick={() => handleOpenNotification(notif)}
+                            className={`p-3 transition-colors cursor-pointer flex items-start gap-3 ${
+                              isDarkMode ? 'hover:bg-slate-800/70' : 'hover:bg-[#f3f6ff]'
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-300 shrink-0">
+                              {notif.senderAvatar ? (
+                                <img src={notif.senderAvatar} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                notif.senderName.charAt(0)
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between text-xs mb-0.5">
+                                <span className="font-bold truncate max-w-[140px]">{notif.senderName}</span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(notif.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 truncate mb-1">{notif.text}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                  isDarkMode ? 'bg-slate-800 text-amber-300' : 'bg-[#e5eeff] text-[#00288e]'
+                                }`}>
+                                  {notif.senderRole}
+                                </span>
+                                <span className="text-[10px] text-cyan-400 font-semibold ml-auto flex items-center gap-0.5">
+                                  <span>{currentLang === 'es' ? 'Abrir chat' : 'Open'}</span>
+                                  <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {currentUser ? (
               <div className="relative" ref={menuRef}>

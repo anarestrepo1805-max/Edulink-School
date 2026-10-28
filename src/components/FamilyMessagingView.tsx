@@ -5,6 +5,8 @@ import {
   subscribeUserConversations,
   subscribeConversationMessages,
   sendChatMessage,
+  markConversationAsRead,
+  deleteConversationForUser,
   getAuthorizedContactsForUser,
   Conversation,
   ChatMessage,
@@ -26,9 +28,11 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const effectiveUserId = currentUser?.id || (currentUser?.documentId ? `guardian_${currentUser.documentId}` : 'demo-family-1');
-  const familyName = currentUser?.fullName || 'Elena Gómez de Jiménez';
-  const studentRef = currentUser?.studentName ? `${currentUser.studentName} (${currentUser.gradeLevel || 'Estudiante'})` : 'Estudiante Institucional';
+  const effectiveUserId = currentUser?.documentId || currentUser?.id || '43521980';
+  const familyName = currentUser?.fullName || 'Elena Gómez Jiménez';
+  const studentRef = currentUser?.representedStudentName
+    ? `${currentUser.representedStudentName} (11°1)`
+    : 'Miguel Ángel Jiménez (11°1)';
 
   // State
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -39,8 +43,10 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // New Chat Modal
+  // Modals
   const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingConv, setIsDeletingConv] = useState(false);
   const [authorizedContacts, setAuthorizedContacts] = useState<AuthorizedContact[]>([]);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedRecipient, setSelectedRecipient] = useState<AuthorizedContact | null>(null);
@@ -54,19 +60,24 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
   // 1. Subscribe to real-time conversations for this guardian
   useEffect(() => {
-    // Also listen on possible aliases: user ID and guardian documentId
-    const docAlias = currentUser?.documentId ? `guardian_${currentUser.documentId}` : null;
-    const targetId = currentUser?.id || docAlias || 'demo-family-1';
-
+    const targetId = effectiveUserId;
     const unsubscribe = subscribeUserConversations(targetId, (convs) => {
       setConversations(convs);
       if (convs.length > 0 && !selectedConvId) {
         setSelectedConvId(convs[0].id);
+        markConversationAsRead(convs[0].id, targetId);
       }
     });
 
     return () => unsubscribe();
-  }, [currentUser, selectedConvId]);
+  }, [effectiveUserId]);
+
+  // Mark as read when selectedConvId changes
+  useEffect(() => {
+    if (selectedConvId && effectiveUserId) {
+      markConversationAsRead(selectedConvId, effectiveUserId);
+    }
+  }, [selectedConvId, effectiveUserId]);
 
   // 2. Fetch authorized contacts (Teachers and Admin Staff)
   useEffect(() => {
@@ -102,11 +113,9 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   // The other participant in the conversation (Teacher or Directivo)
   const otherParticipant = useMemo(() => {
     if (!activeConversation) return null;
-    const targetId = currentUser?.id || (currentUser?.documentId ? `guardian_${currentUser.documentId}` : 'demo-family-1');
-    const otherId = activeConversation.participantIds.find((id) => id !== targetId && !id.includes(currentUser?.documentId || '___'));
-    if (!otherId) return null;
-    return activeConversation.participants[otherId] || null;
-  }, [activeConversation, currentUser]);
+    const participantsList = Object.values(activeConversation.participants || {}) as ConversationParticipant[];
+    return participantsList.find((p) => p.id !== effectiveUserId && p.id !== currentUser?.id) || null;
+  }, [activeConversation, effectiveUserId, currentUser?.id]);
 
   // Filtered contacts in "Nuevo mensaje" modal
   const filteredContacts = useMemo(() => {
@@ -136,8 +145,9 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       id: effectiveUserId,
       fullName: familyName,
       role: 'family',
-      documentId: currentUser?.documentId || '43892015',
-      email: currentUser?.email || 'elena.gomez@edulink.edu.co'
+      documentId: effectiveUserId,
+      email: currentUser?.email || 'elena.gomez@edulink.edu.co',
+      avatarUrl: currentUser?.avatarUrl
     };
 
     setIsSending(true);
@@ -149,7 +159,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           fullName: recipient.fullName,
           role: recipient.role,
           email: recipient.email,
-          detail: recipient.detail
+          detail: recipient.detail,
+          avatarUrl: recipient.avatarUrl
         },
         text: content.trim()
       });
@@ -171,8 +182,26 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
     const existing = conversations.find((c) => c.participantIds.includes(contact.id));
     if (existing) {
       setSelectedConvId(existing.id);
+      markConversationAsRead(existing.id, effectiveUserId);
     } else {
       setSelectedConvId(null);
+    }
+  };
+
+  // Delete / Hide conversation for user
+  const handleDeleteConversation = async () => {
+    if (!selectedConvId) return;
+    setIsDeletingConv(true);
+    try {
+      await deleteConversationForUser(selectedConvId, effectiveUserId);
+      setShowDeleteModal(false);
+      setSelectedConvId(null);
+      showToast(isEn ? 'Conversation removed from your inbox.' : 'Conversación eliminada de tu bandeja.');
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+      showToast(isEn ? 'Could not delete conversation.' : 'No se pudo eliminar la conversación.');
+    } finally {
+      setIsDeletingConv(false);
     }
   };
 
@@ -196,7 +225,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           <div className={`h-20 px-6 flex items-center gap-3 border-b ${
             isDark ? 'border-slate-800' : 'border-[#eff4ff]'
           }`}>
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
               isDark ? 'bg-amber-950 border-amber-800 text-amber-300' : 'bg-[#eff4ff] border-[#dce9ff] text-[#00288e]'
             }`}>
               <span className="material-symbols-outlined text-2xl">family_restroom</span>
@@ -237,7 +266,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               }`}
             >
               <span className="material-symbols-outlined text-xl">calendar_today</span>
-              <span className="text-xs font-semibold">{isEn ? 'Attendance & Schedule' : 'Asistencia y Horario'}</span>
+              <span className="text-xs font-semibold">{isEn ? 'Schedule & Subjects' : 'Horario y Asignaturas'}</span>
             </button>
             <button
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all text-left cursor-default ${
@@ -252,7 +281,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           <div className="px-4 mt-2">
             <button
               onClick={() => setShowNewChatModal(true)}
-              className="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-600/20 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">edit_square</span>
               <span>{isEn ? 'Contact Teacher' : 'Contactar Docente'}</span>
@@ -261,7 +290,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
         </div>
 
         <div className={`p-4 border-t ${isDark ? 'border-slate-800' : 'border-[#eff4ff]'}`}>
-          <div className={`p-3.5 rounded-2xl flex flex-col gap-1 border ${
+          <div className={`p-3.5 rounded-xl flex flex-col gap-1 border ${
             isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-[#eff4ff] border-[#dce9ff]'
           }`}>
             <div className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-[#444653]'}`}>
@@ -282,12 +311,16 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-[#e5eeff]'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-              {familyName.charAt(0)}
+            <div className="w-9 h-9 rounded-full bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+              {currentUser?.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                familyName.charAt(0)
+              )}
             </div>
             <div>
               <span className="text-xs font-bold block">{familyName}</span>
-              <span className="text-[10px] text-cyan-500 font-semibold">{isEn ? 'Authorized Guardian' : 'Acudiente Autorizado'}</span>
+              <span className="text-[10px] text-amber-400 font-semibold">{isEn ? 'Authorized Guardian' : 'Acudiente Autorizada'}</span>
             </div>
           </div>
 
@@ -347,10 +380,11 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                       const isSelected = selectedConvId === ch.id;
                       const participantsList = Object.values(ch.participants || {}) as ConversationParticipant[];
                       const other = participantsList.find(
-                        (p) => p.id !== effectiveUserId && !p.id.includes(currentUser?.documentId || '___')
+                        (p) => p.id !== effectiveUserId && p.id !== currentUser?.id
                       );
                       const name = other?.fullName || 'Docente Institucional';
                       const role = other?.role || 'Docente';
+                      const unread = ch.unreadCount?.[effectiveUserId] || 0;
                       const timeFormatted = new Date(ch.lastMessageTime || ch.updatedAt || Date.now()).toLocaleTimeString(
                         [],
                         { hour: '2-digit', minute: '2-digit' }
@@ -362,8 +396,9 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                           onClick={() => {
                             setSelectedConvId(ch.id);
                             setSelectedRecipient(null);
+                            markConversationAsRead(ch.id, effectiveUserId);
                           }}
-                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                          className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
                             isSelected
                               ? 'bg-amber-500/10 border-amber-500/60 shadow-md shadow-amber-950/20'
                               : isDark
@@ -371,19 +406,36 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                               : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                           }`}
                         >
-                          <div className="flex items-center justify-between text-xs mb-1.5">
-                            <span className="font-bold truncate max-w-[170px] text-slate-100">{name}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">{timeFormatted}</span>
+                          {/* Avatar with fallback initial letter (no Edulink logo) */}
+                          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-300">
+                            {other?.avatarUrl ? (
+                              <img src={other.avatarUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              name.charAt(0)
+                            )}
                           </div>
-                          <p className="text-xs text-slate-400 line-clamp-1 mb-1.5">{ch.lastMessage}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold text-amber-400 px-2 py-0.5 rounded-md bg-amber-950/40 border border-amber-800/40">
-                              {role}
-                            </span>
-                            <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                              {isEn ? 'Official' : 'Oficial'}
-                            </span>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="font-bold truncate max-w-[150px] text-slate-100">{name}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{timeFormatted}</span>
+                            </div>
+                            <p className="text-xs text-slate-400 line-clamp-1 mb-1.5">{ch.lastMessage}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-amber-400 px-2 py-0.5 rounded-md bg-amber-950/40 border border-amber-800/40">
+                                {role}
+                              </span>
+                              {unread > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-extrabold text-[10px] animate-pulse">
+                                  {unread} nuevo{unread > 1 ? 's' : ''}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                  {isEn ? 'Official' : 'Oficial'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -411,8 +463,16 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               }`}>
                 {otherParticipant || selectedRecipient ? (
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm">
-                      {(otherParticipant?.fullName || selectedRecipient?.fullName || 'D').charAt(0)}
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-amber-600/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-sm shrink-0">
+                      {(otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl) ? (
+                        <img
+                          src={otherParticipant?.avatarUrl || selectedRecipient?.avatarUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        (otherParticipant?.fullName || selectedRecipient?.fullName || 'D').charAt(0)
+                      )}
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-slate-100">
@@ -433,10 +493,23 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                   </div>
                 )}
 
-                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span>Canal Institucional</span>
-                </span>
+                <div className="flex items-center gap-2">
+                  {selectedConvId && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="px-2.5 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-rose-900/40"
+                      title={isEn ? 'Delete conversation' : 'Eliminar conversación'}
+                    >
+                      <span className="material-symbols-outlined text-[17px]">delete</span>
+                      <span className="hidden sm:inline">{isEn ? 'Delete' : 'Eliminar'}</span>
+                    </button>
+                  )}
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Canal Oficial</span>
+                  </span>
+                </div>
               </div>
 
               {/* Messages Body */}
@@ -457,7 +530,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                           ? 'Send a message to confirm attendance or ask a question.'
                           : 'Envía un mensaje para confirmar asistencia o realizar una consulta.'
                         : isEn
-                        ? 'Todavía no tienes conversaciones activas seleccionadas.'
+                        ? 'No active conversation selected.'
                         : 'Todavía no tienes conversaciones activas seleccionadas.'}
                     </p>
                   </div>
@@ -472,8 +545,16 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
                   return (
                     <div key={msg.id} className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'}`}>
-                      <div className="text-[10px] font-semibold text-slate-400 mb-1 px-1">
-                        {isSelf ? `Tú (${familyName})` : `${msg.senderName} • ${msg.senderRole}`}
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 mb-1 px-1">
+                        {/* Avatar */}
+                        <div className="w-4 h-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center text-[9px] text-white">
+                          {msg.senderAvatar ? (
+                            <img src={msg.senderAvatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            msg.senderName.charAt(0)
+                          )}
+                        </div>
+                        <span>{isSelf ? `Tú (${familyName})` : `${msg.senderName} • ${msg.senderRole}`}</span>
                       </div>
 
                       <div
@@ -579,6 +660,58 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
         </div>
       </div>
 
+      {/* Confirmation Modal: Eliminar Conversación */}
+      {showDeleteModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
+        >
+          <div className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden p-6 ${
+            isDark ? 'bg-slate-900 border-rose-900/50 text-white' : 'bg-white border-rose-200 text-slate-900'
+          }`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-base leading-tight">
+                  {isEn ? 'Delete conversation?' : '¿Eliminar conversación?'}
+                </h3>
+                <p className="text-xs text-rose-400 font-semibold">
+                  {isEn ? 'Action only affects your view' : 'Esta acción solo afectará tu bandeja'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+              {isEn
+                ? 'This conversation will be hidden from your inbox. The other participant will keep their full chat history.'
+                : 'Esta conversación se ocultará de tu bandeja de comunicaciones. El docente destinatario conservará el historial completo de mensajes.'}
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingConv}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                {isEn ? 'Cancel' : 'Cancelar'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConversation}
+                disabled={isDeletingConv}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>{isDeletingConv ? (isEn ? 'Deleting...' : 'Eliminando...') : (isEn ? 'Yes, delete' : 'Sí, eliminar conversación')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Select Authorized Teacher */}
       {showNewChatModal && (
         <div
@@ -640,10 +773,19 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                         : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'
                     }`}
                   >
-                    <div>
-                      <h5 className="font-bold text-xs text-slate-100">{c.fullName}</h5>
-                      <p className="text-[11px] text-cyan-400 font-medium">{c.roleLabel}</p>
-                      {c.detail && <p className="text-[10px] text-slate-400">{c.detail}</p>}
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-300 shrink-0">
+                        {c.avatarUrl ? (
+                          <img src={c.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          c.fullName.charAt(0)
+                        )}
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-100">{c.fullName}</h5>
+                        <p className="text-[11px] text-cyan-400 font-medium">{c.roleLabel}</p>
+                        {c.detail && <p className="text-[10px] text-slate-400">{c.detail}</p>}
+                      </div>
                     </div>
                     <span className="material-symbols-outlined text-sm text-cyan-400">send</span>
                   </div>
