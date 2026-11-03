@@ -146,36 +146,54 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
 
   // Participante destinatario con resolución ultra robusta
   const otherParticipant = useMemo<ConversationParticipant | null>(() => {
+    if (selectedRecipient) {
+      return {
+        id: selectedRecipient.id,
+        fullName: selectedRecipient.fullName,
+        role: selectedRecipient.roleLabel || 'Acudiente',
+        email: selectedRecipient.email,
+        detail: selectedRecipient.detail,
+        avatarUrl: selectedRecipient.avatarUrl
+      };
+    }
     if (!activeConversation) return null;
-    const participantsList = Object.values(activeConversation.participants || {}) as ConversationParticipant[];
-    let found = participantsList.find((p) => p && p.id && p.id !== effectiveUserId && p.id !== currentUser?.id && p.id !== currentUser?.documentId);
 
-    // Búsqueda por clave de diccionario si no viene la propiedad id en el objeto
-    if (!found && activeConversation.participants) {
+    // Check participants dictionary
+    if (activeConversation.participants) {
       for (const [key, val] of Object.entries(activeConversation.participants)) {
-        if (key !== effectiveUserId && key !== currentUser?.id && key !== currentUser?.documentId) {
-          found = {
-            id: key,
-            fullName: (val as any).fullName || (val as any).name || 'Acudiente Oficial',
-            role: (val as any).role || 'Acudiente',
-            email: (val as any).email,
-            detail: (val as any).detail,
-            avatarUrl: (val as any).avatarUrl
+        const valObj = val as any;
+        const candidateId = valObj?.id || key;
+        if (
+          candidateId !== effectiveUserId &&
+          candidateId !== currentUser?.id &&
+          candidateId !== currentUser?.documentId &&
+          candidateId !== currentUser?.email
+        ) {
+          return {
+            id: candidateId,
+            fullName: valObj?.fullName || valObj?.name || 'Acudiente Oficial',
+            role: valObj?.role || 'Acudiente',
+            email: valObj?.email,
+            detail: valObj?.detail,
+            avatarUrl: valObj?.avatarUrl
           };
-          break;
         }
       }
     }
 
-    // Respaldo mediante los IDs en participantIds
-    if (!found && activeConversation.participantIds) {
+    // Check participantIds list
+    if (activeConversation.participantIds) {
       const otherId = activeConversation.participantIds.find(
-        (id) => id !== effectiveUserId && id !== currentUser?.id && id !== currentUser?.documentId
+        (id) =>
+          id !== effectiveUserId &&
+          id !== currentUser?.id &&
+          id !== currentUser?.documentId &&
+          id !== currentUser?.email
       );
       if (otherId) {
         const contact = authorizedContacts.find((c) => c.id === otherId);
         if (contact) {
-          found = {
+          return {
             id: contact.id,
             fullName: contact.fullName,
             role: contact.roleLabel,
@@ -183,29 +201,27 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
             detail: contact.detail,
             avatarUrl: contact.avatarUrl
           };
-        } else {
-          const guardian = CENSUS_GUARDIANS.find((g) => g.cedula === otherId);
-          if (guardian) {
-            found = {
-              id: guardian.cedula,
-              fullName: guardian.fullName,
-              role: 'Acudiente',
-              email: guardian.email,
-              detail: `Acudiente (${guardian.relationship})`
-            };
-          } else {
-            found = {
-              id: otherId,
-              fullName: 'Acudiente Oficial',
-              role: 'Acudiente'
-            };
-          }
         }
+        const guardian = CENSUS_GUARDIANS.find((g) => g.cedula === otherId);
+        if (guardian) {
+          return {
+            id: guardian.cedula,
+            fullName: guardian.fullName,
+            role: 'Acudiente',
+            email: guardian.email,
+            detail: `Acudiente (${guardian.relationship})`
+          };
+        }
+        return {
+          id: otherId,
+          fullName: 'Acudiente Oficial',
+          role: 'Acudiente'
+        };
       }
     }
 
-    return found || null;
-  }, [activeConversation, effectiveUserId, currentUser?.id, currentUser?.documentId, authorizedContacts]);
+    return null;
+  }, [activeConversation, selectedRecipient, effectiveUserId, currentUser?.id, currentUser?.documentId, currentUser?.email, authorizedContacts]);
 
   // Estudiantes asignados al docente para citaciones
   const assignedStudents = useMemo(() => {
@@ -271,7 +287,31 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
     };
 
     const textToSend = replyText.trim();
+    const targetConvId = selectedConvId || getDeterministicConversationId(effectiveUserId, recipient.id);
+
+    // Actualización optimista inmediata en la UI: el docente ve su mensaje al instante
+    const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      conversationId: targetConvId,
+      senderId: effectiveUserId,
+      senderName: senderProfile.fullName || teacherName,
+      senderRole: 'Docente',
+      senderAvatar: senderProfile.avatarUrl,
+      recipientId: recipient.id,
+      recipientName: recipient.fullName,
+      recipientRole: recipient.role,
+      text: textToSend,
+      createdAt: Date.now()
+    };
+
+    if (!selectedConvId) {
+      setSelectedConvId(targetConvId);
+    }
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setReplyText('');
     setIsSending(true);
+
     try {
       const sentMsg = await sendChatMessage({
         sender: senderProfile,
@@ -286,17 +326,9 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
         text: textToSend
       });
 
-      // Asegurar que la conversación quede seleccionada y el mensaje aparezca de inmediato
-      if (!selectedConvId) {
-        setSelectedConvId(sentMsg.conversationId);
-      }
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === sentMsg.id)) return prev;
-        return [...prev, sentMsg];
-      });
-
-      setReplyText('');
-      showToast(isEn ? 'Message sent and notified.' : 'Mensaje enviado y notificado al destinatario.');
+      // Confirmar mensaje con Firestore
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? sentMsg : m)));
+      showToast(isEn ? 'Message sent.' : 'Mensaje enviado correctamente.');
     } catch (err) {
       console.error('Error sending message:', err);
       showToast(isEn ? 'Failed to send message.' : 'Error al enviar el mensaje.');
@@ -527,7 +559,29 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
                         key={ch.id}
                         onClick={() => {
                           setSelectedConvId(ch.id);
-                          setSelectedRecipient(null);
+                          let rec: AuthorizedContact | null = null;
+                          const otherId = (ch.participantIds || []).find(
+                            (id) => id !== effectiveUserId && id !== currentUser?.id && id !== currentUser?.documentId && id !== currentUser?.email
+                          );
+                          if (otherId) {
+                            const contact = authorizedContacts.find((c) => c.id === otherId);
+                            if (contact) {
+                              rec = contact;
+                            } else {
+                              const g = CENSUS_GUARDIANS.find((guard) => guard.cedula === otherId);
+                              if (g) {
+                                rec = {
+                                  id: g.cedula,
+                                  fullName: g.fullName,
+                                  role: 'family',
+                                  roleLabel: 'Acudiente',
+                                  email: g.email,
+                                  detail: `Acudiente (${g.relationship})`
+                                };
+                              }
+                            }
+                          }
+                          setSelectedRecipient(rec);
                           markConversationAsRead(ch.id, effectiveUserId);
                         }}
                         className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
@@ -751,6 +805,14 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
                     type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (replyText.trim() && !isSending) {
+                          handleSendMessage();
+                        }
+                      }
+                    }}
                     placeholder={
                       isEn
                         ? 'Type an official message or response...'

@@ -689,7 +689,7 @@ export const OFFICIAL_TEACHER_SCHEDULE_PATRICIA: ScheduleSlot[] = [
     time: '8:05 - 9:00',
     period: 3,
     monday: { subject: 'Filosofía de vida (11°2)', teacher: 'Aula 11°2' },
-    tuesday: { subject: 'Libre', teacher: 'Atención a Padres y Acudientes' },
+    tuesday: { subject: 'Filosofía de vida (10°1)', teacher: 'Aula 10°1' },
     wednesday: { subject: 'Filosofía de vida (10°1)', teacher: 'Aula 10°1' },
     thursday: { subject: 'Filosofía de vida (9°2)', teacher: 'Aula 9°2' },
     friday: { subject: 'Filosofía de vida (11°2)', teacher: 'Aula 11°2' },
@@ -710,7 +710,7 @@ export const OFFICIAL_TEACHER_SCHEDULE_PATRICIA: ScheduleSlot[] = [
     tuesday: { subject: 'Filosofía de vida (10°2)', teacher: 'Aula 10°2' },
     wednesday: { subject: 'Filosofía de vida (11°2)', teacher: 'Aula 11°2' },
     thursday: { subject: 'Filosofía de vida (11°2)', teacher: 'Aula 11°2' },
-    friday: { subject: 'Filosofía de vida (11°2)', teacher: 'Aula 11°2' },
+    friday: { subject: 'Filosofía de vida (9°2)', teacher: 'Aula 9°2' },
   },
   {
     time: '10:25 - 11:20',
@@ -718,7 +718,7 @@ export const OFFICIAL_TEACHER_SCHEDULE_PATRICIA: ScheduleSlot[] = [
     monday: { subject: 'Filosofía de vida (10°2)', teacher: 'Aula 10°2' },
     tuesday: { subject: 'Filosofía de vida (9°2)', teacher: 'Aula 9°2' },
     wednesday: { subject: 'Filosofía de vida (11°1)', teacher: 'Aula 11°1' },
-    thursday: { subject: 'Libre', teacher: 'Planeación Curricular' },
+    thursday: { subject: 'Filosofía de vida (9°1)', teacher: 'Aula 9°1' },
     friday: { subject: 'Filosofía de vida (10°2)', teacher: 'Aula 10°2' },
   },
   {
@@ -728,7 +728,7 @@ export const OFFICIAL_TEACHER_SCHEDULE_PATRICIA: ScheduleSlot[] = [
     tuesday: { subject: 'Filosofía de vida (10°1)', teacher: 'Aula 10°1' },
     wednesday: { subject: 'Filosofía de vida (10°2)', teacher: 'Aula 10°2' },
     thursday: { subject: 'Filosofía de vida (9°1)', teacher: 'Aula 9°1' },
-    friday: { subject: 'Libre', teacher: 'Comité de Área' },
+    friday: { subject: 'Filosofía de vida (11°1)', teacher: 'Aula 11°1' },
   },
 ];
 
@@ -834,14 +834,11 @@ export function getTeacherPersonalSchedule(teacherNameOrDoc?: string): ScheduleS
       // If no static slot was matched, distribute classes across assigned groups so week is not mostly "Libre"
       if (!matched && assignedGroups.length > 0) {
         const groupIndex = (slot.period * 2 + dayIdx) % assignedGroups.length;
-        const isFreePeriod = (slot.period === 3 && day === 'tuesday') || (slot.period === 6 && day === 'friday');
-        if (!isFreePeriod) {
-          const targetGrp = assignedGroups[groupIndex];
-          row[day] = {
-            subject: `${teacherArea} (${targetGrp})`,
-            teacher: `Aula ${targetGrp}`
-          };
-        }
+        const targetGrp = assignedGroups[groupIndex];
+        row[day] = {
+          subject: `${teacherArea} (${targetGrp})`,
+          teacher: `Aula ${targetGrp}`
+        };
       }
     });
 
@@ -1578,6 +1575,18 @@ export function getTeacherAcademicAssignments(
       label: `Filosofía de vida — ${grp}`
     };
   });
+}
+
+/**
+ * Retorna los grupos asignados a un docente en formato de texto array (ej. ['10°1', '10°2', ...]).
+ */
+export function getTeacherAssignedGroups(
+  teacherNameOrDoc?: string,
+  userSubjectArea?: string,
+  userAssignedGrades?: string
+): string[] {
+  const assignments = getTeacherAcademicAssignments(teacherNameOrDoc, userSubjectArea, userAssignedGrades);
+  return assignments.map(a => a.group);
 }
 
 

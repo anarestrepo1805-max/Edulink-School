@@ -133,15 +133,16 @@ export function formatRoleLabel(role?: string): string {
  * Helper to strip undefined values so Firestore setDoc/updateDoc never fails.
  */
 function cleanUndefined<T>(value: T): T {
-  if (value === undefined) return null as any;
+  if (value === undefined) return undefined as any;
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) {
-    return value.map(cleanUndefined) as any;
+    return value.map(cleanUndefined).filter((v) => v !== undefined) as any;
   }
   const cleaned: any = {};
   for (const [k, v] of Object.entries(value)) {
-    if (v !== undefined) {
-      cleaned[k] = cleanUndefined(v);
+    const cleanedVal = cleanUndefined(v);
+    if (cleanedVal !== undefined) {
+      cleaned[k] = cleanedVal;
     }
   }
   return cleaned;

@@ -11,7 +11,8 @@ import {
   Conversation,
   ChatMessage,
   AuthorizedContact,
-  ConversationParticipant
+  ConversationParticipant,
+  getDeterministicConversationId
 } from '../services/messagingService';
 
 interface FamilyMessagingViewProps {
@@ -56,7 +57,8 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
 
   // 1. Subscribe to real-time conversations for this guardian
   useEffect(() => {
-    const unsubscribe = subscribeUserConversations(effectiveUserId, (convs) => {
+    const userIds = Array.from(new Set([effectiveUserId, currentUser?.id, currentUser?.documentId])).filter(Boolean) as string[];
+    const unsubscribe = subscribeUserConversations(userIds, (convs) => {
       setConversations(convs);
       if (convs.length > 0 && !selectedConvId) {
         setSelectedConvId(convs[0].id);
@@ -65,7 +67,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
     });
 
     return () => unsubscribe();
-  }, [effectiveUserId, selectedConvId]);
+  }, [effectiveUserId, selectedConvId, currentUser?.id, currentUser?.documentId]);
 
   // 2. Fetch authorized contacts (Teachers of 8°1 and Admin Staff)
   useEffect(() => {
@@ -133,6 +135,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       return;
     }
 
+    const textToSend = content.trim();
     const senderProfile: UserProfile = currentUser || {
       id: effectiveUserId,
       fullName: familyName,
@@ -141,9 +144,33 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
       email: currentUser?.email || 'elena.jimenez@vallejuelos.edu.co'
     };
 
+    const targetConvId = selectedConvId || getDeterministicConversationId(effectiveUserId, recipient.id);
+
+    // Optimistic message update
+    const tempId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      conversationId: targetConvId,
+      senderId: effectiveUserId,
+      senderName: senderProfile.fullName || familyName,
+      senderRole: 'Acudiente',
+      senderAvatar: senderProfile.avatarUrl,
+      recipientId: recipient.id,
+      recipientName: recipient.fullName,
+      recipientRole: recipient.role,
+      text: textToSend,
+      createdAt: Date.now()
+    };
+
+    if (!selectedConvId) {
+      setSelectedConvId(targetConvId);
+    }
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setReplyText('');
     setIsSending(true);
+
     try {
-      await sendChatMessage({
+      const sentMsg = await sendChatMessage({
         sender: senderProfile,
         recipient: {
           id: recipient.id,
@@ -152,10 +179,10 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
           email: recipient.email,
           detail: recipient.detail
         },
-        text: content.trim()
+        text: textToSend
       });
 
-      setReplyText('');
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? sentMsg : m)));
       showToast(isEn ? 'Message sent to teacher.' : 'Mensaje enviado al docente correctamente.');
     } catch (err) {
       console.error('Error sending message:', err);
@@ -372,7 +399,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
                       );
                       const name = other?.fullName || 'Docente Institucional';
                       const role = other?.role || 'Docente';
-                      const avatar = other?.avatar;
+                      const avatar = other?.avatarUrl;
                       const timeFormatted = new Date(ch.lastMessageTime || ch.updatedAt || Date.now()).toLocaleTimeString(
                         [],
                         { hour: '2-digit', minute: '2-digit' }

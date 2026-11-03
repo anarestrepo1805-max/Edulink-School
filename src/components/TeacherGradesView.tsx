@@ -38,9 +38,11 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
   // Consulta automática de asignaturas y grupos asignados al docente desde la base de datos institucional
   const teacherAssignments = useMemo<TeacherAcademicAssignment[]>(() => {
     return getTeacherAcademicAssignments(
-      currentUser?.fullName || currentUser?.documentId || currentUser?.email
+      currentUser?.fullName || currentUser?.documentId || currentUser?.email,
+      currentUser?.subjectArea,
+      currentUser?.assignedGrades
     );
-  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email]);
+  }, [currentUser?.fullName, currentUser?.documentId, currentUser?.email, currentUser?.subjectArea, currentUser?.assignedGrades]);
 
   // Selección automática si tiene una sola o primera combinación
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(() => {

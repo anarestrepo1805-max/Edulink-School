@@ -28,10 +28,14 @@ export const TeacherForumView: React.FC<TeacherForumViewProps> = ({
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const teacherName = currentUser?.fullName || 'Prof. Carlos Ramírez';
-  const teacherArea = currentUser?.subjectArea || 'Filosofía de Vida';
+  const teacherName = currentUser?.fullName || 'Patricia Quintero';
+  const teacherArea = currentUser?.subjectArea || 'Filosofía de vida';
   const assignedGroups = useMemo(() => {
-    return getTeacherAssignedGroups(currentUser?.fullName || currentUser?.documentId);
+    return getTeacherAssignedGroups(
+      currentUser?.fullName || currentUser?.documentId || 'Patricia Quintero',
+      currentUser?.subjectArea,
+      currentUser?.assignedGrades
+    );
   }, [currentUser]);
 
   // Main state
@@ -305,7 +309,7 @@ export const TeacherForumView: React.FC<TeacherForumViewProps> = ({
                 {isEn ? 'Forums & Institutional Surveys' : 'Foros Pedagógicos y Encuestas'}
               </h2>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                {teacherName} • {teacherArea} • I.E. Vallejuelos
+                {teacherName} • Docente de {teacherArea} • {assignedGroups.join(', ')}
               </p>
             </div>
           </div>
