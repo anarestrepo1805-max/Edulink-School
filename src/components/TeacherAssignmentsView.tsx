@@ -381,7 +381,7 @@ export const TeacherAssignmentsView: React.FC<TeacherAssignmentsViewProps> = ({
                   {teacherArea}
                 </span>
                 <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#757684]'}`}>
-                  • Docente: <strong className={isDark ? 'text-white' : 'text-[#0b1c30]'}>{teacherName}</strong> • I.E. Vallejuelos
+                  • Docente: <strong className={isDark ? 'text-white' : 'text-[#0b1c30]'}>{teacherName}</strong> • {teacherAssignments.map((a) => a.group).join(', ')}
                 </span>
               </div>
               <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>

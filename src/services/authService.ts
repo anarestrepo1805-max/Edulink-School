@@ -62,6 +62,66 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     subjects: INITIAL_SUBJECTS,
     assignments: []
   },
+  '30880317': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  '30.880.317': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  'patricia.quintero@edulink.edu.co': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  'patricia_quintero@ejemplo.edu': {
+    id: 'demo-teacher-patricia',
+    email: 'patricia.quintero@edulink.edu.co',
+    fullName: 'Patricia Quintero',
+    role: 'teacher',
+    documentId: '30880317',
+    employeeId: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    createdAt: '2026-01-10T08:00:00.000Z',
+    hasConfigured: true,
+    institution: 'I.E. Vallejuelos',
+    gradeLevel: 'Docente Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2)',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
   '71394821': {
     id: 'demo-teacher-1',
     email: 'daniela.alvarez@edulink.edu.co',
@@ -104,48 +164,6 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     gradeLevel: 'Docente Tecnología & Programación',
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
   },
-  '30880317': {
-    id: 'demo-teacher-patricia',
-    email: 'patricia_quintero@ejemplo.edu',
-    fullName: 'Patricia Quintero',
-    role: 'teacher',
-    documentId: '30880317',
-    employeeId: 'DOC-FIL-3088',
-    subjectArea: 'Filosofía de Vida',
-    createdAt: '2026-01-10T08:00:00.000Z',
-    hasConfigured: true,
-    institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Docente Filosofía de Vida (10°1, 10°2, 11°1, 11°2)',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
-  },
-  'patricia_quintero@ejemplo.edu': {
-    id: 'demo-teacher-patricia',
-    email: 'patricia_quintero@ejemplo.edu',
-    fullName: 'Patricia Quintero',
-    role: 'teacher',
-    documentId: '30880317',
-    employeeId: 'DOC-FIL-3088',
-    subjectArea: 'Filosofía de Vida',
-    createdAt: '2026-01-10T08:00:00.000Z',
-    hasConfigured: true,
-    institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Docente Filosofía de Vida (10°1, 10°2, 11°1, 11°2)',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
-  },
-  'patricia.quintero@edulink.edu.co': {
-    id: 'demo-teacher-patricia',
-    email: 'patricia_quintero@ejemplo.edu',
-    fullName: 'Patricia Quintero',
-    role: 'teacher',
-    documentId: '30880317',
-    employeeId: 'DOC-FIL-3088',
-    subjectArea: 'Filosofía de Vida',
-    createdAt: '2026-01-10T08:00:00.000Z',
-    hasConfigured: true,
-    institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Docente Filosofía de Vida (10°1, 10°2, 11°1, 11°2)',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
-  },
   '43521980': {
     id: 'demo-family-1',
     email: 'elena.jimenez@vallejuelos.edu.co',
@@ -153,13 +171,12 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     role: 'family',
     documentId: '43521980',
     relationship: 'Madre de familia',
-    representedStudentName: 'Valentina Gómez Suárez',
-    representedStudentDocumentId: '1007855552',
-    representedStudentCode: '1007855552',
+    representedStudentName: 'Miguel Ángel Jiménez',
+    representedStudentCode: '1092837465',
     createdAt: '2026-01-12T08:00:00.000Z',
     hasConfigured: true,
     institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Grado 8°1',
+    gradeLevel: 'Acudiente de Miguel Ángel Jiménez (Grado 11°1)',
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
   },
   '43.521.980': {
@@ -169,13 +186,12 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     role: 'family',
     documentId: '43521980',
     relationship: 'Madre de familia',
-    representedStudentName: 'Valentina Gómez Suárez',
-    representedStudentDocumentId: '1007855552',
-    representedStudentCode: '1007855552',
+    representedStudentName: 'Miguel Ángel Jiménez',
+    representedStudentCode: '1092837465',
     createdAt: '2026-01-12T08:00:00.000Z',
     hasConfigured: true,
     institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Grado 8°1',
+    gradeLevel: 'Acudiente de Miguel Ángel Jiménez (Grado 11°1)',
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
   },
   'elena.jimenez@vallejuelos.edu.co': {
@@ -185,13 +201,12 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     role: 'family',
     documentId: '43521980',
     relationship: 'Madre de familia',
-    representedStudentName: 'Valentina Gómez Suárez',
-    representedStudentDocumentId: '1007855552',
-    representedStudentCode: '1007855552',
+    representedStudentName: 'Miguel Ángel Jiménez',
+    representedStudentCode: '1092837465',
     createdAt: '2026-01-12T08:00:00.000Z',
     hasConfigured: true,
     institution: 'I.E. Vallejuelos',
-    gradeLevel: 'Grado 8°1',
+    gradeLevel: 'Acudiente de Miguel Ángel Jiménez (Grado 11°1)',
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
   },
   '98765432': {
@@ -279,6 +294,24 @@ export interface EnrolledStudentDirectoryRecord {
 
 // Institutional Teacher Registry: Each code is UNIQUE & IRREPETIBLE and has fixed assigned subjects & grades
 export const TEACHER_ASSIGNMENTS: Record<string, TeacherAssignmentRecord> = {
+  'DOC-FILO-3088': {
+    code: 'DOC-FILO-3088',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    description: 'Docente de Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2) - Patricia Quintero'
+  },
+  '015': {
+    code: '015',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    description: 'Docente de Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2) - Patricia Quintero'
+  },
+  '30880317': {
+    code: '30880317',
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    description: 'Docente de Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2) - Patricia Quintero'
+  },
   'DOC-VALLE-2026': {
     code: 'DOC-VALLE-2026',
     subjectArea: 'Tecnología e Informática',
@@ -329,15 +362,9 @@ export const TEACHER_ASSIGNMENTS: Record<string, TeacherAssignmentRecord> = {
   },
   'DOC-FIL-3088': {
     code: 'DOC-FIL-3088',
-    subjectArea: 'Filosofía de Vida',
-    assignedGrades: '10°1, 10°2, 11°1, 11°2',
-    description: 'Docente Patricia Quintero - Filosofía de Vida (10°1, 10°2, 11°1, 11°2)'
-  },
-  '015': {
-    code: '015',
-    subjectArea: 'Filosofía de Vida',
-    assignedGrades: '10°1, 10°2, 11°1, 11°2',
-    description: 'Docente Patricia Quintero - Filosofía de Vida (10°1, 10°2, 11°1, 11°2)'
+    subjectArea: 'Filosofía de vida',
+    assignedGrades: '10°1, 10°2, 11°1, 11°2, 9°1, 9°2',
+    description: 'Docente Patricia Quintero - Filosofía de vida (10°1, 10°2, 11°1, 11°2, 9°1, 9°2)'
   }
 };
 

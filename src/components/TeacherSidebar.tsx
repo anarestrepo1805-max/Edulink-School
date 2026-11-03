@@ -2,6 +2,7 @@ import React from 'react';
 import { ActiveScreen, UserProfile } from '../types';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 import { ASSETS } from '../data/mockData';
+import { getTeacherAcademicAssignments } from '../data/institutionalCensus';
 
 export type TeacherActiveTab =
   | 'grades'
@@ -38,8 +39,14 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     activeScreen === 'teacher_forum' ? 'forum' : 'grades'
   );
 
+  const teacherAssignments = getTeacherAcademicAssignments(
+    currentUser?.fullName || currentUser?.documentId || currentUser?.email,
+    currentUser?.subjectArea,
+    currentUser?.assignedGrades
+  );
   const teacherName = currentUser?.fullName || (isEn ? 'Teacher' : 'Docente');
-  const teacherArea = currentUser?.subjectArea || currentUser?.area || (isEn ? 'High School Faculty' : 'Docencia Secundaria');
+  const teacherArea = teacherAssignments[0]?.subjectName || currentUser?.subjectArea || currentUser?.area || (isEn ? 'High School Faculty' : 'Filosofía de vida');
+  const assignedGradesDisplay = teacherAssignments.map((a) => a.group).join(', ');
 
   const navItems = [
     {
@@ -143,12 +150,22 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
             <div className="min-w-0 flex-1">
               <h4 className="font-bold text-xs leading-tight truncate">{teacherName}</h4>
               <p
-                className={`text-[11px] truncate mt-0.5 ${
+                className={`text-[11px] truncate mt-0.5 font-semibold ${
                   isDark ? 'text-cyan-400' : 'text-[#0051d5]'
                 }`}
               >
                 {teacherArea}
               </p>
+              {assignedGradesDisplay && (
+                <p
+                  className={`text-[10px] truncate mt-0.5 ${
+                    isDark ? 'text-slate-400' : 'text-[#444653]'
+                  }`}
+                  title={assignedGradesDisplay}
+                >
+                  {assignedGradesDisplay}
+                </p>
+              )}
               <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
                 {isEn ? 'Active Teacher' : 'Docente Titular'}
               </span>

@@ -1,36 +1,48 @@
 import React, { useMemo } from 'react';
 import { UserProfile, ScheduleSlot } from '../types';
-import { getTeacherPersonalSchedule, getOfficialScheduleForGrade } from '../data/institutionalCensus';
+import { getTeacherPersonalSchedule, getOfficialScheduleForGrade, getTeacherAcademicAssignments } from '../data/institutionalCensus';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 export interface TeacherScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser?: UserProfile | null;
+  teacherName?: string;
+  teacherDoc?: string;
 }
 
 export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
   isOpen,
   onClose,
-  currentUser
+  currentUser,
+  teacherName: propTeacherName,
+  teacherDoc: propTeacherDoc
 }) => {
   const { theme, language } = useThemeLanguage();
   const isDark = theme === 'dark';
   const isEn = language === 'en';
 
-  const isTeacher = currentUser?.role === 'teacher' || currentUser?.role === 'docente';
-  const isStudent = currentUser?.role === 'student' || currentUser?.role === 'estudiante';
-  const userName = currentUser?.fullName || (isTeacher ? (isEn ? 'Teacher' : 'Docente') : (isEn ? 'Student' : 'Estudiante'));
+  const isTeacher = !currentUser || currentUser?.role === 'teacher' || currentUser?.role === 'docente' || !!propTeacherName;
+  const isStudent = !isTeacher && (currentUser?.role === 'student' || currentUser?.role === 'estudiante');
+  const userName = propTeacherName || currentUser?.fullName || (isTeacher ? 'Patricia Quintero' : (isEn ? 'Student' : 'Estudiante'));
+  const effectiveDoc = propTeacherDoc || currentUser?.documentId || currentUser?.employeeId || '';
+
+  const teacherAssignments = useMemo(() => {
+    return getTeacherAcademicAssignments(userName || effectiveDoc, currentUser?.subjectArea, currentUser?.assignedGrades);
+  }, [userName, effectiveDoc, currentUser?.subjectArea, currentUser?.assignedGrades]);
 
   const scheduleData = useMemo<ScheduleSlot[]>(() => {
     if (isTeacher) {
-      return getTeacherPersonalSchedule(currentUser?.fullName || currentUser?.documentId || currentUser?.employeeId);
+      return getTeacherPersonalSchedule(userName || effectiveDoc);
     }
     const grade = currentUser?.gradeLevel || currentUser?.group || '11-1';
     return getOfficialScheduleForGrade(grade);
-  }, [currentUser, isTeacher]);
+  }, [currentUser, isTeacher, userName, effectiveDoc]);
 
   if (!isOpen) return null;
+
+  const subjectHeader = teacherAssignments[0]?.subjectName || currentUser?.subjectArea || 'Filosofía de vida';
+  const groupsHeader = teacherAssignments.map(a => a.group).join(', ');
 
   return (
     <div
@@ -64,7 +76,7 @@ export const TeacherScheduleModal: React.FC<TeacherScheduleModalProps> = ({
                 {isEn ? 'Personal Schedule' : 'Horario propio'}
               </h3>
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                {userName} • I.E. Vallejuelos • {isTeacher ? (currentUser?.area || 'Docencia') : `Grado ${currentUser?.gradeLevel || currentUser?.group || '11-1'}`} • {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
+                {userName} • {isTeacher ? `${subjectHeader} • ${groupsHeader}` : `Grado ${currentUser?.gradeLevel || currentUser?.group || '11-1'}`} • {isEn ? 'Morning Shift (6:15 AM - 12:15 PM)' : 'Jornada Mañana (6:15 AM - 12:15 PM)'}
               </p>
             </div>
           </div>

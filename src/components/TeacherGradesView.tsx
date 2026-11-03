@@ -511,7 +511,7 @@ export const TeacherGradesView: React.FC<TeacherGradesViewProps> = ({
                   {teacherName}
                 </span>
                 <span className={`text-[11px] leading-tight ${isDark ? 'text-slate-400' : 'text-[#444653]'}`}>
-                  {currentUser?.subjectArea ? (isEn ? `Teacher of ${currentUser.subjectArea}` : `Docente de ${currentUser.subjectArea}`) : (isEn ? 'Tenured Teacher' : 'Docente Titular')} {currentUser?.assignedGrades ? `• ${currentUser.assignedGrades}` : '• Edulink School'}
+                  {currentAssignment.subjectName ? (isEn ? `Teacher of ${currentAssignment.subjectName}` : `Docente de ${currentAssignment.subjectName}`) : (isEn ? 'Tenured Teacher' : 'Docente Titular')} • {teacherAssignments.map((a) => a.group).join(', ')}
                 </span>
               </div>
               <img
