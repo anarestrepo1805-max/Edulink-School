@@ -184,9 +184,10 @@ function MainApp() {
         />
       )}
 
-      {currentScreen === 'admin_dashboard' && (
+      {(currentScreen === 'admin_dashboard' || currentScreen === 'admin_messaging' || currentScreen === 'admin_forum') && (
         <AdminDashboardView
           currentUser={currentUser}
+          currentScreen={currentScreen}
           onNavigate={setCurrentScreen}
           onLogout={handleLogout}
           onUpdateUser={handleUpdateUser}

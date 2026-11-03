@@ -151,6 +151,8 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       onSelectScreen('family_messaging');
     } else if (role === 'teacher' || role === 'docente') {
       onSelectScreen('teacher_messaging');
+    } else if (role === 'admin' || role === 'administrativo') {
+      onSelectScreen('admin_messaging');
     } else {
       onSelectScreen('teacher_messaging');
     }
@@ -226,8 +228,20 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
     // ROL ADMINISTRATIVO
     {
       id: 'admin_dashboard',
-      label: currentLang === 'es' ? 'Administrativo • Panel' : 'Staff • Dashboard',
+      label: currentLang === 'es' ? 'Coordinación • Panel' : 'Staff • Dashboard',
       icon: 'admin_panel_settings',
+      category: currentLang === 'es' ? 'Administración' : 'Administration'
+    },
+    {
+      id: 'admin_messaging',
+      label: currentLang === 'es' ? 'Chat con Familias' : 'Family Chat',
+      icon: 'chat',
+      category: currentLang === 'es' ? 'Administración' : 'Administration'
+    },
+    {
+      id: 'admin_forum',
+      label: currentLang === 'es' ? 'Foro y encuestas' : 'Forums & Polls',
+      icon: 'forum',
       category: currentLang === 'es' ? 'Administración' : 'Administration'
     }
   ];
@@ -255,7 +269,11 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({
       return screen.id === 'family_dashboard' || screen.id === 'family_messaging';
     }
     if (role === 'admin' || role === 'administrativo') {
-      return screen.id === 'admin_dashboard';
+      return (
+        screen.id === 'admin_dashboard' ||
+        screen.id === 'admin_messaging' ||
+        screen.id === 'admin_forum'
+      );
     }
     return true;
   });

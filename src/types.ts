@@ -69,7 +69,9 @@ export type ActiveScreen =
   | 'family_dashboard'
   | 'family_messaging'
   // Administrativo
-  | 'admin_dashboard';
+  | 'admin_dashboard'
+  | 'admin_messaging'
+  | 'admin_forum';
 
 export interface Subject {
   id: string;
