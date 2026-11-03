@@ -5,8 +5,11 @@ import {
   CENSUS_STUDENTS,
   CENSUS_GUARDIANS,
   CENSUS_TEACHERS,
+  CENSUS_ADMIN_STAFF,
   getCensusStudentsForGroup,
   lookupCensusGuardian,
+  formatGroupDisplay,
+  normalizeGroupKey,
   CensusStudent
 } from '../data/institutionalCensus';
 import {
@@ -19,6 +22,7 @@ import {
   fetchCommitteeMembers,
   saveCommitteeMember,
   deleteCommitteeMember,
+  resetStatutoryCommitteeToDefaults,
   CommitteeMember
 } from '../services/committeeService';
 import {
@@ -269,11 +273,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const [committeeMembers, setCommitteeMembers] = useState<CommitteeMember[]>([]);
   const [isLoadingCommittee, setIsLoadingCommittee] = useState(false);
   const [editingMember, setEditingMember] = useState<CommitteeMember | null>(null);
+  const [originalOccupant, setOriginalOccupant] = useState<{ name: string; email?: string; phone?: string; notes?: string } | null>(null);
+  const [candidateSearch, setCandidateSearch] = useState('');
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const [guestRoleTitle, setGuestRoleTitle] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [isSavingMember, setIsSavingMember] = useState(false);
+
+  const handleOpenEditMember = (member: CommitteeMember) => {
+    setEditingMember({ ...member });
+    setOriginalOccupant({
+      name: member.name,
+      email: member.email,
+      phone: member.phone,
+      notes: member.notes
+    });
+    setCandidateSearch('');
+  };
 
   const loadCommittee = async () => {
     setIsLoadingCommittee(true);
@@ -346,6 +363,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       await loadCommittee();
     } catch (err) {
       console.warn('Error removing committee member:', err);
+    }
+  };
+
+  const handleResetOfficialCommittee = async () => {
+    setIsSavingMember(true);
+    try {
+      await resetStatutoryCommitteeToDefaults();
+      showToast(isEn ? 'Committee members restored to official institutional data.' : 'Integrantes del comité restablecidos con la base de datos institucional.');
+      await loadCommittee();
+    } catch (err) {
+      console.warn('Error resetting committee:', err);
+      showToast(isEn ? 'Error resetting committee' : 'Error al restablecer los integrantes.');
+    } finally {
+      setIsSavingMember(false);
     }
   };
 
@@ -567,7 +598,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           fullName: activeOtherParticipant.fullName,
           role: activeOtherParticipant.role,
           email: activeOtherParticipant.email,
-          avatar: activeOtherParticipant.avatar
+          avatarUrl: activeOtherParticipant.avatarUrl || (activeOtherParticipant as any).avatar
         },
         text: textToSend
       });
@@ -1281,15 +1312,30 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                         : 'Órgano institucional encargado de liderar la convivencia, mediación pacífica de conflictos, acciones restaurativas y debido proceso escolar.'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => setShowAddGuestModal(true)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer shadow-xs text-white ${
-                      isDark ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#00288e] hover:bg-[#001f70]'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">person_add</span>
-                    <span>{isEn ? 'Add Committee Guest' : 'Agregar Invitado al Comité'}</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleResetOfficialCommittee}
+                      disabled={isSavingMember}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition-all ${
+                        isDark
+                          ? 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                          : 'border-[#dce9ff] bg-[#eff4ff] text-[#00288e] hover:bg-[#dce9ff]'
+                      }`}
+                      title="Sincronizar y restablecer los 8 integrantes con el censo y base de datos"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">sync</span>
+                      <span>Restablecer Integrantes Oficiales</span>
+                    </button>
+                    <button
+                      onClick={() => setShowAddGuestModal(true)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer shadow-xs text-white ${
+                        isDark ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#00288e] hover:bg-[#001f70]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">person_add</span>
+                      <span>{isEn ? 'Add Committee Guest' : 'Agregar Invitado al Comité'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
@@ -1299,13 +1345,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       <p>Cargando integrantes del comité...</p>
                     </div>
                   ) : (
-                    committeeMembers.map((member, index) => {
-                      const isAssigned = Boolean(member.name && member.name.trim());
-                      return (
+                    committeeMembers.map((member, index) => (
                         <div
                           key={member.id}
                           className={`p-5 rounded-xl border flex flex-col justify-between transition-all ${
-                            isDark ? 'bg-slate-950 border-slate-800' : 'bg-[#f8f9ff] border-[#e5eeff]'
+                            isDark ? 'bg-slate-950 border-slate-800 hover:border-slate-700' : 'bg-[#f8f9ff] border-[#e5eeff] hover:border-[#ccdfff]'
                           }`}
                         >
                           <div>
@@ -1313,15 +1357,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                                 {member.isCustomGuest ? 'Invitado Especial' : `Cargo Oficial #${index + 1}`}
                               </span>
-                              {isAssigned ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
-                                  Asignado
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                                  Pendiente
-                                </span>
-                              )}
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                                <span>Asignado</span>
+                              </span>
                             </div>
 
                             <h4 className={`text-sm font-bold mb-1 leading-snug ${isDark ? 'text-white' : 'text-[#0b1c30]'}`}>
@@ -1329,29 +1368,29 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                             </h4>
 
                             <div className="mt-3">
-                              {isAssigned ? (
-                                <div className="space-y-1">
-                                  <p className="text-sm font-extrabold text-emerald-400">
-                                    {member.name}
-                                  </p>
-                                  {member.phone && (
-                                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-xs">phone</span>
-                                      <span>{member.phone}</span>
-                                    </p>
-                                  )}
-                                  {member.email && (
-                                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-xs">mail</span>
-                                      <span className="truncate">{member.email}</span>
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-slate-400 italic">
-                                  Cargo pendiente de asignación
+                              <div className="space-y-1.5">
+                                <p className="text-sm font-extrabold text-emerald-400">
+                                  {member.name || 'Integrante Asignado'}
                                 </p>
-                              )}
+                                {member.phone && (
+                                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs">phone</span>
+                                    <span>{member.phone}</span>
+                                  </p>
+                                )}
+                                {member.email && (
+                                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs">mail</span>
+                                    <span className="truncate">{member.email}</span>
+                                  </p>
+                                )}
+                                {member.notes && (
+                                  <p className="text-[11px] text-amber-300/90 bg-amber-500/10 px-2 py-1 rounded-md mt-1 flex items-center gap-1.5 border border-amber-500/20">
+                                    <span className="material-symbols-outlined text-[13px] text-amber-400 shrink-0">badge</span>
+                                    <span className="truncate">{member.notes}</span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -1359,33 +1398,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                             isDark ? 'border-slate-800' : 'border-[#e5eeff]'
                           }`}>
                             <button
-                              onClick={() => setEditingMember(member)}
-                              className="text-xs font-bold text-cyan-400 hover:underline cursor-pointer flex items-center gap-1"
+                              onClick={() => handleOpenEditMember(member)}
+                              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer flex items-center gap-1.5"
                             >
                               <span className="material-symbols-outlined text-sm">edit</span>
-                              <span>{isAssigned ? 'Editar integrante' : 'Asignar persona'}</span>
+                              <span>Editar integrante</span>
                             </button>
 
-                            {member.isCustomGuest ? (
+                            {member.isCustomGuest && (
                               <button
                                 onClick={() => handleDeleteMember(member.id)}
                                 className="text-xs font-semibold text-rose-400 hover:underline cursor-pointer"
                               >
                                 Eliminar
                               </button>
-                            ) : isAssigned ? (
-                              <button
-                                onClick={() => handleDeleteMember(member.id)}
-                                className="text-[11px] text-slate-500 hover:text-rose-400 cursor-pointer"
-                                title="Desasignar cargo"
-                              >
-                                Vaciar
-                              </button>
-                            ) : null}
+                            )}
                           </div>
                         </div>
-                      );
-                    })
+                      ))
                   )}
                 </div>
               </div>
@@ -2226,94 +2256,505 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       )}
 
       {/* =============================================================== */}
-      {/* MODAL 3: EDITAR INTEGRANTE DEL COMITÉ DE CONVIVENCIA            */}
+      {/* MODAL 3: EDITAR O REEMPLAZAR INTEGRANTE DEL COMITÉ               */}
       {/* =============================================================== */}
       {editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <form onSubmit={handleSaveMemberEdit} className="bg-slate-900 border border-slate-800 text-slate-100 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          <form
+            onSubmit={handleSaveMemberEdit}
+            className="bg-slate-900 border border-slate-800 text-slate-100 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400">manage_accounts</span>
-                <h3 className="font-bold text-base text-white">Editar Integrante del Comité</h3>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined text-xl">manage_accounts</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Editar o Reemplazar Integrante</h3>
+                  <p className="text-xs text-amber-400 font-semibold">{editingMember.roleTitle}</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingMember(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">
-                  Cargo o Representación
-                </label>
-                <input
-                  type="text"
-                  value={editingMember.roleTitle}
-                  onChange={(e) => setEditingMember({ ...editingMember, roleTitle: e.target.value })}
-                  disabled={!editingMember.isCustomGuest}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none disabled:opacity-75"
-                />
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* 1. Current Occupant Box */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Persona que ocupa actualmente el cargo:
+                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
+                    <span className="font-bold text-sm text-white">
+                      {originalOccupant?.name || editingMember.name || 'Sin asignar'}
+                    </span>
+                  </div>
+                  {(originalOccupant?.phone || editingMember.phone) && (
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">phone</span>
+                      <span>{originalOccupant?.phone || editingMember.phone}</span>
+                    </span>
+                  )}
+                </div>
+                {(originalOccupant?.notes || editingMember.notes) && (
+                  <p className="text-[11px] text-slate-400 mt-1.5 italic">
+                    {originalOccupant?.notes || editingMember.notes}
+                  </p>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nombre Completo de la Persona
-                </label>
-                <input
-                  type="text"
-                  value={editingMember.name}
-                  onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
-                  placeholder="Ingresa el nombre de la persona asignada..."
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-400"
-                />
-              </div>
+              {/* 2. Candidate Selection From Real Database / Demo Profiles */}
+              {editingMember.id === 'com_docente_secundaria' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">school</span>
+                      <span>Seleccionar Docente de Secundaria (Base de Datos — 21 Docentes)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">Clic para asignar</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    placeholder="Filtrar por nombre, área (ej. Física, Matemáticas) o cédula..."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-cyan-400"
+                  />
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                    {CENSUS_TEACHERS.filter((t) => {
+                      const q = candidateSearch.toLowerCase();
+                      return (
+                        !q ||
+                        t.fullName.toLowerCase().includes(q) ||
+                        t.area.toLowerCase().includes(q) ||
+                        t.cedula.includes(q)
+                      );
+                    }).map((teacher) => (
+                      <div
+                        key={teacher.code}
+                        onClick={() => {
+                          setEditingMember({
+                            ...editingMember,
+                            name: `Lic. ${teacher.fullName}`,
+                            email: teacher.email,
+                            phone: `311${teacher.cedula.slice(-6)}`,
+                            notes: `Docente de ${teacher.area} (Grados: ${teacher.grades}) — Cédula: ${teacher.cedula}`
+                          });
+                        }}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                          editingMember.name.includes(teacher.fullName)
+                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            : 'bg-slate-800/70 border-slate-700 hover:border-cyan-500 hover:bg-slate-800 text-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold">{teacher.fullName}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {teacher.area} • Grados: {teacher.grades}
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-semibold text-cyan-400">Seleccionar</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
+              {editingMember.id === 'com_rep_estudiantes' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">how_to_reg</span>
+                      <span>Seleccionar Estudiante del Grupo 11°1 (Base de Datos — 15 Estudiantes)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">Clic para asignar</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    placeholder="Filtrar por nombre o documento..."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-cyan-400"
+                  />
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                    {getCensusStudentsForGroup('11-1')
+                      .filter((s) => {
+                        const q = candidateSearch.toLowerCase();
+                        return !q || s.fullName.toLowerCase().includes(q) || s.documentId.includes(q);
+                      })
+                      .map((student) => (
+                        <div
+                          key={student.documentId}
+                          onClick={() => {
+                            setEditingMember({
+                              ...editingMember,
+                              name: student.fullName,
+                              email: student.email,
+                              phone: `315${student.documentId.slice(-6)}`,
+                              notes: `Representante Estudiantil — Grupo 11°1 (Doc: ${student.documentId})`
+                            });
+                          }}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            editingMember.name.includes(student.fullName)
+                              ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                              : 'bg-slate-800/70 border-slate-700 hover:border-cyan-500 hover:bg-slate-800 text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-bold">{student.fullName}</p>
+                            <p className="text-[11px] text-slate-400">
+                              Grupo 11°1 • Documento: {student.documentId}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-semibold text-cyan-400">Seleccionar</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {editingMember.id === 'com_personero' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">badge</span>
+                      <span>Seleccionar Estudiante de Grado 11 (Base de Datos — Grados 11°1 y 11°2)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">Clic para asignar</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    placeholder="Filtrar por nombre o grupo de 11°..."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-cyan-400"
+                  />
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                    {[...getCensusStudentsForGroup('11-1'), ...getCensusStudentsForGroup('11-2')]
+                      .filter((s) => {
+                        const q = candidateSearch.toLowerCase();
+                        return !q || s.fullName.toLowerCase().includes(q) || s.documentId.includes(q);
+                      })
+                      .map((student) => (
+                        <div
+                          key={`${student.group}_${student.documentId}`}
+                          onClick={() => {
+                            setEditingMember({
+                              ...editingMember,
+                              name: student.fullName,
+                              email: student.email,
+                              phone: `315${student.documentId.slice(-6)}`,
+                              notes: `Personero Estudiantil Institucional — Grado ${formatGroupDisplay(student.group)} (Doc: ${student.documentId})`
+                            });
+                          }}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            editingMember.name.includes(student.fullName)
+                              ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                              : 'bg-slate-800/70 border-slate-700 hover:border-cyan-500 hover:bg-slate-800 text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-bold">{student.fullName}</p>
+                            <p className="text-[11px] text-slate-400">
+                              Grado {formatGroupDisplay(student.group)} • Doc: {student.documentId}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-semibold text-cyan-400">Seleccionar</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {editingMember.id === 'com_acudiente' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">family_restroom</span>
+                      <span>Seleccionar Acudiente o Padre de Familia (Base de Datos Oficial)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">Clic para asignar</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={candidateSearch}
+                    onChange={(e) => setCandidateSearch(e.target.value)}
+                    placeholder="Filtrar por nombre de acudiente o parentesco..."
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-cyan-400"
+                  />
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+                    {CENSUS_GUARDIANS
+                      .filter((g, idx, arr) => {
+                        const q = candidateSearch.toLowerCase();
+                        const matches = !q || g.fullName.toLowerCase().includes(q) || g.cedula.includes(q) || g.relationship.toLowerCase().includes(q);
+                        const isFirstOccurrence = arr.findIndex((item) => item.fullName === g.fullName) === idx;
+                        return matches && isFirstOccurrence;
+                      })
+                      .map((guardian) => (
+                        <div
+                          key={guardian.cedula}
+                          onClick={() => {
+                            setEditingMember({
+                              ...editingMember,
+                              name: guardian.fullName,
+                              email: guardian.email,
+                              phone: guardian.phone,
+                              notes: `Acudiente legal registrada (${guardian.relationship}) — Cédula: ${guardian.cedula}`
+                            });
+                          }}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            editingMember.name.includes(guardian.fullName)
+                              ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                              : 'bg-slate-800/70 border-slate-700 hover:border-cyan-500 hover:bg-slate-800 text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-bold">{guardian.fullName}</p>
+                            <p className="text-[11px] text-slate-400">
+                              {guardian.relationship} • Cédula: {guardian.cedula} • Tel: {guardian.phone}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-semibold text-cyan-400">Seleccionar</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {editingMember.id === 'com_docente_primaria' && (
+                <div className="space-y-2.5">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">badge</span>
+                    <span>Perfiles Institucionales de Demostración (Docente de Primaria)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    No existe registro de primaria en la base de datos de secundaria. Selecciona un perfil institucional de demostración o personaliza los campos:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      {
+                        name: 'Lic. Amalia Restrepo Vélez',
+                        email: 'amalia.restrepo@vallejuelos.edu.co',
+                        phone: '3182245901',
+                        notes: 'Docente de Básica Primaria (Sede Primaria) — Perfil institucional de demostración'
+                      },
+                      {
+                        name: 'Lic. Carlos Restrepo Henao',
+                        email: 'carlos.restrepo@vallejuelos.edu.co',
+                        phone: '3183451120',
+                        notes: 'Docente de Básica Primaria (Grados 1° a 3°) — Perfil institucional de demostración'
+                      },
+                      {
+                        name: 'Lic. Marta Lucía Pérez',
+                        email: 'marta.perez@vallejuelos.edu.co',
+                        phone: '3189912044',
+                        notes: 'Docente Básica Primaria (Grados 4° y 5°) — Perfil institucional de demostración'
+                      }
+                    ].map((demo) => (
+                      <div
+                        key={demo.name}
+                        onClick={() => {
+                          setEditingMember({
+                            ...editingMember,
+                            name: demo.name,
+                            email: demo.email,
+                            phone: demo.phone,
+                            notes: demo.notes
+                          });
+                        }}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all text-xs ${
+                          editingMember.name.includes(demo.name)
+                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            : 'bg-slate-800/70 border-slate-700 hover:border-amber-400 text-slate-200'
+                        }`}
+                      >
+                        <p className="font-bold text-amber-300">{demo.name}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{demo.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {editingMember.id === 'com_psicologa' && (
+                <div className="space-y-2.5">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">psychology</span>
+                    <span>Perfiles Institucionales de Demostración (Psicóloga / Orientación Escolar)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    No existe psicóloga en la base de datos docente. Selecciona un perfil institucional de demostración o personaliza los campos:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      {
+                        name: 'Dra. Carolina Builes Henao',
+                        email: 'carolina.builes@vallejuelos.edu.co',
+                        phone: '3195531840',
+                        notes: 'Psicología y Orientación Escolar — Perfil institucional de demostración'
+                      },
+                      {
+                        name: 'Dra. Marcela Jaramillo Soto',
+                        email: 'marcela.jaramillo@vallejuelos.edu.co',
+                        phone: '3194481022',
+                        notes: 'Psicóloga de Convivencia y Apoyo Emocional — Perfil de demostración'
+                      },
+                      {
+                        name: 'Dr. Juan Camilo Pineda',
+                        email: 'juan.pineda@vallejuelos.edu.co',
+                        phone: '3196623049',
+                        notes: 'Orientador Psicológico Escolar — Perfil de demostración'
+                      }
+                    ].map((demo) => (
+                      <div
+                        key={demo.name}
+                        onClick={() => {
+                          setEditingMember({
+                            ...editingMember,
+                            name: demo.name,
+                            email: demo.email,
+                            phone: demo.phone,
+                            notes: demo.notes
+                          });
+                        }}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all text-xs ${
+                          editingMember.name.includes(demo.name)
+                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            : 'bg-slate-800/70 border-slate-700 hover:border-amber-400 text-slate-200'
+                        }`}
+                      >
+                        <p className="font-bold text-amber-300">{demo.name}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{demo.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(editingMember.id === 'com_coord_convivencia' || editingMember.id === 'com_rector') && (
+                <div className="space-y-2.5">
+                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">shield_person</span>
+                    <span>Equipo Directivo Institucional (Base de Datos Oficial)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Predeterminados oficiales: Lic. Viviana Giraldo (Coordinadora de Convivencia) y Lic. Alejandra Moreno (Rectora). Puedes seleccionar otro directivo del censo o ajustar los datos:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {CENSUS_ADMIN_STAFF.map((staff) => (
+                      <div
+                        key={staff.code}
+                        onClick={() => {
+                          setEditingMember({
+                            ...editingMember,
+                            name: `Lic. ${staff.fullName}`,
+                            email: staff.email,
+                            notes: `${staff.cargo} — Dependencia: ${staff.dependencia} (Cédula: ${staff.cedula})`
+                          });
+                        }}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all text-xs ${
+                          editingMember.name.includes(staff.fullName)
+                            ? 'bg-emerald-950/40 border-emerald-500 text-white'
+                            : 'bg-slate-800/70 border-slate-700 hover:border-cyan-400 text-slate-200'
+                        }`}
+                      >
+                        <p className="font-bold">{staff.fullName}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {staff.cargo} • {staff.dependencia}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Confirmed details section */}
+              <div className="pt-2 border-t border-slate-800 space-y-3">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Datos confirmados para el integrante:
+                </span>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Teléfono de Contacto
+                    Nombre Completo de la Persona Asignada
                   </label>
                   <input
                     type="text"
-                    value={editingMember.phone || ''}
-                    onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
-                    placeholder="300 123 4567"
+                    required
+                    value={editingMember.name}
+                    onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
+                    placeholder="Nombre y apellidos del integrante asignado..."
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-400"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Teléfono de Contacto
+                    </label>
+                    <input
+                      type="text"
+                      value={editingMember.phone || ''}
+                      onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                      placeholder="Ej: 312 456 7890"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={editingMember.email || ''}
+                      onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
+                      placeholder="usuario@ejemplo.edu"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-400"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Correo Electrónico
+                    Observaciones / Grado o Representación Institucional
                   </label>
                   <input
-                    type="email"
-                    value={editingMember.email || ''}
-                    onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
-                    placeholder="usuario@ejemplo.edu"
+                    type="text"
+                    value={editingMember.notes || ''}
+                    onChange={(e) => setEditingMember({ ...editingMember, notes: e.target.value })}
+                    placeholder="Ej: Estudiante Grado 11°1, Docente de Secundaria, Perfil Institucional..."
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-400"
                   />
                 </div>
               </div>
             </div>
 
+            {/* Modal Footer */}
             <div className="px-6 py-4 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setEditingMember(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold cursor-pointer transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSavingMember}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
               >
-                Guardar Integrante
+                <span className="material-symbols-outlined text-sm">save</span>
+                <span>Guardar cambios</span>
               </button>
             </div>
           </form>

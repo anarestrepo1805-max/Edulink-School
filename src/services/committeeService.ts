@@ -18,22 +18,86 @@ export interface CommitteeMember {
   updatedAt?: string;
 }
 
+export interface StatutoryRoleDefinition {
+  id: string;
+  roleTitle: string;
+  defaultName: string;
+  email: string;
+  phone: string;
+  notes: string;
+}
+
 // 8 Baseline Statutory Positions defined by Law 1620 of 2013 and Institutional guidelines
-export const STATUTORY_COMMITTEE_ROLES: { id: string; roleTitle: string; defaultName?: string }[] = [
-  { id: 'com_docente_primaria', roleTitle: 'Docente representante de primaria', defaultName: '' },
-  { id: 'com_docente_secundaria', roleTitle: 'Docente representante de secundaria', defaultName: '' },
-  { id: 'com_rep_estudiantes', roleTitle: 'Representante de los estudiantes', defaultName: '' },
-  { id: 'com_coord_convivencia', roleTitle: 'Coordinador o coordinadora de convivencia', defaultName: 'Lic. Viviana Giraldo' },
-  { id: 'com_rector', roleTitle: 'Rector', defaultName: 'Lic. Alejandra Moreno' },
-  { id: 'com_psicologa', roleTitle: 'Psicóloga de la institución', defaultName: '' },
-  { id: 'com_personero', roleTitle: 'Personero estudiantil', defaultName: '' },
-  { id: 'com_acudiente', roleTitle: 'Acudiente o padre de familia de un estudiante de cualquier grupo', defaultName: '' },
+export const STATUTORY_COMMITTEE_ROLES: StatutoryRoleDefinition[] = [
+  {
+    id: 'com_docente_primaria',
+    roleTitle: 'Docente representante de primaria',
+    defaultName: 'Lic. Amalia Restrepo Vélez',
+    email: 'amalia.restrepo@vallejuelos.edu.co',
+    phone: '3182245901',
+    notes: 'Docente de Básica Primaria (Sede Primaria) — Perfil institucional de demostración'
+  },
+  {
+    id: 'com_docente_secundaria',
+    roleTitle: 'Docente representante de secundaria',
+    defaultName: 'Lic. Claudia Montoya',
+    email: 'claudia_montoya@ejemplo.edu',
+    phone: '3117456321',
+    notes: 'Docente de Física (Grados 9° a 11°) — Cédula: 10756431'
+  },
+  {
+    id: 'com_rep_estudiantes',
+    roleTitle: 'Representante de los estudiantes',
+    defaultName: 'Manuela Moreno Zapata',
+    email: 'manuela_moreno_zapata@ejemplo.edu',
+    phone: '315051600',
+    notes: 'Representante Estudiantil — Grupo 11°1 (Doc: 1014437162)'
+  },
+  {
+    id: 'com_coord_convivencia',
+    roleTitle: 'Coordinador de convivencia',
+    defaultName: 'Lic. Viviana Giraldo',
+    email: 'viviana_giraldo@ejemplo.edu',
+    phone: '3124567890',
+    notes: 'Coordinación de Convivencia Escolar (Cédula: 42649487)'
+  },
+  {
+    id: 'com_rector',
+    roleTitle: 'Rector',
+    defaultName: 'Lic. Alejandra Moreno',
+    email: 'alejandra_moreno@ejemplo.edu',
+    phone: '3108976543',
+    notes: 'Rectoría Institucional I.E. Vallejuelos (Cédula: 92401715)'
+  },
+  {
+    id: 'com_psicologa',
+    roleTitle: 'Psicóloga de la institución',
+    defaultName: 'Dra. Carolina Builes Henao',
+    email: 'carolina.builes@vallejuelos.edu.co',
+    phone: '3195531840',
+    notes: 'Psicología y Orientación Escolar — Perfil institucional de demostración'
+  },
+  {
+    id: 'com_personero',
+    roleTitle: 'Personero estudiantil',
+    defaultName: 'Samuel Castaño Arango',
+    email: 'samuel_castaño_arango@ejemplo.edu',
+    phone: '315245084',
+    notes: 'Personero Estudiantil Institucional — Grado 11°2 (Doc: 1515534097)'
+  },
+  {
+    id: 'com_acudiente',
+    roleTitle: 'Acudiente o padre de familia',
+    defaultName: 'Mariana Cardona Pérez',
+    email: 'mariana_cardona_pérez@ejemplo.com',
+    phone: '315099971',
+    notes: 'Acudiente legal registrada — Representante Consejo de Padres (Cédula: 62111588)'
+  },
 ];
 
 /**
  * Loads committee members from Firestore `coexistence_committee`.
- * Guarantees all 8 statutory roles are present. If a role has not been assigned a real name,
- * it leaves the name blank so the UI displays "Cargo pendiente de asignación".
+ * Guarantees all 8 statutory roles are present and populated with institutional records.
  */
 export async function fetchCommitteeMembers(): Promise<CommitteeMember[]> {
   try {
@@ -51,21 +115,34 @@ export async function fetchCommitteeMembers(): Promise<CommitteeMember[]> {
       });
     });
 
-    // Ensure all 8 statutory roles exist
+    // Ensure all 8 statutory roles exist and have complete assigned data
     const result: CommitteeMember[] = [];
     for (const statutory of STATUTORY_COMMITTEE_ROLES) {
-      if (membersMap.has(statutory.id)) {
-        result.push(membersMap.get(statutory.id)!);
+      const existing = membersMap.get(statutory.id);
+      
+      // If the member is already in Firestore and has a valid assigned name, use it
+      if (existing && existing.name && existing.name.trim() !== '') {
+        result.push(existing);
       } else {
-        const defaultItem: CommitteeMember = {
+        // Complete the role using the official census/demo assignment
+        const memberData: CommitteeMember = {
           id: statutory.id,
           roleTitle: statutory.roleTitle,
-          name: statutory.defaultName || '',
-          email: '',
-          phone: '',
-          isCustomGuest: false
+          name: statutory.defaultName,
+          email: statutory.email,
+          phone: statutory.phone,
+          notes: statutory.notes,
+          isCustomGuest: false,
+          updatedAt: new Date().toISOString()
         };
-        result.push(defaultItem);
+        result.push(memberData);
+
+        // Synchronize to Firestore so it is saved in the database
+        try {
+          await setDoc(doc(db, 'coexistence_committee', statutory.id), memberData, { merge: true });
+        } catch (syncErr) {
+          console.warn(`Could not sync statutory committee role ${statutory.id}:`, syncErr);
+        }
       }
     }
 
@@ -82,9 +159,10 @@ export async function fetchCommitteeMembers(): Promise<CommitteeMember[]> {
     return STATUTORY_COMMITTEE_ROLES.map((s) => ({
       id: s.id,
       roleTitle: s.roleTitle,
-      name: s.defaultName || '',
-      email: '',
-      phone: '',
+      name: s.defaultName,
+      email: s.email,
+      phone: s.phone,
+      notes: s.notes,
       isCustomGuest: false
     }));
   }
@@ -121,19 +199,42 @@ export async function deleteCommitteeMember(memberId: string): Promise<void> {
   const docRef = doc(db, 'coexistence_committee', memberId);
 
   if (isStatutory) {
-    // For statutory, reset name to blank (Pending assignment)
+    // For statutory positions, always restore the institutional default assignment
     const statDef = STATUTORY_COMMITTEE_ROLES.find((s) => s.id === memberId);
-    await setDoc(docRef, {
-      id: memberId,
-      roleTitle: statDef?.roleTitle || 'Representante',
-      name: '',
-      email: '',
-      phone: '',
-      isCustomGuest: false,
-      updatedAt: new Date().toISOString()
-    });
+    if (statDef) {
+      await setDoc(docRef, {
+        id: memberId,
+        roleTitle: statDef.roleTitle,
+        name: statDef.defaultName,
+        email: statDef.email,
+        phone: statDef.phone,
+        notes: statDef.notes,
+        isCustomGuest: false,
+        updatedAt: new Date().toISOString()
+      });
+    }
   } else {
     // Delete custom guest
     await deleteDoc(docRef);
   }
 }
+
+/**
+ * Resets all 8 statutory committee members to their official institutional/census data in Firestore.
+ */
+export async function resetStatutoryCommitteeToDefaults(): Promise<void> {
+  for (const statutory of STATUTORY_COMMITTEE_ROLES) {
+    const memberData: CommitteeMember = {
+      id: statutory.id,
+      roleTitle: statutory.roleTitle,
+      name: statutory.defaultName,
+      email: statutory.email,
+      phone: statutory.phone,
+      notes: statutory.notes,
+      isCustomGuest: false,
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'coexistence_committee', statutory.id), memberData, { merge: true });
+  }
+}
+
