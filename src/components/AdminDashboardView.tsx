@@ -1378,12 +1378,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                                     <span>{member.phone}</span>
                                   </p>
                                 )}
-                                {member.email && (
-                                  <p className="text-xs text-slate-400 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs">mail</span>
-                                    <span className="truncate">{member.email}</span>
-                                  </p>
-                                )}
                                 {member.notes && (
                                   <p className="text-[11px] text-amber-300/90 bg-amber-500/10 px-2 py-1 rounded-md mt-1 flex items-center gap-1.5 border border-amber-500/20">
                                     <span className="material-symbols-outlined text-[13px] text-amber-400 shrink-0">badge</span>
