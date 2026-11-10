@@ -65,7 +65,7 @@ export async function fetchTeacherPublications(
  * Saves or updates a forum post or survey in Firestore.
  */
 export async function saveTeacherPublication(
-  publication: Omit<InstitutionalPublicationDoc, 'id'> & { id?: string }
+  publication: Omit<InstitutionalPublicationDoc, 'id' | 'createdAt'> & { id?: string; createdAt?: string }
 ): Promise<InstitutionalPublicationDoc> {
   const colRef = collection(db, 'institutional_publications');
   const docId = publication.id || `pub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;

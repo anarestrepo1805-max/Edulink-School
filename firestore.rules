@@ -77,14 +77,16 @@ service cloud.firestore {
       }
     }
 
-    // Coexistence committee members
-    match /coexistence_committee/{memberId} {
-      allow read, write: if true;
+    // Official institutional circulars
+    match /circulars/{circularId} {
+      allow read: if true;
+      allow write: if true;
     }
 
-    // Official institutional circulars and directives
-    match /institutional_circulars/{circularId} {
-      allow read, write: if true;
+    // Coexistence committee members
+    match /coexistence_committee/{memberId} {
+      allow read: if true;
+      allow write: if true;
     }
 
     match /users/{userId} {
