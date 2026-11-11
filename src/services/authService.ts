@@ -244,8 +244,8 @@ const DEMO_ACCOUNTS: Record<string, UserProfile> = {
     role: 'admin',
     documentId: '1020304050',
     employeeId: 'ADM-2026-002',
-    adminPosition: 'Dirección General & Administración',
-    department: 'Dirección General y Rectoría',
+    adminPosition: 'Coordinadora de Convivencia',
+    department: 'Coordinación de Convivencia Escolar',
     createdAt: '2026-01-01T08:00:00.000Z',
     hasConfigured: true,
     institution: 'I.E. Vallejuelos',
@@ -1979,6 +1979,22 @@ export async function loginUser(
       }
     } catch (e) {
       console.warn('Error resolving user via registered_emails:', e);
+    }
+  }
+
+  if (!profile) {
+    const demo = DEMO_ACCOUNTS[targetAuthEmail] || (cleanDoc ? DEMO_ACCOUNTS[cleanDoc] : null);
+    if (demo) {
+      profile = {
+        ...demo,
+        id: authUid,
+        email: targetAuthEmail
+      };
+      try {
+        await setDoc(doc(db, 'users', authUid), profile, { merge: true });
+      } catch (err) {
+        console.warn('Could not auto-sync profile to users collection:', err);
+      }
     }
   }
 

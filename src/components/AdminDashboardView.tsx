@@ -10,19 +10,24 @@ import {
 } from '../data/institutionalCensus';
 import {
   OfficialCircular,
-  CommitteeMember,
   fetchCirculars,
   saveCircular,
   deleteCircular,
-  fetchCommitteeMembers,
-  saveCommitteeMember,
-  deleteCommitteeMember,
-  generateCircularPdf,
-  generateManualConvivenciaPdf,
   generateIdentidadInstitucionalPdf,
   MANUAL_DE_CONVIVENCIA_DATA,
   INSTITUTIONAL_IDENTITY
 } from '../services/circularService';
+import {
+  downloadCircularPDF,
+  downloadManualDeConvivenciaPDF
+} from '../services/circularPdfService';
+import {
+  fetchCommitteeMembers,
+  saveCommitteeMember,
+  deleteCommitteeMember,
+  resetStatutoryCommitteeToDefaults,
+  CommitteeMember
+} from '../services/committeeService';
 import {
   fetchTeacherPublications,
   saveTeacherPublication,
@@ -42,13 +47,16 @@ import {
 
 interface AdminDashboardViewProps {
   currentUser: UserProfile;
+  currentScreen?: ActiveScreen;
   onNavigate: (screen: ActiveScreen) => void;
   onLogout: () => void;
   onUpdateUser: (user: UserProfile) => void;
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
-  currentUser
+  currentUser,
+  currentScreen,
+  onNavigate
 }) => {
   const { theme, language } = useThemeLanguage();
   const isDark = theme === 'dark';
@@ -57,6 +65,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   // Navigation tab state (Estudiantes y Certificados has been removed for Coordinador de Convivencia)
   const [selectedTab, setSelectedTab] = useState<'overview' | 'groups' | 'circulars' | 'forums' | 'chat'>('overview');
   const [circularSubTab, setCircularSubTab] = useState<'notices' | 'manual' | 'identity' | 'committee'>('notices');
+
+  // Synchronize with currentScreen if navigated from top bar
+  useEffect(() => {
+    if (currentScreen === 'admin_messaging') {
+      setSelectedTab('chat');
+    } else if (currentScreen === 'admin_forum') {
+      setSelectedTab('forums');
+    }
+  }, [currentScreen]);
 
   // General toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -136,6 +153,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   const handleSaveCircularSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingCircular) return; // Prevent duplicate clicks
     setCircularFormError('');
 
     if (!circTitle.trim()) {
@@ -159,10 +177,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         target: circTarget,
         urgency: circUrgency,
         author: currentUser.fullName || 'Ana Restrepo',
-        authorRole: currentUser.adminPosition || 'Coordinadora de Convivencia'
+        authorRole: currentUser.adminPosition || 'Coordinadora de Convivencia',
+        authorEmail: currentUser.email || 'anarestrepo1805@gmail.com',
+        authorId: currentUser.id || ''
       });
 
-      // Update local state immediately
+      // Update local state immediately with the confirmed saved circular from Firebase
       setCircularsList((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
       setShowDraftCircularModal(false);
       setCircTitle('');
@@ -1052,7 +1072,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
                           <div className="flex items-center gap-2 self-end md:self-start shrink-0">
                             <button
-                              onClick={() => generateCircularPdf(c)}
+                              onClick={() => downloadCircularPDF({
+                                title: c.title,
+                                author: `${c.author} (${c.authorRole})`,
+                                date: c.date,
+                                target: c.target,
+                                content: c.content
+                              })}
                               className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                                 isDark
                                   ? 'border-slate-700 bg-slate-800 text-white hover:bg-slate-700'
@@ -1110,7 +1136,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     </p>
                   </div>
                   <button
-                    onClick={() => generateManualConvivenciaPdf()}
+                    onClick={() => downloadManualDeConvivenciaPDF()}
                     className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer shadow-xs text-white ${
                       isDark ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#00288e] hover:bg-[#001f70]'
                     }`}

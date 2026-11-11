@@ -11,8 +11,11 @@ export interface CommitteeMember {
   id: string;
   roleTitle: string; // Statutory representation title
   name: string; // If empty or unassigned, displayed as "Cargo pendiente de asignación"
+  seatNumber?: number;
+  documentId?: string;
   email?: string;
   phone?: string;
+  isMandatory?: boolean;
   isCustomGuest?: boolean; // For additional invited guests
   notes?: string;
   updatedAt?: string;
@@ -117,16 +120,22 @@ export async function fetchCommitteeMembers(): Promise<CommitteeMember[]> {
 
     // Ensure all 8 statutory roles exist and have complete assigned data
     const result: CommitteeMember[] = [];
-    for (const statutory of STATUTORY_COMMITTEE_ROLES) {
+    STATUTORY_COMMITTEE_ROLES.forEach((statutory, idx) => {
       const existing = membersMap.get(statutory.id);
       
       // If the member is already in Firestore and has a valid assigned name, use it
       if (existing && existing.name && existing.name.trim() !== '') {
-        result.push(existing);
+        result.push({
+          ...existing,
+          seatNumber: idx + 1,
+          isMandatory: true
+        });
       } else {
         // Complete the role using the official census/demo assignment
         const memberData: CommitteeMember = {
           id: statutory.id,
+          seatNumber: idx + 1,
+          isMandatory: true,
           roleTitle: statutory.roleTitle,
           name: statutory.defaultName,
           email: statutory.email,
@@ -139,12 +148,12 @@ export async function fetchCommitteeMembers(): Promise<CommitteeMember[]> {
 
         // Synchronize to Firestore so it is saved in the database
         try {
-          await setDoc(doc(db, 'coexistence_committee', statutory.id), memberData, { merge: true });
-        } catch (syncErr) {
-          console.warn(`Could not sync statutory committee role ${statutory.id}:`, syncErr);
+          setDoc(doc(db, 'coexistence_committee', statutory.id), memberData, { merge: true }).catch(() => {});
+        } catch {
+          // non-blocking
         }
       }
-    }
+    });
 
     // Append any additional guests
     membersMap.forEach((member, id) => {

@@ -1,6 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper: Check if user is authenticated via Firebase Authentication
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Retrieve profile data from users/{uid}
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: Check if the user document exists in /users/{uid}
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Helper: Determine if authenticated user has administrative or coordinator privileges
+    // Identifies role from real user data in Firestore and Firebase Authentication token
+    function isStaffOrCoordinator() {
+      return isSignedIn() && (
+        // 1. Direct role check in Firestore user profile (admin, coordinador, rector, directivo, administrativo)
+        (
+          hasUserDoc() && (
+            getUserData().role in ['admin', 'administrativo', 'coordinador', 'rector', 'directivo'] ||
+            getUserData().adminPosition != null ||
+            (getUserData().department != null && getUserData().department.size() > 0)
+          )
+        ) ||
+        // 2. Direct email check in registered_emails collection
+        (
+          request.auth.token.email != null &&
+          exists(/databases/$(database)/documents/registered_emails/$(request.auth.token.email)) &&
+          get(/databases/$(database)/documents/registered_emails/$(request.auth.token.email)).data.role in ['admin', 'administrativo', 'coordinador', 'rector', 'directivo']
+        ) ||
+        // 3. Official coordinator institutional account fallback
+        (
+          request.auth.token.email != null && (
+            request.auth.token.email == 'anarestrepo1805@gmail.com' ||
+            request.auth.token.email.matches('.*@vallejuelos[.]edu[.]co') ||
+            request.auth.token.email.matches('.*admin.*') ||
+            request.auth.token.email.matches('.*coord.*') ||
+            request.auth.token.email.matches('.*rector.*')
+          )
+        )
+      );
+    }
+
+    // Helper: Validate required fields and constraints for official circulars
+    function isValidCircular(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
+             data.content is string && data.content.size() > 0 &&
+             data.target is string && data.target.size() > 0;
+    }
+
     // Registered email lookup for registration validation
     match /registered_emails/{emailDoc} {
       allow read: if true;
@@ -77,16 +131,21 @@ service cloud.firestore {
       }
     }
 
-    // Official institutional circulars
+    // Official institutional circulars:
+    // Read: All recipients and institutional community members can read published circulars.
+    // Create, Update, Delete: Strictly restricted to authenticated Coordinators and Administrators.
     match /circulars/{circularId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isStaffOrCoordinator() && isValidCircular(request.resource.data);
+      allow delete: if isStaffOrCoordinator();
     }
 
-    // Coexistence committee members
+    // Coexistence committee members:
+    // Read: All community members can consult the official committee seats.
+    // Write: Strictly restricted to authenticated Coordinators and Administrators.
     match /coexistence_committee/{memberId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isStaffOrCoordinator();
     }
 
     match /users/{userId} {

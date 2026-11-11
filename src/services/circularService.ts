@@ -7,7 +7,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import jsPDF from 'jspdf';
 
 export interface OfficialCircular {
@@ -18,6 +18,8 @@ export interface OfficialCircular {
   date: string;
   author: string;
   authorRole: string;
+  authorEmail?: string;
+  authorId?: string;
   createdAt: string;
   urgency?: 'normal' | 'alta' | 'urgente';
 }
@@ -341,7 +343,19 @@ export async function saveCircular(
     throw new Error('Debe especificar los destinatarios de la circular.');
   }
 
+  // Ensure Firebase Auth state has completed initialization (e.g. after page reload)
+  if (typeof auth.authStateReady === 'function') {
+    try {
+      await auth.authStateReady();
+    } catch {
+      // ignore
+    }
+  }
+
   const id = data.id || `circ_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const authorEmail = data.authorEmail || auth.currentUser?.email || '';
+  const authorId = data.authorId || auth.currentUser?.uid || '';
+
   const payload: OfficialCircular = {
     id,
     title: data.title.trim(),
@@ -350,13 +364,23 @@ export async function saveCircular(
     date: data.date || new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }),
     author: data.author?.trim() || 'Coordinación de Convivencia',
     authorRole: data.authorRole?.trim() || 'Coordinador(a) de Convivencia',
+    authorEmail,
+    authorId,
     createdAt: data.createdAt || new Date().toISOString(),
     urgency: data.urgency || 'normal'
   };
 
-  const docRef = doc(db, 'circulars', id);
-  await setDoc(docRef, payload, { merge: true });
-  return payload;
+  try {
+    const docRef = doc(db, 'circulars', id);
+    await setDoc(docRef, payload, { merge: true });
+    return payload;
+  } catch (err: any) {
+    console.error('Error saving circular in Firestore:', err);
+    if (err?.code === 'permission-denied' || err?.message?.includes('insufficient permissions')) {
+      throw new Error('Permisos insuficientes en Firebase: Solo los usuarios con rol de Coordinación o Administración pueden publicar circulares oficiales.');
+    }
+    throw new Error(err?.message || 'Error al guardar la circular en Firestore.');
+  }
 }
 
 export async function deleteCircular(circularId: string): Promise<void> {
