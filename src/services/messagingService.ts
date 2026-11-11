@@ -361,6 +361,9 @@ export async function sendChatMessage(params: {
   };
 }): Promise<ChatMessage> {
   const { sender, recipient, text, citation } = params;
+  if (!text || !text.trim()) {
+    throw new Error('Debes escribir un mensaje para poder enviarlo.');
+  }
   const senderId = (sender.documentId || sender.id || '30880317').toString().trim();
   const recipientId = (recipient.id || (recipient as any).cedula || '43521980').toString().trim();
   const conversationId = getDeterministicConversationId(senderId, recipientId);

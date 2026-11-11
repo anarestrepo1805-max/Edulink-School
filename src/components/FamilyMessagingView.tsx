@@ -39,6 +39,7 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [chatValidationError, setChatValidationError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -126,8 +127,13 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
   // Send reply message
   const handleSendMessage = async (e?: React.FormEvent, directText?: string) => {
     if (e) e.preventDefault();
-    const content = directText || replyText;
-    if (!content.trim() || isSending) return;
+    const content = directText !== undefined ? directText : replyText;
+    if (!content.trim()) {
+      setChatValidationError('Debes escribir un mensaje para poder enviarlo.');
+      return;
+    }
+    setChatValidationError(null);
+    if (isSending) return;
 
     const recipient = otherParticipant || selectedRecipient;
     if (!recipient) {
@@ -613,38 +619,59 @@ export const FamilyMessagingView: React.FC<FamilyMessagingViewProps> = ({
               {/* Reply Form */}
               <form
                 onSubmit={handleSendMessage}
-                className={`p-3.5 border-t flex gap-2 shrink-0 ${
+                className={`p-3.5 border-t flex flex-col gap-1.5 shrink-0 ${
                   isDark ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50'
                 }`}
               >
-                <input
-                  type="text"
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder={
-                    otherParticipant || selectedRecipient
-                      ? isEn
-                        ? `Message ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
-                        : `Escribir a ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
-                      : isEn
-                      ? 'Select a conversation first...'
-                      : 'Selecciona una conversación...'
-                  }
-                  disabled={!otherParticipant && !selectedRecipient}
-                  className={`flex-1 px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
-                    isDark
-                      ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
-                      : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-cyan-600'
-                  }`}
-                />
-                <button
-                  type="submit"
-                  disabled={isSending || (!otherParticipant && !selectedRecipient) || !replyText.trim()}
-                  className="px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-600/20 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
-                >
-                  <span className="material-symbols-outlined text-base">send</span>
-                  <span className="hidden sm:inline">{isEn ? 'Send' : 'Enviar'}</span>
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={replyText}
+                    onChange={(e) => {
+                      setReplyText(e.target.value);
+                      if (chatValidationError && e.target.value.trim()) {
+                        setChatValidationError(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder={
+                      otherParticipant || selectedRecipient
+                        ? isEn
+                          ? `Message ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
+                          : `Escribir a ${otherParticipant?.fullName || selectedRecipient?.fullName}...`
+                        : isEn
+                        ? 'Select a conversation first...'
+                        : 'Selecciona una conversación...'
+                    }
+                    disabled={!otherParticipant && !selectedRecipient}
+                    className={`flex-1 px-4 py-2.5 rounded-2xl text-xs border focus:outline-none transition-all ${
+                      chatValidationError
+                        ? 'border-rose-500 focus:border-rose-500'
+                        : isDark
+                        ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                        : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-cyan-600'
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSending || (!otherParticipant && !selectedRecipient)}
+                    className="px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-600/20 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-base">send</span>
+                    <span className="hidden sm:inline">{isEn ? 'Send' : 'Enviar'}</span>
+                  </button>
+                </div>
+                {chatValidationError && (
+                  <p className="text-xs text-rose-500 font-medium flex items-center gap-1 pl-1">
+                    <span className="material-symbols-outlined text-[14px]">error</span>
+                    <span>{chatValidationError}</span>
+                  </p>
+                )}
               </form>
             </div>
           </div>

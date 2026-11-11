@@ -69,6 +69,7 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
 
   // Message Form State
   const [replyText, setReplyText] = useState('');
+  const [chatValidationError, setChatValidationError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -269,7 +270,12 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
   // Enviar mensaje en el chat con guardado en Firestore y aparición inmediata en la conversación
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!replyText.trim() || isSending) return;
+    if (!replyText.trim()) {
+      setChatValidationError('Debes escribir un mensaje para poder enviarlo.');
+      return;
+    }
+    setChatValidationError(null);
+    if (isSending) return;
 
     const recipient = otherParticipant || selectedRecipient;
     if (!recipient) {
@@ -797,41 +803,54 @@ export const TeacherMessagingView: React.FC<TeacherMessagingViewProps> = ({
               {(selectedConvId || selectedRecipient) && (
                 <form
                   onSubmit={handleSendMessage}
-                  className={`p-4 border-t flex items-center gap-3 shrink-0 ${
+                  className={`p-4 border-t flex flex-col gap-2 shrink-0 ${
                     isDark ? 'border-slate-800 bg-slate-950/80' : 'border-[#e5eeff] bg-white'
                   }`}
                 >
-                  <input
-                    type="text"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        if (replyText.trim() && !isSending) {
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => {
+                        setReplyText(e.target.value);
+                        if (chatValidationError && e.target.value.trim()) {
+                          setChatValidationError(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
                           handleSendMessage();
                         }
+                      }}
+                      placeholder={
+                        isEn
+                          ? 'Type an official message or response...'
+                          : 'Escribe un mensaje o respuesta institucional...'
                       }
-                    }}
-                    placeholder={
-                      isEn
-                        ? 'Type an official message or response...'
-                        : 'Escribe un mensaje o respuesta institucional...'
-                    }
-                    className={`flex-1 px-4 py-3 rounded-xl text-xs focus:outline-none border transition-all ${
-                      isDark
-                        ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500'
-                        : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30] placeholder:text-[#757684] focus:border-[#0051d5]'
-                    }`}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSending || !replyText.trim()}
-                    className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-2"
-                  >
-                    <span>{isEn ? 'Send' : 'Enviar'}</span>
-                    <span className="material-symbols-outlined text-base">send</span>
-                  </button>
+                      className={`flex-1 px-4 py-3 rounded-xl text-xs focus:outline-none border transition-all ${
+                        chatValidationError
+                          ? 'border-rose-500 focus:border-rose-500'
+                          : isDark
+                          ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500'
+                          : 'bg-[#eff4ff] border-[#dce9ff] text-[#0b1c30] placeholder:text-[#757684] focus:border-[#0051d5]'
+                      }`}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSending}
+                      className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-2"
+                    >
+                      <span>{isEn ? 'Send' : 'Enviar'}</span>
+                      <span className="material-symbols-outlined text-base">send</span>
+                    </button>
+                  </div>
+                  {chatValidationError && (
+                    <p className="text-xs text-rose-500 font-medium flex items-center gap-1 pl-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span>
+                      <span>{chatValidationError}</span>
+                    </p>
+                  )}
                 </form>
               )}
             </section>

@@ -401,6 +401,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
   const [chatMessageText, setChatMessageText] = useState('');
+  const [chatValidationError, setChatValidationError] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [recipientsList, setRecipientsList] = useState<RecipientOption[]>([]);
   const [chatSearchRecipient, setChatSearchRecipient] = useState('');
@@ -421,6 +422,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   }, [effectiveUserId]);
 
   useEffect(() => {
+    setChatValidationError(null);
     if (!activeConversationId) {
       setActiveMessages([]);
       return;
@@ -433,7 +435,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!chatMessageText.trim() || !activeConversationId || isSendingMessage) return;
+    if (!chatMessageText.trim()) {
+      setChatValidationError('Debes escribir un mensaje para poder enviarlo.');
+      return;
+    }
+    setChatValidationError(null);
+    if (!activeConversationId || isSendingMessage) return;
 
     const currentConv = conversations.find((c) => c.id === activeConversationId);
     if (!currentConv) return;
@@ -1656,26 +1663,41 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     </div>
 
                     {/* Message Input */}
-                    <form onSubmit={handleSendMessage} className="pt-3 border-t flex gap-2">
-                      <input
-                        type="text"
-                        value={chatMessageText}
-                        onChange={(e) => setChatMessageText(e.target.value)}
-                        placeholder="Escribe un mensaje de orientación o citación para la familia..."
-                        className={`flex-1 px-4 py-2.5 text-xs rounded-xl border outline-none ${
-                          isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-[#f8f9ff] border-[#dce9ff] text-[#0b1c30]'
-                        }`}
-                      />
-                      <button
-                        type="submit"
-                        disabled={isSendingMessage || !chatMessageText.trim()}
-                        className={`px-4 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                          isDark ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#00288e] hover:bg-[#001f70]'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[16px]">send</span>
-                        <span>Enviar</span>
-                      </button>
+                    <form onSubmit={handleSendMessage} className="pt-3 border-t flex flex-col gap-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatMessageText}
+                          onChange={(e) => {
+                            setChatMessageText(e.target.value);
+                            if (chatValidationError && e.target.value.trim()) {
+                              setChatValidationError(null);
+                            }
+                          }}
+                          placeholder="Escribe un mensaje de orientación o citación para la familia..."
+                          className={`flex-1 px-4 py-2.5 text-xs rounded-xl border outline-none ${
+                            chatValidationError
+                              ? 'border-rose-500 focus:border-rose-500'
+                              : isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-[#f8f9ff] border-[#dce9ff] text-[#0b1c30]'
+                          }`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSendingMessage}
+                          className={`px-4 py-2.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                            isDark ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#00288e] hover:bg-[#001f70]'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">send</span>
+                          <span>Enviar</span>
+                        </button>
+                      </div>
+                      {chatValidationError && (
+                        <p className="text-xs text-rose-500 font-medium flex items-center gap-1 pl-1">
+                          <span className="material-symbols-outlined text-[14px]">error</span>
+                          <span>{chatValidationError}</span>
+                        </p>
+                      )}
                     </form>
                   </>
                 ) : (

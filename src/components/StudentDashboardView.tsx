@@ -98,6 +98,33 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
     return getOfficialScheduleForGrade(currentUser?.gradeLevel || currentUser?.group || '11-1');
   }, [currentUser?.gradeLevel, currentUser?.group]);
 
+  // Identify Mariana Cardona Pérez (Grado 11°1, Doc: 1215314710)
+  const isMarianaCardona11_1 = useMemo(() => {
+    if (!currentUser) return false;
+    const docId = (currentUser.documentId || currentUser.id || '').trim();
+    if (docId === '1215314710') return true;
+
+    const name = (currentUser.fullName || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+    const grade = (currentUser.gradeLevel || currentUser.group || '').toLowerCase().trim();
+    const email = (currentUser.email || '').toLowerCase().trim();
+
+    const isNameMatch = name.includes('mariana') && name.includes('cardona');
+    const is11_1 =
+      grade.includes('11-1') ||
+      grade.includes('11°1') ||
+      grade === '11' ||
+      grade === '11-01' ||
+      (grade.includes('11') && !grade.includes('11-2') && !grade.includes('11°2'));
+
+    if (isNameMatch && is11_1) return true;
+    if (email.includes('mariana_cardona') && is11_1) return true;
+    return false;
+  }, [currentUser]);
+
   const [filterUrgentOnly, setFilterUrgentOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -967,53 +994,70 @@ export const StudentDashboardView: React.FC<StudentDashboardViewProps> = ({
 
             {/* Schedule Table Body */}
             <div className="p-4 sm:p-6 overflow-x-auto overflow-y-auto flex-1">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
-                    isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
+              {isMarianaCardona11_1 ? (
+                <div className="py-16 sm:py-20 px-6 flex flex-col items-center justify-center text-center">
+                  <div
+                    className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 border ${
+                      isDark ? 'bg-slate-800/80 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[34px]">calendar_today</span>
+                  </div>
+                  <p className={`text-base sm:text-lg font-semibold max-w-lg leading-relaxed ${
+                    isDark ? 'text-slate-200' : 'text-[#0b1c30]'
                   }`}>
-                    <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Tuesday' : 'Martes'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Wednesday' : 'Miércoles'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Thursday' : 'Jueves'}</th>
-                    <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                  {officialSchedule.map((slot) => (
-                    <tr
-                      key={slot.period}
-                      className={`transition-colors ${
-                        isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
-                      }`}
-                    >
-                      <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400">
-                        <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
-                          {isEn ? `Period ${slot.period}` : `Hora ${slot.period}`}
-                        </div>
-                        <div>{slot.time}</div>
-                      </td>
-                      {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
-                        <td key={idx} className="py-2.5 px-3 align-top">
-                          <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
-                            isDark
-                              ? 'bg-slate-800/80 border-slate-700/60'
-                              : 'bg-white border-slate-200/80 shadow-2xs'
-                          }`}>
-                            <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
-                              {cell.subject}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                              {cell.teacher}
-                            </span>
-                          </div>
-                        </td>
-                      ))}
+                    Todavía no hay un horario disponible para tu grupo. Por favor, consulta más adelante.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
+                      isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-[#444653]'
+                    }`}>
+                      <th className="py-3 px-3 w-28">{isEn ? 'Period & Time' : 'Hora / Bloque'}</th>
+                      <th className="py-3 px-3">{isEn ? 'Monday' : 'Lunes'}</th>
+                      <th className="py-3 px-3">{isEn ? 'Tuesday' : 'Martes'}</th>
+                      <th className="py-3 px-3">{isEn ? 'Wednesday' : 'Miércoles'}</th>
+                      <th className="py-3 px-3">{isEn ? 'Thursday' : 'Jueves'}</th>
+                      <th className="py-3 px-3">{isEn ? 'Friday' : 'Viernes'}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                    {officialSchedule.map((slot) => (
+                      <tr
+                        key={slot.period}
+                        className={`transition-colors ${
+                          isDark ? 'hover:bg-slate-850/60' : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="py-3 px-3 align-top font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400">
+                          <div className="font-sans font-bold text-slate-700 dark:text-slate-300">
+                            {isEn ? `Period ${slot.period}` : `Hora ${slot.period}`}
+                          </div>
+                          <div>{slot.time}</div>
+                        </td>
+                        {[slot.monday, slot.tuesday, slot.wednesday, slot.thursday, slot.friday].map((cell, idx) => (
+                          <td key={idx} className="py-2.5 px-3 align-top">
+                            <div className={`p-2.5 rounded-xl border flex flex-col gap-0.5 ${
+                              isDark
+                                ? 'bg-slate-800/80 border-slate-700/60'
+                                : 'bg-white border-slate-200/80 shadow-2xs'
+                            }`}>
+                              <span className="font-bold text-xs leading-tight text-slate-900 dark:text-slate-100">
+                                {cell.subject}
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                {cell.teacher}
+                              </span>
+                            </div>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Footer */}
